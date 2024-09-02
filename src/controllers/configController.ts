@@ -80,5 +80,18 @@ export const updateConfiguration = async (req: Request, res: Response) => {
 };
 
 export const deleteConfiguration = async (req: Request, res: Response) => {
-    console.log('deleteConfiguration')
+    const { id } = req.params;
+
+    try {
+        const configuration = await Configuration.findByPk(id);
+
+        if (!configuration) {
+            return res.status(404).json({ message: 'Configuration not found' });
+        }
+
+        await configuration.destroy();
+        res.json({ message: 'Configuration deleted' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting configuration', error });
+    }
 };
