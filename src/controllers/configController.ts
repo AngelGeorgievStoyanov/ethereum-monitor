@@ -3,9 +3,13 @@ import Configuration from '../models/configuration';
 
 
 export const getConfigurations = async (req: Request, res: Response) => {
-    console.log('getConfigurations')
+    try {
+        const configurations = await Configuration.findAll();
+        res.json(configurations);
+    } catch (error) {
+        res.status(500).json({ message: 'Error retrieving configurations', error });
+    }
 };
-
 
 export const createConfiguration = async (req: Request, res: Response) => {
     const {
