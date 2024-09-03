@@ -1,3 +1,5 @@
+import { QueryTypes  } from 'sequelize'; 
+import sequelize from '../database';
 import Transaction from '../models/transaction';
 import TransactionAttributes from '../models/transaction';
 import { Request, Response } from 'express';
@@ -110,3 +112,24 @@ export async function deleteTransactionsWithQuery(req: Request, res: Response): 
     }
 }
 
+
+export async function getTransactionsWithQuery(req: Request, res: Response): Promise<Response> {
+    try {
+        const { sql } = req.query;
+      
+        if (!sql) {
+            return res.status(400).json({ message: 'SQL query is required as a query parameter' });
+        }
+
+       
+        const transactions = await sequelize.query(sql as string, {
+            type: QueryTypes.SELECT, 
+            replacements: req.query 
+        });
+
+        return res.status(200).json(transactions);
+    } catch (error) {
+        console.error('Error executing SQL query:', error);
+        return res.status(500).json({ message: 'Failed to retrieve transactions', error: error.message });
+    }
+}
