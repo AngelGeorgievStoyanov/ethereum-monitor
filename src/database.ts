@@ -1,8 +1,11 @@
 import { Sequelize } from 'sequelize';
-import { configInfura } from './config/config';
+import * as dotenv from 'dotenv';
+import Configuration from './models/configuration';
+import Transaction from './models/transaction';
 
+dotenv.config();
 
-const sequelize = new Sequelize(configInfura.databaseUrl, {
+const sequelize = new Sequelize(process.env.DATABASE_URL || 'sqlite:./db.sqlite', {
   dialect: 'sqlite',
   logging: false,
 });

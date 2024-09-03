@@ -1,5 +1,6 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../database';
+import Transaction from './transaction';
 
 
 
@@ -69,6 +70,9 @@ class Configuration extends Model<ConfigurationAttributes, ConfigurationCreation
     public isActive?: boolean;
     public monitoringMode?: MonitoringMode;
     public requiredConfirmations?: number;
+    public static associate() {
+        this.hasMany(Transaction, { foreignKey: 'configurationId' });
+    }
 }
 
 Configuration.init(

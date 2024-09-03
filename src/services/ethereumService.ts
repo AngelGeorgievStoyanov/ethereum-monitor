@@ -3,6 +3,18 @@ import { configInfura } from '../config/config';
 import Configuration from '../models/configuration';
 import async from 'async';
 import { QueueObject } from 'async';
+import { createTransactionFromEthereumData } from './transactionService';
+
+// The singleton instance holder
+let ethereumServiceInstance: ReturnType<typeof createEthereumService> | undefined;
+
+export function getEthereumService() {
+    if (!ethereumServiceInstance) {
+        ethereumServiceInstance = createEthereumService();
+    }
+
+    return ethereumServiceInstance;
+}
 
 export function createEthereumService() {
     const provider = new ethers.WebSocketProvider(`wss://mainnet.infura.io/ws/v3/${configInfura.infuraProjectId}`);
@@ -130,6 +142,7 @@ export function createEthereumService() {
         for (const config of configurations.values()) {
             if (config.isActive && await matchesConfiguration(tx, receipt, config)) {
                 console.log(`Transaction ${tx.hash} matches configuration ${config.id}`);
+                await createTransactionFromEthereumData(tx, receipt, config);
             }
         }
     }
@@ -273,18 +286,35 @@ export function createEthereumService() {
     }
 
     async function addConfiguration(config: Configuration) {
-        configurations.set(config.id, config);
-        if (config.monitoringMode) {
+        if (config.monitoringMode && config.isActive) {
+            configurations.set(config.id, config);
             await switchMonitoringModes([config.monitoringMode]);
         }
     }
 
     async function updateConfiguration(config: Configuration) {
-        if (config.isActive) {
-            configurations.set(config.id, config);
-            await initializeMonitoringModes();
-        } else {
-            await removeConfiguration(config.id);
+
+        const currentConfig = configurations.get(config.id);
+
+        if (currentConfig) {
+
+            const oldMode = currentConfig.monitoringMode;
+            const newMode = config.monitoringMode;
+
+            if (config.isActive) {
+                configurations.set(config.id, config);
+
+                if (oldMode !== newMode) {
+                    console.log(`Switching monitoring modes from ${oldMode} to ${newMode}`);
+
+                    //If necessary force stop all current monitoring modes
+                    await stopMonitoring();
+
+                    await switchMonitoringModes([newMode]);
+                }
+            } else {
+                await removeConfiguration(config.id);
+            }
         }
     }
 
