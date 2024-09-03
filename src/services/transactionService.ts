@@ -56,3 +56,14 @@ export async function getAllStoredTransactions(req: Request, res: Response): Pro
 }
 
 
+export async function deleteAllTransactions(req: Request, res: Response): Promise<void> {
+    try {
+     const destr=   await Transaction.destroy({ where: {} });
+     console.log(destr)
+        res.status(200).json({ message: 'All transactions deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting transactions:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+}
+

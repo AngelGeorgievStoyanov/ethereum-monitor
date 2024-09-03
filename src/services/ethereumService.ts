@@ -293,28 +293,15 @@ export function createEthereumService() {
     }
 
     async function updateConfiguration(config: Configuration) {
+        if (config.isActive) {
+            configurations.set(config.id, config);
+          
+            await stopMonitoring();
 
-        const currentConfig = configurations.get(config.id);
+            await switchMonitoringModes([config.monitoringMode]);
 
-        if (currentConfig) {
-
-            const oldMode = currentConfig.monitoringMode;
-            const newMode = config.monitoringMode;
-
-            if (config.isActive) {
-                configurations.set(config.id, config);
-
-                if (oldMode !== newMode) {
-                    console.log(`Switching monitoring modes from ${oldMode} to ${newMode}`);
-
-                    //If necessary force stop all current monitoring modes
-                    await stopMonitoring();
-
-                    await switchMonitoringModes([newMode]);
-                }
-            } else {
-                await removeConfiguration(config.id);
-            }
+        } else {
+            await removeConfiguration(config.id);
         }
     }
 
@@ -331,11 +318,6 @@ export function createEthereumService() {
     }
 
     async function switchMonitoringModes(newModes: ('blocks' | 'pending')[]) {
-        const newModesSet = new Set(newModes);
-
-        if (monitoringModes.size === newModesSet.size && [...monitoringModes].every(mode => newModesSet.has(mode))) {
-            return;
-        }
 
         monitoringModes.clear();
         newModes.forEach(mode => monitoringModes.add(mode));
