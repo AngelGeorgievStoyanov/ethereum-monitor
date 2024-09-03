@@ -1,5 +1,6 @@
 import Transaction from '../models/transaction';
 import TransactionAttributes from '../models/transaction';
+import { Request, Response } from 'express';
 
 export async function createTransactionFromEthereumData(tx: any, receipt: any, config: any) {
     const data: Partial<TransactionAttributes> = {
@@ -43,5 +44,15 @@ export async function createTransactionFromEthereumData(tx: any, receipt: any, c
     }
 }
 
+
+export async function getAllStoredTransactions(req: Request, res: Response): Promise<void> {
+    try {
+        const transactions = await Transaction.findAll(); 
+        res.json(transactions);
+    } catch (error) {
+        console.error('Error fetching transactions:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+}
 
 

@@ -2,6 +2,7 @@ import express from 'express';
 import sequelize from './database';
 import configRoutes from './routes/configRoutes';
 import { getEthereumService } from './services/ethereumService';
+import transactionRoutes from './routes/transactionRoutes';
 
 const app = express();
 const PORT = 8080;
@@ -20,7 +21,7 @@ async function startServer() {
     console.log('Database connected');
 
     app.use('/api/configurations', configRoutes);
-
+    app.use('/api/transactions', transactionRoutes);
     await ethereumService.loadConfigurations();
 
     app.listen(PORT, () => {
