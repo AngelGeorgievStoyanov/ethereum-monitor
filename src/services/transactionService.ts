@@ -67,3 +67,46 @@ export async function deleteAllTransactions(req: Request, res: Response): Promis
     }
 }
 
+export async function deleteTransactionById(req: Request, res: Response): Promise<void> {
+    const { id } = req.params;
+    try {
+        const result = await Transaction.destroy({ where: { id } });
+        if (result === 0) {
+            res.status(404).send('Transaction not found');
+        } else {
+            res.status(200).json({ message: 'Transaction deleted successfully' });
+        }
+    } catch (error) {
+        console.error('Error deleting transaction:', error);
+        res.status(500).send('Internal Server Error');
+    }
+}
+
+
+export async function deleteTransactionsWithQuery(req: Request, res: Response): Promise<Response> {
+    try {
+        const { where } = req.query;
+
+        let whereClause: any = {};
+
+        if (where) {
+            try {
+                whereClause = JSON.parse(where as string);
+            } catch (error) {
+                return res.status(400).json({ message: 'Invalid "where" query parameter format' });
+            }
+        }
+
+        const deleted = await Transaction.destroy({ where: whereClause });
+
+        if (deleted > 0) {
+            res.status(200).json({ message: `${deleted} transactions deleted successfully` });
+        } else {
+            res.status(404).json({ message: 'No transactions found to delete' });
+        }
+    } catch (error) {
+        console.error('Error deleting transactions:', error);
+        res.status(500).json({ message: 'Failed to delete transactions', error: error.message });
+    }
+}
+
