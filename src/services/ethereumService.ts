@@ -37,8 +37,108 @@ export function getEthereumService() {
     return ethereumServiceInstance;
 }
 
+function summarizeRpcResult(method: string, result: any): string {
+    if (result === null || result === undefined) {
+        return String(result);
+    }
+
+    if (typeof result !== 'object') {
+        return String(result);
+    }
+
+    if (method === 'eth_getBlockByNumber' || method === 'eth_getBlockByHash') {
+        return JSON.stringify({
+            number: result.number,
+            hash: result.hash,
+            transactions: Array.isArray(result.transactions) ? result.transactions.length : undefined,
+        });
+    }
+
+    if (method === 'eth_getTransactionReceipt') {
+        return JSON.stringify({
+            transactionHash: result.transactionHash,
+            blockNumber: result.blockNumber,
+            status: result.status,
+        });
+    }
+
+    if (method === 'eth_getTransactionByHash') {
+        return JSON.stringify({
+            hash: result.hash,
+            blockNumber: result.blockNumber,
+            from: result.from,
+            to: result.to,
+        });
+    }
+
+    return JSON.stringify({ type: Array.isArray(result) ? 'array' : 'object', keys: Object.keys(result).slice(0, 12) });
+}
+
+function attachInfuraRequestLogging(
+    provider: ethers.JsonRpcProvider | ethers.WebSocketProvider,
+    transport: 'HTTP' | 'WebSocket'
+) {
+    const pending = new Map<string, { method: string; startedAt: number }>();
+
+    provider.on('debug', (event: any) => {
+        const timestamp = new Date().toISOString();
+
+        if (event.action === 'sendRpcPayload') {
+            const payloads = Array.isArray(event.payload) ? event.payload : [event.payload];
+
+            for (const payload of payloads) {
+                if (!payload || payload.id === undefined) {
+                    continue;
+                }
+
+                const id = String(payload.id);
+                const method = String(payload.method || 'unknown');
+                pending.set(id, { method, startedAt: Date.now() });
+                console.log(`[Infura][${transport}][REQUEST] ${timestamp} id=${id} method=${method} params=${JSON.stringify(payload.params ?? [])}`);
+            }
+            return;
+        }
+
+        if (event.action === 'receiveRpcResult') {
+            const responses = Array.isArray(event.result) ? event.result : [event.result];
+
+            for (const response of responses) {
+                if (!response || response.id === undefined) {
+                    continue;
+                }
+
+                const id = String(response.id);
+                const request = pending.get(id);
+                const durationMs = request ? Date.now() - request.startedAt : undefined;
+                const method = request?.method || 'unknown';
+                pending.delete(id);
+                console.log(`[Infura][${transport}][RESPONSE] ${timestamp} id=${id} method=${method} durationMs=${durationMs ?? 'unknown'} result=${summarizeRpcResult(method, response.result)}`);
+            }
+            return;
+        }
+
+        if (event.action === 'receiveRpcError') {
+            const payloads = Array.isArray(event.payload) ? event.payload : [event.payload];
+
+            for (const payload of payloads) {
+                if (!payload || payload.id === undefined) {
+                    continue;
+                }
+
+                const id = String(payload.id);
+                const request = pending.get(id);
+                const durationMs = request ? Date.now() - request.startedAt : undefined;
+                const method = request?.method || payload.method || 'unknown';
+                pending.delete(id);
+                console.error(`[Infura][${transport}][ERROR] ${timestamp} id=${id} method=${method} durationMs=${durationMs ?? 'unknown'} error=${event.error instanceof Error ? event.error.message : JSON.stringify(event.error)}`);
+            }
+        }
+    });
+}
+
 export function createEthereumService() {
     const provider = new ethers.JsonRpcProvider(`https://mainnet.infura.io/v3/${configInfura.infuraProjectId}`);
+    attachInfuraRequestLogging(provider, 'HTTP');
     const configurations = new Map<string, Configuration>();
     const scannerId = 'ethereum-mainnet';
     const pollIntervalMs = 4000;
@@ -70,6 +170,7 @@ export function createEthereumService() {
         if (!websocketProvider) {
             try {
                 websocketProvider = new ethers.WebSocketProvider(configInfura.infuraWebsocketUrl);
+                attachInfuraRequestLogging(websocketProvider, 'WebSocket');
                 await websocketProvider.getBlockNumber();
                 console.log('[Ethereum scanner] Caught up to finalized blocks. Waiting for new blocks via WebSocket.');
             } catch (error) {
@@ -105,7 +206,10 @@ export function createEthereumService() {
                 resolve(result);
             };
 
-            const onBlock = () => finish('block');
+            const onBlock = (blockNumber: number) => {
+                console.log(`[Infura][WebSocket][EVENT] ${new Date().toISOString()} newBlock=${blockNumber}`);
+                finish('block');
+            };
             const onError = () => finish('error');
 
             current.on('block', onBlock);
