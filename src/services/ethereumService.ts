@@ -42,10 +42,84 @@ export function createEthereumService() {
     const configurations = new Map<string, Configuration>();
     const scannerId = 'ethereum-mainnet';
     const pollIntervalMs = 4000;
+    const websocketRetryIntervalMs = 4000;
+    const websocketWatchdogMs = 30000;
+    let websocketProvider: ethers.WebSocketProvider | undefined;
     let scannerStarted = false;
     let stopping = false;
 
     const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+    async function closeWebSocket() {
+        const current = websocketProvider;
+        websocketProvider = undefined;
+        if (current) {
+            try {
+                await current.destroy();
+            } catch (error) {
+                console.error('[Ethereum scanner] Error closing WebSocket:', error instanceof Error ? error.message : error);
+            }
+        }
+    }
+
+    async function waitForNextBlock() {
+        if (stopping) {
+            return;
+        }
+
+        if (!websocketProvider) {
+            try {
+                websocketProvider = new ethers.WebSocketProvider(configInfura.infuraWebsocketUrl);
+                await websocketProvider.getBlockNumber();
+                console.log('[Ethereum scanner] Caught up to finalized blocks. Waiting for new blocks via WebSocket.');
+            } catch (error) {
+                console.error('[Ethereum scanner] WebSocket connection failed; falling back to HTTP polling:', error instanceof Error ? error.message : error);
+                await closeWebSocket();
+                await wait(websocketRetryIntervalMs);
+                return;
+            }
+        }
+
+        const current = websocketProvider;
+        if (!current) {
+            await wait(pollIntervalMs);
+            return;
+        }
+
+        const outcome = await new Promise<'block' | 'error' | 'timeout'>(resolve => {
+            let settled = false;
+            const timeout = setTimeout(() => finish('timeout'), websocketWatchdogMs);
+
+            const cleanup = () => {
+                clearTimeout(timeout);
+                void current.removeListener('block', onBlock);
+                void current.removeListener('error', onError);
+            };
+
+            const finish = (result: 'block' | 'error' | 'timeout') => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                cleanup();
+                resolve(result);
+            };
+
+            const onBlock = () => finish('block');
+            const onError = () => finish('error');
+
+            current.on('block', onBlock);
+            current.on('error', onError);
+        });
+
+        if (outcome === 'block') {
+            return;
+        }
+
+        console.error(`[Ethereum scanner] WebSocket ${outcome === 'timeout' ? 'received no block events before watchdog timeout' : 'reported an error'}; falling back to HTTP polling.`);
+        await closeWebSocket();
+        await wait(websocketRetryIntervalMs);
+    }
 
     async function loadConfigurations() {
         const configs = await Configuration.findAll({ where: { isActive: true } });
@@ -103,6 +177,7 @@ export function createEthereumService() {
 
             while (!stopping) {
                 let processingBlock: number | undefined;
+                let retryAfterError = false;
                 try {
                     const finalized = await provider.getBlock('finalized');
                     if (!finalized) {
@@ -157,14 +232,20 @@ export function createEthereumService() {
                         }
                     }
                 } catch (error) {
+                    retryAfterError = true;
                     const location = processingBlock === undefined ? '' : ` at block ${processingBlock}`;
                     console.error(`[Ethereum scanner] Error${location}; checkpoint remains at ${state.lastProcessedBlock}:`, error instanceof Error ? error.message : error);
                 }
 
-                await wait(pollIntervalMs);
+                if (retryAfterError) {
+                    await wait(pollIntervalMs);
+                } else {
+                    await waitForNextBlock();
+                }
             }
         } catch (error) {
             scannerStarted = false;
+            await closeWebSocket();
             throw error;
         }
     }
