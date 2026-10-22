@@ -18,15 +18,16 @@ export async function getReceiptForTransaction(
 }
 
 export function matchesConfiguration(tx: TransactionResponse, config: Configuration): boolean {
-    if (config.senderAddress && tx.from.toLowerCase() !== config.senderAddress.toLowerCase()) {
+    if (!config.senderAddress && !config.recipientAddress) {
         return false;
     }
 
-    if (config.recipientAddress && tx.to?.toLowerCase() !== config.recipientAddress.toLowerCase()) {
-        return false;
-    }
+    const senderMatches = !config.senderAddress
+        || tx.from.toLowerCase() === config.senderAddress.toLowerCase();
+    const recipientMatches = !config.recipientAddress
+        || tx.to?.toLowerCase() === config.recipientAddress.toLowerCase();
 
-    return true;
+    return senderMatches && recipientMatches;
 }
 
 export function getEthereumService() {
