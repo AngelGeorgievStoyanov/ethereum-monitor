@@ -6,6 +6,29 @@ import { createTransactionFromEthereumData } from './transactionService';
 
 let ethereumServiceInstance: ReturnType<typeof createEthereumService> | undefined;
 
+export async function getReceiptForTransaction(
+    provider: ethers.JsonRpcProvider,
+    tx: TransactionResponse
+): Promise<TransactionReceipt> {
+    const receipt = await provider.getTransactionReceipt(tx.hash);
+    if (!receipt) {
+        throw new Error(`Receipt unavailable for transaction ${tx.hash}`);
+    }
+    return receipt;
+}
+
+export function matchesConfiguration(tx: TransactionResponse, config: Configuration): boolean {
+    if (config.senderAddress && tx.from.toLowerCase() !== config.senderAddress.toLowerCase()) {
+        return false;
+    }
+
+    if (config.recipientAddress && tx.to?.toLowerCase() !== config.recipientAddress.toLowerCase()) {
+        return false;
+    }
+
+    return true;
+}
+
 export function getEthereumService() {
     if (!ethereumServiceInstance) {
         ethereumServiceInstance = createEthereumService();
@@ -113,16 +136,18 @@ export function createEthereumService() {
                                     continue;
                                 }
 
-                                const receipt = await provider.getTransactionReceipt(tx.hash);
-                                if (!receipt) {
-                                    throw new Error(`Receipt unavailable for transaction ${tx.hash}`);
+                                const matchingConfigurations = Array.from(configurations.values())
+                                    .filter(config => config.isActive && matchesConfiguration(tx, config));
+
+                                if (matchingConfigurations.length === 0) {
+                                    continue;
                                 }
 
-                                for (const config of configurations.values()) {
-                                    if (config.isActive && matchesConfiguration(tx, config)) {
-                                        await createTransactionFromEthereumData(tx, receipt, config, block.timestamp);
-                                        matchedTransactionCount += 1;
-                                    }
+                                const receipt = await getReceiptForTransaction(provider, tx);
+
+                                for (const config of matchingConfigurations) {
+                                    await createTransactionFromEthereumData(tx, receipt, config, block.timestamp);
+                                    matchedTransactionCount += 1;
                                 }
                             }
 
@@ -143,18 +168,6 @@ export function createEthereumService() {
             scannerStarted = false;
             throw error;
         }
-    }
-
-    function matchesConfiguration(tx: TransactionResponse, config: Configuration): boolean {
-        if (config.senderAddress && tx.from.toLowerCase() !== config.senderAddress.toLowerCase()) {
-            return false;
-        }
-
-        if (config.recipientAddress && tx.to?.toLowerCase() !== config.recipientAddress.toLowerCase()) {
-            return false;
-        }
-
-        return true;
     }
 
     async function addConfiguration(config: Configuration) {
