@@ -1,55 +1,61 @@
-import { QueryTypes  } from 'sequelize'; 
-import sequelize from '../database';
-import Transaction from '../models/transaction';
-import TransactionAttributes from '../models/transaction';
 import { Request, Response } from 'express';
+import Transaction from '../models/transaction';
+import Configuration from '../models/configuration';
+import { TransactionReceipt, TransactionResponse } from 'ethers';
 
-export async function createTransactionFromEthereumData(tx: any, receipt: any, config: any) {
-    const data: Partial<TransactionAttributes> = {
+export async function createTransactionFromEthereumData(
+    tx: TransactionResponse,
+    receipt: TransactionReceipt,
+    config: Configuration,
+    blockTimestamp: number
+) {
+    const existing = await Transaction.findOne({
+        where: {
+            configurationId: config.id,
+            hash: tx.hash,
+        },
+    });
+
+    if (existing) {
+        return existing;
+    }
+
+    const data = {
         configurationId: config.id,
         hash: tx.hash,
         nonce: tx.nonce,
         blockHash: receipt.blockHash,
         blockNumber: receipt.blockNumber,
-        transactionIndex: receipt.index !== undefined ? receipt.index : 0,
+        transactionIndex: receipt.index,
         from: tx.from,
         to: tx.to,
         value: tx.value.toString(),
-        gas: receipt.gasUsed.toString(),
-        gasPrice: tx.gasPrice.toString(),
+        gas: Number(receipt.gasUsed),
+        gasPrice: tx.gasPrice?.toString() ?? tx.maxFeePerGas?.toString() ?? '0',
         input: tx.data,
         status: receipt.status === 1 ? 'success' : 'failed',
-        transactionType: tx.type,
-        contractAddress: receipt.contractAddress,
-        timestamp: receipt.timestamp !== undefined ? new Date(receipt.timestamp * 1000) : new Date(),
-        requiredConfirmations: config.requiredConfirmations,
-        gasLimit: tx.gasLimit ? tx.gasLimit : null,
-        maxPriorityFeePerGas: tx.maxPriorityFeePerGas ? tx.maxPriorityFeePerGas.toString() : null,
-        maxFeePerGas: tx.maxFeePerGas ? tx.maxFeePerGas.toString() : null,
-        maxFeePerBlobGas: tx.maxFeePerBlobGas ? tx.maxFeePerBlobGas.toString() : null,
-        accessList: tx.accessList ? JSON.stringify(tx.accessList) : null,
-        blobVersionedHashes: tx.blobVersionedHashes ? JSON.stringify(tx.blobVersionedHashes) : null,
-        logsBloom: receipt.logsBloom,
-        gasUsed: receipt.gasUsed.toString(),
-        cumulativeGasUsed: receipt.cumulativeGasUsed.toString(),
-        root: receipt.root || null,
-        blobGasUsed: receipt.blobGasUsed ? receipt.blobGasUsed.toString() : null
+        transactionType: tx.type?.toString(),
+        contractAddress: receipt.contractAddress ?? undefined,
+        timestamp: new Date(blockTimestamp * 1000),
+        gasLimit: Number(tx.gasLimit),
+        maxPriorityFeePerGas: tx.maxPriorityFeePerGas?.toString() ?? undefined,
+        maxFeePerGas: tx.maxFeePerGas?.toString() ?? undefined,
+        maxFeePerBlobGas: tx.maxFeePerBlobGas?.toString() ?? undefined,
+        accessList: tx.accessList ? JSON.stringify(tx.accessList) : undefined,
+        blobVersionedHashes: tx.blobVersionedHashes ? JSON.stringify(tx.blobVersionedHashes) : undefined,
+        logsBloom: receipt.logsBloom ?? undefined,
+        gasUsed: Number(receipt.gasUsed),
+        cumulativeGasUsed: Number(receipt.cumulativeGasUsed),
+        root: receipt.root ?? undefined,
+        blobGasUsed: receipt.blobGasUsed ? Number(receipt.blobGasUsed) : undefined,
     };
 
-
-    try {
-        const transaction = await Transaction.create(data);
-        return transaction;
-    } catch (error) {
-        console.error('Error creating transaction:', error);
-        throw error;
-    }
+    return Transaction.create(data);
 }
-
 
 export async function getAllStoredTransactions(req: Request, res: Response): Promise<void> {
     try {
-        const transactions = await Transaction.findAll(); 
+        const transactions = await Transaction.findAll();
         res.json(transactions);
     } catch (error) {
         console.error('Error fetching transactions:', error);
@@ -57,11 +63,9 @@ export async function getAllStoredTransactions(req: Request, res: Response): Pro
     }
 }
 
-
 export async function deleteAllTransactions(req: Request, res: Response): Promise<void> {
     try {
-     const destr=   await Transaction.destroy({ where: {} });
-     console.log(destr)
+        await Transaction.destroy({ where: {} });
         res.status(200).json({ message: 'All transactions deleted successfully' });
     } catch (error) {
         console.error('Error deleting transactions:', error);
@@ -84,23 +88,21 @@ export async function deleteTransactionById(req: Request, res: Response): Promis
     }
 }
 
-
-export async function deleteTransactionsWithQuery(req: Request, res: Response): Promise<Response> {
+export async function deleteTransactionsWithQuery(req: Request, res: Response): Promise<void> {
     try {
         const { where } = req.query;
-
-        let whereClause: any = {};
+        let whereClause: Record<string, unknown> = {};
 
         if (where) {
             try {
                 whereClause = JSON.parse(where as string);
-            } catch (error) {
-                return res.status(400).json({ message: 'Invalid "where" query parameter format' });
+            } catch {
+                res.status(400).json({ message: 'Invalid "where" query parameter format' });
+                return;
             }
         }
 
         const deleted = await Transaction.destroy({ where: whereClause });
-
         if (deleted > 0) {
             res.status(200).json({ message: `${deleted} transactions deleted successfully` });
         } else {
@@ -108,28 +110,6 @@ export async function deleteTransactionsWithQuery(req: Request, res: Response): 
         }
     } catch (error) {
         console.error('Error deleting transactions:', error);
-        res.status(500).json({ message: 'Failed to delete transactions', error: error.message });
-    }
-}
-
-
-export async function getTransactionsWithQuery(req: Request, res: Response): Promise<Response> {
-    try {
-        const { sql } = req.query;
-      
-        if (!sql) {
-            return res.status(400).json({ message: 'SQL query is required as a query parameter' });
-        }
-
-       
-        const transactions = await sequelize.query(sql as string, {
-            type: QueryTypes.SELECT, 
-            replacements: req.query 
-        });
-
-        return res.status(200).json(transactions);
-    } catch (error) {
-        console.error('Error executing SQL query:', error);
-        return res.status(500).json({ message: 'Failed to retrieve transactions', error: error.message });
+        res.status(500).json({ message: 'Failed to delete transactions' });
     }
 }

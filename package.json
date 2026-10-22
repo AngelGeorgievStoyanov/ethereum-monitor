@@ -2,8 +2,10 @@
   "name": "ethereum-monitor",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "build/index.js",
   "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon"
   },
