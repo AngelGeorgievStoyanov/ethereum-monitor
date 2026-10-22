@@ -118,19 +118,17 @@ function attachInfuraRequestLogging(
         }
 
         if (event.action === 'receiveRpcError') {
-            const payloads = Array.isArray(event.payload) ? event.payload : [event.payload];
+            const message = event.error instanceof Error ? event.error.message : JSON.stringify(event.error);
 
-            for (const payload of payloads) {
-                if (!payload || payload.id === undefined) {
-                    continue;
-                }
+            if (pending.size === 0) {
+                console.error(`[Infura][${transport}][ERROR] ${timestamp} id=unknown method=unknown durationMs=unknown error=${message}`);
+                return;
+            }
 
-                const id = String(payload.id);
-                const request = pending.get(id);
-                const durationMs = request ? Date.now() - request.startedAt : undefined;
-                const method = request?.method || payload.method || 'unknown';
+            for (const [id, request] of pending.entries()) {
+                const durationMs = Date.now() - request.startedAt;
+                console.error(`[Infura][${transport}][ERROR] ${timestamp} id=${id} method=${request.method} durationMs=${durationMs} error=${message}`);
                 pending.delete(id);
-                console.error(`[Infura][${transport}][ERROR] ${timestamp} id=${id} method=${method} durationMs=${durationMs ?? 'unknown'} error=${event.error instanceof Error ? event.error.message : JSON.stringify(event.error)}`);
             }
         }
     });
