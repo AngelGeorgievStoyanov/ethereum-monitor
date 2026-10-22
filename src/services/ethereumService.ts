@@ -97,7 +97,10 @@ export function createEthereumService() {
 
                             for (const transactionHash of block.transactions) {
                                 const tx = await provider.getTransaction(transactionHash);
-                                if (!tx || !tx.to) {
+                                if (!tx) {
+                                    throw new Error(`Transaction unavailable for hash ${transactionHash}`);
+                                }
+                                if (!tx.to || tx.value === 0n) {
                                     continue;
                                 }
 
