@@ -125,6 +125,7 @@ export function createEthereumService() {
                                 throw new Error(`Unable to load block ${blockNumber}`);
                             }
 
+                            const blockStartedAt = Date.now();
                             console.log(`[Ethereum scanner] Processing finalized block ${blockNumber} with ${block.transactions.length} transaction(s)`);
                             let matchedTransactionCount = 0;
 
@@ -154,7 +155,8 @@ export function createEthereumService() {
 
                             state.lastProcessedBlock = blockNumber;
                             await state.save();
-                            console.log(`[Ethereum scanner] Completed block ${blockNumber}. Matched ${matchedTransactionCount} transaction/configuration pair(s). Checkpoint saved.`);
+                            const blockDurationMs = Date.now() - blockStartedAt;
+                            console.log(`[Ethereum scanner] Completed block ${blockNumber} in ${(blockDurationMs / 1000).toFixed(2)}s. Matched ${matchedTransactionCount} transaction/configuration pair(s). Checkpoint saved.`);
                             processingBlock = undefined;
                         }
                     }
