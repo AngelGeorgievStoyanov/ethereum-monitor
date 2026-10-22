@@ -100,7 +100,7 @@ export function createEthereumService() {
                                 if (!tx) {
                                     throw new Error(`Transaction unavailable for hash ${transactionHash}`);
                                 }
-                                if (!tx.to || tx.value === 0n) {
+                                if (!tx.to || tx.value === BigInt(0)) {
                                     continue;
                                 }
 
