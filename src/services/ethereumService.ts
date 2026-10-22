@@ -119,7 +119,7 @@ export function createEthereumService() {
                         while (!stopping && state.lastProcessedBlock < finalized.number) {
                             const blockNumber = state.lastProcessedBlock + 1;
                             processingBlock = blockNumber;
-                            const block = await provider.getBlock(blockNumber);
+                            const block = await provider.getBlock(blockNumber, true);
 
                             if (!block) {
                                 throw new Error(`Unable to load block ${blockNumber}`);
@@ -129,11 +129,7 @@ export function createEthereumService() {
                             console.log(`[Ethereum scanner] Processing finalized block ${blockNumber} with ${block.transactions.length} transaction(s)`);
                             let matchedTransactionCount = 0;
 
-                            for (const transactionHash of block.transactions) {
-                                const tx = await provider.getTransaction(transactionHash);
-                                if (!tx) {
-                                    throw new Error(`Transaction unavailable for hash ${transactionHash}`);
-                                }
+                            for (const tx of block.prefetchedTransactions) {
                                 if (!tx.to || tx.value === BigInt(0)) {
                                     continue;
                                 }
