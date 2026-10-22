@@ -27,7 +27,9 @@ export function createEthereumService() {
         const configs = await Configuration.findAll({ where: { isActive: true } });
         configurations.clear();
         configs.forEach(config => configurations.set(config.id, config));
-        await startScanner();
+        void startScanner().catch(error => {
+            console.error('Unable to start Ethereum scanner:', error instanceof Error ? error.message : error);
+        });
     }
 
     async function startScanner() {
