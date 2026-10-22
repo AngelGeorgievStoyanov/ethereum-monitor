@@ -27,6 +27,7 @@ export function createEthereumService() {
         const configs = await Configuration.findAll({ where: { isActive: true } });
         configurations.clear();
         configs.forEach(config => configurations.set(config.id, config));
+        console.log(`[Ethereum scanner] Loaded ${configurations.size} active configuration(s)`);
         void startScanner().catch(error => {
             console.error('Unable to start Ethereum scanner:', error instanceof Error ? error.message : error);
         });
@@ -74,7 +75,10 @@ export function createEthereumService() {
                 });
             }
 
+            console.log(`[Ethereum scanner] Started. Last processed block: ${state.lastProcessedBlock}`);
+
             while (!stopping) {
+                let processingBlock: number | undefined;
                 try {
                     const finalized = await provider.getBlock('finalized');
                     if (!finalized) {
@@ -83,17 +87,22 @@ export function createEthereumService() {
 
                     if (configurations.size === 0) {
                         if (state.lastProcessedBlock < finalized.number) {
+                            console.log(`[Ethereum scanner] No active configurations. Advancing checkpoint from ${state.lastProcessedBlock} to finalized block ${finalized.number}`);
                             state.lastProcessedBlock = finalized.number;
                             await state.save();
                         }
                     } else {
                         while (!stopping && state.lastProcessedBlock < finalized.number) {
                             const blockNumber = state.lastProcessedBlock + 1;
+                            processingBlock = blockNumber;
                             const block = await provider.getBlock(blockNumber);
 
                             if (!block) {
                                 throw new Error(`Unable to load block ${blockNumber}`);
                             }
+
+                            console.log(`[Ethereum scanner] Processing finalized block ${blockNumber} with ${block.transactions.length} transaction(s)`);
+                            let matchedTransactionCount = 0;
 
                             for (const transactionHash of block.transactions) {
                                 const tx = await provider.getTransaction(transactionHash);
@@ -112,16 +121,20 @@ export function createEthereumService() {
                                 for (const config of configurations.values()) {
                                     if (config.isActive && matchesConfiguration(tx, config)) {
                                         await createTransactionFromEthereumData(tx, receipt, config, block.timestamp);
+                                        matchedTransactionCount += 1;
                                     }
                                 }
                             }
 
                             state.lastProcessedBlock = blockNumber;
                             await state.save();
+                            console.log(`[Ethereum scanner] Completed block ${blockNumber}. Matched ${matchedTransactionCount} transaction/configuration pair(s). Checkpoint saved.`);
+                            processingBlock = undefined;
                         }
                     }
                 } catch (error) {
-                    console.error('Ethereum scanner error:', error instanceof Error ? error.message : error);
+                    const location = processingBlock === undefined ? '' : ` at block ${processingBlock}`;
+                    console.error(`[Ethereum scanner] Error${location}; checkpoint remains at ${state.lastProcessedBlock}:`, error instanceof Error ? error.message : error);
                 }
 
                 await wait(pollIntervalMs);
