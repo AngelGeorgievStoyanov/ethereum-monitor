@@ -50,9 +50,12 @@ export function createEthereumService() {
             if (!state) {
                 const configuredStart = process.env.START_BLOCK;
                 const startBlock = configuredStart !== undefined ? Number(configuredStart) : undefined;
+                const validRescanBlock = rescanBlock !== undefined && Number.isSafeInteger(rescanBlock) && rescanBlock >= 0;
                 let initialBlock: number;
 
-                if (startBlock !== undefined && Number.isSafeInteger(startBlock) && startBlock >= 0) {
+                if (validRescanBlock) {
+                    initialBlock = rescanBlock;
+                } else if (startBlock !== undefined && Number.isSafeInteger(startBlock) && startBlock >= 0) {
                     initialBlock = startBlock;
                 } else {
                     const finalized = await provider.getBlock('finalized');
@@ -65,7 +68,7 @@ export function createEthereumService() {
                 state = await ScannerState.create({
                     id: scannerId,
                     lastProcessedBlock: initialBlock - 1,
-                    lastRescanFromBlock: rescanBlock !== undefined && Number.isSafeInteger(rescanBlock) && rescanBlock >= 0 ? rescanBlock : null,
+                    lastRescanFromBlock: validRescanBlock ? rescanBlock : null,
                 });
             }
 

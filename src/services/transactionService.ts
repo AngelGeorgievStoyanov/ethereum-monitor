@@ -91,7 +91,7 @@ export async function deleteTransactionById(req: Request, res: Response): Promis
 export async function deleteTransactionsWithQuery(req: Request, res: Response): Promise<void> {
     try {
         const { where } = req.query;
-        let whereClause: Record<string, unknown> = {};
+        let whereClause: any = {};
 
         if (where) {
             try {
