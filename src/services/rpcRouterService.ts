@@ -1,4 +1,4 @@
-import { Block, BlockTag, JsonRpcProvider } from 'ethers';
+import { BlockTag, JsonRpcProvider } from 'ethers';
 import { formatError } from '../utils/formatError';
 import { getRpcProviderService } from './rpcProviderService';
 
