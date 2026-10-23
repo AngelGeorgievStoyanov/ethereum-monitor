@@ -33,7 +33,7 @@ RPC_URL_2=https://YOUR_SECOND_PROVIDER_ENDPOINT
 DATABASE_URL=sqlite:./db.sqlite
 ```
 
-Configure at least `RPC_URL_1`. Additional `RPC_URL_N` endpoints are used as fallbacks when an endpoint is rate-limited.
+Configure at least `RPC_URL_1`. Additional `RPC_URL_N` endpoints are used as fallbacks when an endpoint is rate-limited, times out, or has a transient network error.
 
 ## Running
 
@@ -56,7 +56,7 @@ The API listens on port 8000.
 
 - The scanner processes only finalized blocks, in ascending block order.
 - It fetches blocks and their receipts over HTTP JSON-RPC. Requests are sequential and retried with bounded exponential backoff.
-- The RPC router rotates across configured endpoints and retries rate-limited requests on another endpoint.
+- The RPC client rotates across configured endpoints and retries rate-limited requests, timeouts, and transient network errors on another endpoint.
 - Native ETH transfers and successful ERC-20 `Transfer` logs are matched against active sender/recipient configuration filters.
 - Stored records include `transferType` (`native` or `erc20`), `tokenAddress` for ERC-20 transfers, and `logIndex` to distinguish multiple token transfers in one transaction.
 - During catch-up, it reads finalized blocks over HTTP and saves a persistent checkpoint after each fully processed block.
