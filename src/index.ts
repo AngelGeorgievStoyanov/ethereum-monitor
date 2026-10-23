@@ -1,10 +1,9 @@
 import express from 'express';
 import sequelize from './database';
-import configRoutes from './routes/configRoutes';
+import httpRouter from './httpRouter';
 import { getEthereumService } from './services/ethereumService';
 import { getConfigurationService } from './services/configurationService';
 import { formatError } from './utils/formatError';
-import transactionRoutes from './routes/transactionRoutes';
 
 const app = express();
 const PORT = 8000;
@@ -14,13 +13,12 @@ const ethereumService = getEthereumService();
 const configurationService = getConfigurationService();
 
 app.use(express.json());
+app.use('/api', httpRouter);
 
 async function startServer() {
     await sequelize.sync();
     console.log('Database connected');
 
-    app.use('/api/configurations', configRoutes);
-    app.use('/api/transactions', transactionRoutes);
     await configurationService.loadConfigurations();
 
     void ethereumService.start().catch(error => {
