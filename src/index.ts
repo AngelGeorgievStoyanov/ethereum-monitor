@@ -16,7 +16,7 @@ const configurationService = getConfigurationService();
 app.use(express.json());
 
 async function startServer() {
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log('Database connected');
 
     app.use('/api/configurations', configRoutes);
