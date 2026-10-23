@@ -11,6 +11,20 @@ export const ethereumProvider = new ethers.JsonRpcProvider(
 
 const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
+function formatError(error: unknown): string {
+    const value = error as { shortMessage?: unknown; reason?: unknown; code?: unknown; message?: unknown };
+    const rawMessage = typeof value?.shortMessage === 'string'
+        ? value.shortMessage
+        : typeof value?.reason === 'string'
+            ? value.reason
+            : error instanceof Error
+                ? error.message
+                : String(error);
+    const message = rawMessage.length > 240 ? `${rawMessage.slice(0, 240)}…` : rawMessage;
+    const code = typeof value?.code === 'string' ? ` (${value.code})` : '';
+    return `${message}${code}`;
+}
+
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
         const startedAt = Date.now();
@@ -30,7 +44,7 @@ export async function fetchBlockData(blockNumber: number) {
 
             return { block, receipts, durationMs: Date.now() - startedAt, attempt };
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
+            const message = formatError(error);
             if (attempt === MAX_BLOCK_FETCH_ATTEMPTS) {
                 console.error(`[RPC] Block ${blockNumber} failed after ${attempt} attempts: ${message}`);
                 throw error;
