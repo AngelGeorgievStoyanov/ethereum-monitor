@@ -40,7 +40,7 @@ export function createBlockMonitorService() {
                 const startBlock = env.startBlock;
                 let initialBlock: number;
 
-                if (validRescanBlock) {
+                if (rescanBlock !== undefined) {
                     initialBlock = rescanBlock;
                 } else if (
                     startBlock !== undefined
@@ -73,7 +73,7 @@ export function createBlockMonitorService() {
                     if (configurationService.getConfigurations().length === 0) {
                         if (state.lastProcessedBlock < finalized.number) {
                             state.lastProcessedBlock = finalized.number;
-                            await state.save();
+                            await saveScannerState(state);
                             console.log(`[Scanner] No active configurations; checkpoint advanced to ${finalized.number}`);
                         }
                     } else {
@@ -115,7 +115,7 @@ export function createBlockMonitorService() {
                             );
 
                             state.lastProcessedBlock = blockNumber;
-                            await state.save();
+                            await saveScannerState(state);
 
                             const durationMs = Date.now() - blockStartedAt;
                             console.log(
