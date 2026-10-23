@@ -1,29 +1,30 @@
 import { ethers } from 'ethers';
-import { configInfura } from '../config/config';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
+import { getRpcRouterService } from './rpcRouterService';
 
 const MAX_BLOCK_FETCH_ATTEMPTS = 5;
 const RETRY_BASE_DELAY_MS = 1000;
 const RETRY_MAX_DELAY_MS = 15000;
 
-export const ethereumProvider = new ethers.JsonRpcProvider(
-    `https://mainnet.infura.io/v3/${configInfura.infuraProjectId}`
-);
+export const ethereumProvider = getRpcRouterService();
 
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
         const startedAt = Date.now();
 
         try {
-            const [block, receipts] = await Promise.all([
-                ethereumProvider.getBlock(blockNumber, true),
-                ethereumProvider.send('eth_getBlockReceipts', [ethers.toQuantity(blockNumber)]),
-            ]);
+            const block = await ethereumProvider.getBlock(blockNumber, true);
 
             if (!block) {
                 throw new Error(`Unable to load block ${blockNumber}`);
             }
+
+            const receipts = await ethereumProvider.send(
+                'eth_getBlockReceipts',
+                [ethers.toQuantity(blockNumber)]
+            );
+
             if (!Array.isArray(receipts)) {
                 throw new Error('eth_getBlockReceipts returned a non-array response');
             }
