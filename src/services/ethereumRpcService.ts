@@ -1,5 +1,7 @@
 import { ethers } from 'ethers';
 import { configInfura } from '../config/config';
+import { formatError } from '../utils/formatError';
+import { sleep } from '../utils/sleep';
 
 const MAX_BLOCK_FETCH_ATTEMPTS = 5;
 const RETRY_BASE_DELAY_MS = 1000;
@@ -8,9 +10,6 @@ const RETRY_MAX_DELAY_MS = 15000;
 export const ethereumProvider = new ethers.JsonRpcProvider(
     `https://mainnet.infura.io/v3/${configInfura.infuraProjectId}`
 );
-
-import { formatError } from '../utils/formatError';
-import { sleep } from '../utils/sleep';
 
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
