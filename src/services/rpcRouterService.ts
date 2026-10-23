@@ -1,4 +1,4 @@
-import { BlockTag, JsonRpcProvider } from 'ethers';
+import { JsonRpcProvider } from 'ethers';
 import { formatError } from '../utils/formatError';
 import { getRpcProviderService } from './rpcProviderService';
 
@@ -54,7 +54,7 @@ export function createRpcRouterService() {
     }
 
     return {
-        getBlock(blockTag: BlockTag | number, includeTransactions = false) {
+        getBlock(blockTag: string | number, includeTransactions = false) {
             return execute(
                 `getBlock(${String(blockTag)})`,
                 provider => provider.getBlock(blockTag, includeTransactions)
