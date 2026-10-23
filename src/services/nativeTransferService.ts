@@ -1,19 +1,9 @@
 import { TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
 import { createTransactionFromEthereumData } from './transactionService';
+import { matchesConfiguration } from '../utils/matchesConfiguration';
 
-export function matchesConfiguration(tx: TransactionResponse, config: Configuration): boolean {
-    if (!config.senderAddress && !config.recipientAddress) {
-        return false;
-    }
-
-    const senderMatches = !config.senderAddress
-        || tx.from.toLowerCase() === config.senderAddress.toLowerCase();
-    const recipientMatches = !config.recipientAddress
-        || tx.to?.toLowerCase() === config.recipientAddress.toLowerCase();
-
-    return senderMatches && recipientMatches;
-}
+export { matchesConfiguration };
 
 export async function processNativeTransfers(
     transactions: readonly TransactionResponse[],
@@ -31,7 +21,7 @@ export async function processNativeTransfers(
         transfersSeen += 1;
 
         const matchingConfigurations = configurations.filter(config =>
-            config.isActive && matchesConfiguration(tx, config)
+            config.isActive && matchesConfiguration(tx.from, tx.to, config)
         );
         if (matchingConfigurations.length === 0) continue;
 
