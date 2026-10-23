@@ -15,7 +15,7 @@ Ethereum Monitor monitors finalized native ETH transfers and ERC-20 Transfer eve
 ## Requirements
 
 - Node.js and npm
-- An Infura project ID with Ethereum mainnet access, including WebSocket access
+- An Infura project ID with Ethereum mainnet HTTP JSON-RPC access
 
 ## Installation
 
@@ -29,8 +29,6 @@ Create a `.env` file:
 
 ```env
 INFURA_PROJECT_ID=your-infura-project-id
-# Optional: defaults to the WebSocket endpoint for INFURA_PROJECT_ID
-INFURA_WEBSOCKET_URL=wss://mainnet.infura.io/ws/v3/your-infura-project-id
 DATABASE_URL=sqlite:./db.sqlite
 ```
 
@@ -49,7 +47,7 @@ npm run build
 npm start
 ```
 
-The API listens on port 8080.
+The API listens on port 8000.
 
 ## Scanner behavior
 
@@ -58,8 +56,7 @@ The API listens on port 8080.
 - Native ETH transfers and successful ERC-20 `Transfer` logs are matched against active sender/recipient configuration filters.
 - Stored records include `transferType` (`native` or `erc20`), `tokenAddress` for ERC-20 transfers, and `logIndex` to distinguish multiple token transfers in one transaction.
 - During catch-up, it reads finalized blocks over HTTP and saves a persistent checkpoint after each fully processed block.
-- Once caught up, it waits for new-block notifications over WebSocket, then checks the finalized block height over HTTP and processes only blocks that have finalized.
-- If WebSocket disconnects, errors, or stops delivering block events, the scanner falls back to HTTP polling and retries the WebSocket connection.
+- It checks the finalized block height over HTTP every 4 seconds and processes newly finalized blocks.
 - After a restart, scanning continues from the block after the saved checkpoint.
 - If processing a block fails, the checkpoint does not advance and that block is retried.
 - Only finalized direct native ETH transfers with a recipient and successful ERC-20 `Transfer` events are stored. Pending transactions and internal transactions are not monitored.
@@ -91,8 +88,7 @@ The raw SQL query endpoint has been removed.
 
 ## Environment variables
 
-- `INFURA_PROJECT_ID`: Infura project ID used for HTTP and the default WebSocket endpoint.
-- `INFURA_WEBSOCKET_URL`: optional override for the Infura WebSocket endpoint.
+- `INFURA_PROJECT_ID`: Infura project ID used for HTTP JSON-RPC requests.
 - `DATABASE_URL`: SQLite database URL. Defaults to `sqlite:./db.sqlite`.
 - `START_BLOCK`: optional initial block number, used only when no checkpoint exists.
 - `RESCAN_FROM_BLOCK`: optional one-time rewind to a block number. Each distinct value is applied once.
