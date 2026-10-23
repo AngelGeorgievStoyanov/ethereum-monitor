@@ -1,5 +1,5 @@
 import { createBlockMonitorService } from './blockMonitorService';
-export { matchesConfiguration } from './nativeTransferService';
+export { matchesConfiguration } from '../utils/matchesConfiguration';
 
 let ethereumServiceInstance: ReturnType<typeof createBlockMonitorService> | undefined;
 
