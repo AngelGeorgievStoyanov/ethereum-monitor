@@ -10,12 +10,7 @@ export function createConfigurationService() {
         console.log(`[Scanner] Loaded ${configurations.size} active configuration(s)`);
     }
 
-    async function addConfiguration(config: Configuration) {
-        if (config.isActive) configurations.set(config.id, config);
-        else configurations.delete(config.id);
-    }
-
-    async function updateConfiguration(config: Configuration) {
+    function syncConfiguration(config: Configuration) {
         if (config.isActive) configurations.set(config.id, config);
         else configurations.delete(config.id);
     }
@@ -26,8 +21,8 @@ export function createConfigurationService() {
 
     return {
         loadConfigurations,
-        addConfiguration,
-        updateConfiguration,
+        addConfiguration: syncConfiguration,
+        updateConfiguration: syncConfiguration,
         removeConfiguration,
         getConfigurations: () => Array.from(configurations.values()),
     };
