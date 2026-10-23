@@ -1,5 +1,6 @@
 import { TransactionResponse } from 'ethers';
 import { createScannerState, findScannerState, saveScannerState } from '../repositories/scannerStateRepository';
+import { env } from '../config/env';
 import { ethereumProvider, fetchBlockData } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
@@ -21,11 +22,8 @@ export function createBlockMonitorService() {
 
         try {
             let state = await findScannerState(SCANNER_ID);
-            const rescanValue = process.env.RESCAN_FROM_BLOCK;
-            const rescanBlock = rescanValue !== undefined ? Number(rescanValue) : undefined;
-            const validRescanBlock = rescanBlock !== undefined
-                && Number.isSafeInteger(rescanBlock)
-                && rescanBlock >= 0;
+            const rescanBlock = env.rescanFromBlock;
+            const validRescanBlock = rescanBlock !== undefined;
 
             if (
                 state
@@ -39,8 +37,7 @@ export function createBlockMonitorService() {
             }
 
             if (!state) {
-                const configuredStart = process.env.START_BLOCK;
-                const startBlock = configuredStart !== undefined ? Number(configuredStart) : undefined;
+                const startBlock = env.startBlock;
                 let initialBlock: number;
 
                 if (validRescanBlock) {
