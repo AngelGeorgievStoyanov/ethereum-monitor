@@ -36,15 +36,15 @@ export function createRpcRouterService() {
             } catch (error) {
                 lastError = error;
 
-                if (!isRateLimitError(error)) {
+                if (!isRetryableEndpointError(error)) {
                     throw error;
                 }
 
                 console.warn(
-                    `[RPC Router] Endpoint ${endpoint.index} rate-limited during ${operationName}; `
+                    `[RPC Router] Endpoint ${endpoint.index} failed temporarily during ${operationName}; `
                     + (attempt + 1 < endpoints.length
                         ? 'trying the next endpoint'
-                        : 'all configured endpoints were rate-limited')
+                        : 'all configured endpoints failed temporarily')
                     + `: ${formatError(error)}`
                 );
             }
