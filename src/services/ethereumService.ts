@@ -333,11 +333,7 @@ export function createEthereumService() {
                     console.error(`[Ethereum scanner] Error${location}; checkpoint remains at ${state.lastProcessedBlock}:`, error instanceof Error ? error.message : error);
                 }
 
-                if (retryAfterError) {
-                    await wait(pollIntervalMs);
-                } else {
-                    await wait(pollIntervalMs);
-                }
+                await wait(pollIntervalMs);
             }
         } catch (error) {
             scannerStarted = false;
