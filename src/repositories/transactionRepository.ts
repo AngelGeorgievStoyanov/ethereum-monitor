@@ -1,4 +1,4 @@
-import Transaction from '../models/transaction';
+import Transaction, { TransactionCreationAttributes } from '../models/transaction';
 
 export function findExistingTransfer(
     configurationId: string,
@@ -11,8 +11,8 @@ export function findExistingTransfer(
     });
 }
 
-export function createTransaction(data: Record<string, unknown>) {
-    return Transaction.create(data as never);
+export function createTransaction(data: TransactionCreationAttributes) {
+    return Transaction.create(data);
 }
 
 export function findAllTransactions() {
