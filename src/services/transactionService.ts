@@ -1,18 +1,30 @@
 import { Request, Response } from 'express';
 import Transaction from '../models/transaction';
 import Configuration from '../models/configuration';
-import { TransactionReceipt, TransactionResponse } from 'ethers';
+import { TransactionResponse } from 'ethers';
+
+export interface TransferMetadata {
+    transferType: 'native' | 'erc20';
+    logIndex: number;
+    from: string;
+    to: string;
+    value: string;
+    tokenAddress?: string;
+}
 
 export async function createTransactionFromEthereumData(
     tx: TransactionResponse,
-    receipt: TransactionReceipt,
+    receipt: any,
     config: Configuration,
-    blockTimestamp: number
+    blockTimestamp: number,
+    transfer: TransferMetadata
 ) {
     const existing = await Transaction.findOne({
         where: {
             configurationId: config.id,
             hash: tx.hash,
+            transferType: transfer.transferType,
+            logIndex: transfer.logIndex,
         },
     });
 
@@ -25,15 +37,18 @@ export async function createTransactionFromEthereumData(
         hash: tx.hash,
         nonce: tx.nonce,
         blockHash: receipt.blockHash,
-        blockNumber: receipt.blockNumber,
-        transactionIndex: receipt.index,
-        from: tx.from,
-        to: tx.to,
-        value: tx.value.toString(),
-        gas: Number(receipt.gasUsed),
+        blockNumber: Number(BigInt(receipt.blockNumber)),
+        transactionIndex: Number(BigInt(receipt.transactionIndex ?? receipt.index)),
+        from: transfer.from,
+        to: transfer.to,
+        value: transfer.value,
+        transferType: transfer.transferType,
+        tokenAddress: transfer.tokenAddress,
+        logIndex: transfer.logIndex,
+        gas: Number(BigInt(receipt.gasUsed ?? '0x0')),
         gasPrice: tx.gasPrice?.toString() ?? tx.maxFeePerGas?.toString() ?? '0',
         input: tx.data,
-        status: receipt.status === 1 ? 'success' : 'failed',
+        status: Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed',
         transactionType: tx.type?.toString(),
         contractAddress: receipt.contractAddress ?? undefined,
         timestamp: new Date(blockTimestamp * 1000),
@@ -44,10 +59,10 @@ export async function createTransactionFromEthereumData(
         accessList: tx.accessList ? JSON.stringify(tx.accessList) : undefined,
         blobVersionedHashes: tx.blobVersionedHashes ? JSON.stringify(tx.blobVersionedHashes) : undefined,
         logsBloom: receipt.logsBloom ?? undefined,
-        gasUsed: Number(receipt.gasUsed),
-        cumulativeGasUsed: Number(receipt.cumulativeGasUsed),
+        gasUsed: Number(BigInt(receipt.gasUsed ?? '0x0')),
+        cumulativeGasUsed: Number(BigInt(receipt.cumulativeGasUsed ?? '0x0')),
         root: receipt.root ?? undefined,
-        blobGasUsed: receipt.blobGasUsed ? Number(receipt.blobGasUsed) : undefined,
+        blobGasUsed: receipt.blobGasUsed ? Number(BigInt(receipt.blobGasUsed)) : undefined,
     };
 
     return Transaction.create(data);

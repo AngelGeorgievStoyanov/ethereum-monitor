@@ -6,6 +6,9 @@ interface TransactionAttributes {
     id: string;
     configurationId: string;
     hash: string;
+    transferType: 'native' | 'erc20';
+    tokenAddress?: string;
+    logIndex: number;
     nonce: number;
     blockHash: string;
     blockNumber: number;
@@ -41,6 +44,9 @@ class Transaction extends Model<TransactionAttributes, TransactionCreationAttrib
     public id!: string;
     public configurationId!: string;
     public hash!: string;
+    public transferType!: 'native' | 'erc20';
+    public tokenAddress?: string;
+    public logIndex!: number;
     public nonce!: number;
     public blockHash!: string;
     public blockNumber!: number;
@@ -88,6 +94,9 @@ Transaction.init(
             type: DataTypes.STRING,
             allowNull: false,
         },
+        transferType: { type: DataTypes.STRING, allowNull: false, defaultValue: 'native' },
+        tokenAddress: { type: DataTypes.STRING, allowNull: true },
+        logIndex: { type: DataTypes.INTEGER, allowNull: false, defaultValue: -1 },
         nonce: {
             type: DataTypes.INTEGER,
             allowNull: false,

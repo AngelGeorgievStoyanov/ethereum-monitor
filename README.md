@@ -1,6 +1,6 @@
 # Ethereum Monitor
 
-Ethereum Monitor monitors finalized native ETH transfers on Ethereum mainnet and stores transfers that match active configurations.
+Ethereum Monitor monitors finalized native ETH transfers and ERC-20 Transfer events on Ethereum mainnet, storing transfers that match active configurations.
 
 ## Technologies
 
@@ -54,14 +54,18 @@ The API listens on port 8080.
 ## Scanner behavior
 
 - The scanner processes only finalized blocks, in ascending block order.
+- For each block, the scanner fetches the full block and all block receipts in parallel using `Promise.all`; if either request fails, both are retried together with bounded exponential backoff.
+- Native ETH transfers and successful ERC-20 `Transfer` logs are matched against active sender/recipient configuration filters.
+- Stored records include `transferType` (`native` or `erc20`), `tokenAddress` for ERC-20 transfers, and `logIndex` to distinguish multiple token transfers in one transaction.
 - During catch-up, it reads finalized blocks over HTTP and saves a persistent checkpoint after each fully processed block.
 - Once caught up, it waits for new-block notifications over WebSocket, then checks the finalized block height over HTTP and processes only blocks that have finalized.
 - If WebSocket disconnects, errors, or stops delivering block events, the scanner falls back to HTTP polling and retries the WebSocket connection.
 - After a restart, scanning continues from the block after the saved checkpoint.
 - If processing a block fails, the checkpoint does not advance and that block is retried.
-- Only native ETH transactions with a recipient address are stored. Pending transactions, internal transactions, and token transfers are not monitored.
+- Only finalized direct native ETH transfers with a recipient and successful ERC-20 `Transfer` events are stored. Pending transactions and internal transactions are not monitored.
 - Each configuration can filter by sender address, recipient address, both, or neither.
-- Reprocessing a block does not create duplicate records for the same configuration and transaction hash.
+- Reprocessing a block does not create duplicate records for the same configuration, transaction hash, transfer type, and log index.
+- Detailed console logs record RPC duration/retries, per-block processing time, transfer counts, database-write time, checkpoint progress, catch-up duration, and blocks per second.
 
 The first startup begins at the latest finalized block unless `START_BLOCK` is set. `START_BLOCK` is used only when no scanner checkpoint exists.
 

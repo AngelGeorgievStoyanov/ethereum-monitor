@@ -17,7 +17,7 @@ app.use(express.json());
 
 
 async function startServer() {
-    await sequelize.sync();
+    await sequelize.sync({ alter: true });
     console.log('Database connected');
 
     app.use('/api/configurations', configRoutes);
