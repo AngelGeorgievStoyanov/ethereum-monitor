@@ -2,7 +2,7 @@ import { JsonRpcProvider } from 'ethers';
 import { formatError } from '../utils/formatError';
 import { getRpcProviderService } from './rpcProviderService';
 
-function isRateLimitError(error: unknown): boolean {
+function isRetryableEndpointError(error: unknown): boolean {
     let details = '';
 
     try {
@@ -12,7 +12,7 @@ function isRateLimitError(error: unknown): boolean {
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    return /\b429\b|too many requests|-32005|rate.?limit/i.test(`${message} ${details}`);
+    return /\b429\b|too many requests|-32005|rate.?limit|timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up|network error|\b50[234]\b/i.test(`${message} ${details}`);
 }
 
 export function createRpcRouterService() {
