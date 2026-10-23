@@ -10,6 +10,20 @@ const POLL_INTERVAL_MS = 4000;
 
 const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
+function formatError(error: unknown): string {
+    const value = error as { shortMessage?: unknown; reason?: unknown; code?: unknown; message?: unknown };
+    const rawMessage = typeof value?.shortMessage === 'string'
+        ? value.shortMessage
+        : typeof value?.reason === 'string'
+            ? value.reason
+            : error instanceof Error
+                ? error.message
+                : String(error);
+    const message = rawMessage.length > 240 ? `${rawMessage.slice(0, 240)}…` : rawMessage;
+    const code = typeof value?.code === 'string' ? ` (${value.code})` : '';
+    return `${message}${code}`;
+}
+
 export function createBlockMonitorService() {
     const configurations = new Map<string, Configuration>();
     let scannerStarted = false;
@@ -145,7 +159,7 @@ export function createBlockMonitorService() {
                     }
                 } catch (error) {
                     const location = processingBlock === undefined ? '' : ` at block ${processingBlock}`;
-                    const message = error instanceof Error ? error.message : String(error);
+                    const message = formatError(error);
                     console.error(`[Scanner] Processing failed${location}; checkpoint=${state.lastProcessedBlock}: ${message}`);
                 }
 
