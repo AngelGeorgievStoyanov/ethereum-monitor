@@ -9,21 +9,8 @@ export const ethereumProvider = new ethers.JsonRpcProvider(
     `https://mainnet.infura.io/v3/${configInfura.infuraProjectId}`
 );
 
-const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
-
-function formatError(error: unknown): string {
-    const value = error as { shortMessage?: unknown; reason?: unknown; code?: unknown; message?: unknown };
-    const rawMessage = typeof value?.shortMessage === 'string'
-        ? value.shortMessage
-        : typeof value?.reason === 'string'
-            ? value.reason
-            : error instanceof Error
-                ? error.message
-                : String(error);
-    const message = rawMessage.length > 240 ? `${rawMessage.slice(0, 240)}…` : rawMessage;
-    const code = typeof value?.code === 'string' ? ` (${value.code})` : '';
-    return `${message}${code}`;
-}
+import { formatError } from '../utils/formatError';
+import { sleep } from '../utils/sleep';
 
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
@@ -52,7 +39,7 @@ export async function fetchBlockData(blockNumber: number) {
 
             const delayMs = Math.min(RETRY_BASE_DELAY_MS * (2 ** (attempt - 1)), RETRY_MAX_DELAY_MS);
             console.warn(`[RPC] Block ${blockNumber} fetch failed (attempt ${attempt}/${MAX_BLOCK_FETCH_ATTEMPTS}); retrying in ${delayMs}ms: ${message}`);
-            await wait(delayMs);
+            await sleep(delayMs);
         }
     }
 
