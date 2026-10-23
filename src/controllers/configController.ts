@@ -24,9 +24,7 @@ export const createConfiguration = async (req: Request, res: Response) => {
             isActive: isActive ?? true,
         });
 
-        if (configuration.isActive) {
-            await configurationService.addConfiguration(configuration);
-        }
+        await configurationService.addConfiguration(configuration);
 
         res.status(201).json(configuration);
     } catch {
