@@ -1,6 +1,7 @@
 import { ethers, TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
 import { createTransactionFromEthereumData } from './transactionService';
+import { matchesConfiguration } from '../utils/matchesConfiguration';
 
 const TRANSFER_TOPIC = ethers.id('Transfer(address,address,uint256)').toLowerCase();
 
@@ -42,9 +43,7 @@ export async function processErc20Transfers(
 
             const matchingConfigurations = configurations.filter(config =>
                 config.isActive
-                && (config.senderAddress || config.recipientAddress)
-                && (!config.senderAddress || from.toLowerCase() === config.senderAddress.toLowerCase())
-                && (!config.recipientAddress || to.toLowerCase() === config.recipientAddress.toLowerCase())
+                && matchesConfiguration(from, to, config)
             );
 
             for (const config of matchingConfigurations) {
