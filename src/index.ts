@@ -5,7 +5,7 @@ import { getEthereumService } from './services/ethereumService';
 import transactionRoutes from './routes/transactionRoutes';
 
 const app = express();
-const PORT = 8080;
+const PORT = 8000;
 const HOST = "localhost";
 
 
