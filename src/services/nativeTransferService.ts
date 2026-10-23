@@ -3,7 +3,6 @@ import Configuration from '../models/configuration';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesConfiguration } from '../utils/matchesConfiguration';
 
-export { matchesConfiguration };
 
 export async function processNativeTransfers(
     transactions: readonly TransactionResponse[],
