@@ -128,7 +128,7 @@ function attachInfuraRequestLogging(provider: ethers.JsonRpcProvider) {
 
 export function createEthereumService() {
     const provider = new ethers.JsonRpcProvider(`https://mainnet.infura.io/v3/${configInfura.infuraProjectId}`);
-    attachInfuraRequestLogging(provider, 'HTTP');
+    attachInfuraRequestLogging(provider);
     const configurations = new Map<string, Configuration>();
     const scannerId = 'ethereum-mainnet';
     const pollIntervalMs = 4000;
@@ -240,7 +240,6 @@ export function createEthereumService() {
 
             while (!stopping) {
                 let processingBlock: number | undefined;
-                let retryAfterError = false;
                 try {
                     const finalized = await provider.getBlock('finalized');
                     if (!finalized) {
@@ -328,7 +327,6 @@ export function createEthereumService() {
                         }
                     }
                 } catch (error) {
-                    retryAfterError = true;
                     const location = processingBlock === undefined ? '' : ` at block ${processingBlock}`;
                     console.error(`[Ethereum scanner] Error${location}; checkpoint remains at ${state.lastProcessedBlock}:`, error instanceof Error ? error.message : error);
                 }
