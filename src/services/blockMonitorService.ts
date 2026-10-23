@@ -1,31 +1,17 @@
 import { TransactionResponse } from 'ethers';
-import Configuration from '../models/configuration';
 import ScannerState from '../models/scannerState';
 import { ethereumProvider, fetchBlockData } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
+import { getConfigurationService } from './configurationService';
+import { formatError } from '../utils/formatError';
+import { sleep } from '../utils/sleep';
 
 const SCANNER_ID = 'ethereum-mainnet';
 const POLL_INTERVAL_MS = 4000;
 
-const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
-
-function formatError(error: unknown): string {
-    const value = error as { shortMessage?: unknown; reason?: unknown; code?: unknown; message?: unknown };
-    const rawMessage = typeof value?.shortMessage === 'string'
-        ? value.shortMessage
-        : typeof value?.reason === 'string'
-            ? value.reason
-            : error instanceof Error
-                ? error.message
-                : String(error);
-    const message = rawMessage.length > 240 ? `${rawMessage.slice(0, 240)}…` : rawMessage;
-    const code = typeof value?.code === 'string' ? ` (${value.code})` : '';
-    return `${message}${code}`;
-}
-
 export function createBlockMonitorService() {
-    const configurations = new Map<string, Configuration>();
+    const configurationService = getConfigurationService();
     let scannerStarted = false;
     let stopping = false;
 
@@ -87,7 +73,7 @@ export function createBlockMonitorService() {
                     const finalized = await ethereumProvider.getBlock('finalized');
                     if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
-                    if (configurations.size === 0) {
+                    if (configurationService.getConfigurations().length === 0) {
                         if (state.lastProcessedBlock < finalized.number) {
                             state.lastProcessedBlock = finalized.number;
                             await state.save();
@@ -115,7 +101,7 @@ export function createBlockMonitorService() {
                                 transactionsByHash.set(tx.hash.toLowerCase(), tx);
                             }
 
-                            const activeConfigurations = Array.from(configurations.values()).filter(config => config.isActive);
+                            const activeConfigurations = configurationService.getConfigurations();
                             const native = await processNativeTransfers(
                                 transactions,
                                 receiptsByHash,
@@ -163,7 +149,7 @@ export function createBlockMonitorService() {
                     console.error(`[Scanner] Processing failed${location}; checkpoint=${state.lastProcessedBlock}: ${message}`);
                 }
 
-                await wait(POLL_INTERVAL_MS);
+                await sleep(POLL_INTERVAL_MS);
             }
         } catch (error) {
             scannerStarted = false;
@@ -171,36 +157,5 @@ export function createBlockMonitorService() {
         }
     }
 
-    async function loadConfigurations() {
-        const configs = await Configuration.findAll({ where: { isActive: true } });
-        configurations.clear();
-        configs.forEach(config => configurations.set(config.id, config));
-        console.log(`[Scanner] Loaded ${configurations.size} active configuration(s)`);
-
-        void start().catch(error => {
-            const message = error instanceof Error ? error.message : String(error);
-            console.error(`[Scanner] Unable to start: ${message}`);
-        });
-    }
-
-    async function addConfiguration(config: Configuration) {
-        if (config.isActive) configurations.set(config.id, config);
-    }
-
-    async function updateConfiguration(config: Configuration) {
-        if (config.isActive) configurations.set(config.id, config);
-        else configurations.delete(config.id);
-    }
-
-    async function removeConfiguration(id: string) {
-        configurations.delete(id);
-    }
-
-    return {
-        loadConfigurations,
-        addConfiguration,
-        updateConfiguration,
-        removeConfiguration,
-        getConfigurations: () => Array.from(configurations.values()),
-    };
+    return { start };
 }
