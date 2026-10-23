@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import Configuration from '../models/configuration';
-import { getEthereumService } from '../services/ethereumService';
+import { getConfigurationService } from '../services/configurationService';
 
-const ethereumService = getEthereumService();
+const configurationService = getConfigurationService();
 
 export const getConfigurations = async (_req: Request, res: Response) => {
     try {
@@ -25,7 +25,7 @@ export const createConfiguration = async (req: Request, res: Response) => {
         });
 
         if (configuration.isActive) {
-            await ethereumService.addConfiguration(configuration);
+            await configurationService.addConfiguration(configuration);
         }
 
         res.status(201).json(configuration);
@@ -60,7 +60,7 @@ export const updateConfiguration = async (req: Request, res: Response) => {
         }
 
         await configuration.save();
-        await ethereumService.updateConfiguration(configuration);
+        await configurationService.updateConfiguration(configuration);
         res.json(configuration);
     } catch {
         res.status(500).json({ message: 'Error updating configuration' });
@@ -79,7 +79,7 @@ export const deleteConfiguration = async (req: Request, res: Response) => {
         }
 
         await configuration.destroy();
-        await ethereumService.removeConfiguration(id);
+        await configurationService.removeConfiguration(id);
         res.json({ message: 'Configuration deleted' });
     } catch {
         res.status(500).json({ message: 'Error deleting configuration' });
