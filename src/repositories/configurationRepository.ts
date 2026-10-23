@@ -30,9 +30,16 @@ export async function updateConfiguration(
         isActive?: boolean;
     }
 ) {
-    const [updatedCount] = await Configuration.update(updates, { where: { id } });
-    if (updatedCount === 0) return null;
-    return Configuration.findByPk(id);
+    const configuration = await Configuration.findByPk(id);
+    if (!configuration) return null;
+
+    if (updates.name !== undefined) configuration.name = updates.name;
+    if (updates.senderAddress !== undefined) configuration.senderAddress = updates.senderAddress;
+    if (updates.recipientAddress !== undefined) configuration.recipientAddress = updates.recipientAddress;
+    if (updates.isActive !== undefined) configuration.isActive = updates.isActive;
+
+    await configuration.save();
+    return configuration;
 }
 
 export function deleteConfigurationById(id: string) {
