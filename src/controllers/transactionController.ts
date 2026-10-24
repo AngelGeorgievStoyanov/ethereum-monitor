@@ -1,8 +1,5 @@
 import { Request, Response } from 'express';
-import {
-    deleteStoredTransaction,
-    listStoredTransactions,
-} from '../services/transactionService';
+import { deleteStoredTransaction, listStoredTransactions } from '../services/transactionService';
 
 export async function getAllStoredTransactions(_req: Request, res: Response): Promise<void> {
     try {
