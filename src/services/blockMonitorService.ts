@@ -1,5 +1,6 @@
 import { TransactionResponse } from 'ethers';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
+import ScannerState from '../models/scannerState';
 import {
     createScannerState,
     findScannerState,
@@ -15,7 +16,7 @@ import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 
 async function advanceCheckpoint(
-    state: Awaited<ReturnType<typeof findScannerState>> & {},
+    state: ScannerState,
     blockNumber: number,
 ) {
     const previousBlock = state.lastProcessedBlock;
