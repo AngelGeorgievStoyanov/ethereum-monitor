@@ -1,5 +1,6 @@
 import { TransactionResponse } from 'ethers';
-import ScannerState from '../models/scannerState';
+import { createScannerState, findScannerState, saveScannerState } from '../repositories/scannerStateRepository';
+import { env } from '../config/env';
 import { ethereumProvider, fetchBlockData } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
@@ -20,12 +21,9 @@ export function createBlockMonitorService() {
         scannerStarted = true;
 
         try {
-            let state = await ScannerState.findByPk(SCANNER_ID);
-            const rescanValue = process.env.RESCAN_FROM_BLOCK;
-            const rescanBlock = rescanValue !== undefined ? Number(rescanValue) : undefined;
-            const validRescanBlock = rescanBlock !== undefined
-                && Number.isSafeInteger(rescanBlock)
-                && rescanBlock >= 0;
+            let state = await findScannerState(SCANNER_ID);
+            const rescanBlock = env.rescanFromBlock;
+            const validRescanBlock = rescanBlock !== undefined;
 
             if (
                 state
@@ -34,16 +32,15 @@ export function createBlockMonitorService() {
             ) {
                 state.lastProcessedBlock = rescanBlock - 1;
                 state.lastRescanFromBlock = rescanBlock;
-                await state.save();
+                await saveScannerState(state);
                 console.log(`[Scanner] Rescan scheduled from block ${rescanBlock}`);
             }
 
             if (!state) {
-                const configuredStart = process.env.START_BLOCK;
-                const startBlock = configuredStart !== undefined ? Number(configuredStart) : undefined;
+                const startBlock = env.startBlock;
                 let initialBlock: number;
 
-                if (validRescanBlock) {
+                if (rescanBlock !== undefined) {
                     initialBlock = rescanBlock;
                 } else if (
                     startBlock !== undefined
@@ -57,7 +54,7 @@ export function createBlockMonitorService() {
                     initialBlock = finalized.number;
                 }
 
-                state = await ScannerState.create({
+                state = await createScannerState({
                     id: SCANNER_ID,
                     lastProcessedBlock: initialBlock - 1,
                     lastRescanFromBlock: validRescanBlock ? rescanBlock : null,
@@ -76,7 +73,7 @@ export function createBlockMonitorService() {
                     if (configurationService.getConfigurations().length === 0) {
                         if (state.lastProcessedBlock < finalized.number) {
                             state.lastProcessedBlock = finalized.number;
-                            await state.save();
+                            await saveScannerState(state);
                             console.log(`[Scanner] No active configurations; checkpoint advanced to ${finalized.number}`);
                         }
                     } else {
@@ -118,7 +115,7 @@ export function createBlockMonitorService() {
                             );
 
                             state.lastProcessedBlock = blockNumber;
-                            await state.save();
+                            await saveScannerState(state);
 
                             const durationMs = Date.now() - blockStartedAt;
                             console.log(

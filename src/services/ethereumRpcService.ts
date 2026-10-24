@@ -1,13 +1,13 @@
 import { ethers } from 'ethers';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
-import { getRpcRouterService } from './rpcRouterService';
+import { getRpcClient } from '../clients/rpcClient';
 
 const MAX_BLOCK_FETCH_ATTEMPTS = 5;
 const RETRY_BASE_DELAY_MS = 1000;
 const RETRY_MAX_DELAY_MS = 15000;
 
-export const ethereumProvider = getRpcRouterService();
+export const ethereumProvider = getRpcClient();
 
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {

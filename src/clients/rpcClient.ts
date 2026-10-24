@@ -1,8 +1,8 @@
 import { JsonRpcProvider } from 'ethers';
+import { env } from '../config/env';
 import { formatError } from '../utils/formatError';
-import { getRpcProviderService } from './rpcProviderService';
 
-function isRateLimitError(error: unknown): boolean {
+function isRetryableEndpointError(error: unknown): boolean {
     let details = '';
 
     try {
@@ -12,12 +12,18 @@ function isRateLimitError(error: unknown): boolean {
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    return /\b429\b|too many requests|-32005|rate.?limit/i.test(`${message} ${details}`);
+    return /\b429\b|too many requests|-32005|rate.?limit|timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up|network error|\b50[234]\b/i.test(`${message} ${details}`);
 }
 
-export function createRpcRouterService() {
-    const providerService = getRpcProviderService();
-    const endpoints = providerService.getEndpoints();
+export function createRpcClient() {
+    if (env.rpcUrls.length === 0) {
+        throw new Error('No RPC endpoints configured. Add RPC_URL_1, RPC_URL_2, etc. to .env');
+    }
+
+    const endpoints = env.rpcUrls.map((url, index) => ({
+        index: index + 1,
+        provider: new JsonRpcProvider(url),
+    }));
     let nextEndpointIndex = 0;
 
     async function execute<T>(
@@ -27,24 +33,20 @@ export function createRpcRouterService() {
         let lastError: unknown;
 
         for (let attempt = 0; attempt < endpoints.length; attempt += 1) {
-            const endpointIndex = nextEndpointIndex;
-            const endpoint = endpoints[endpointIndex];
+            const endpoint = endpoints[nextEndpointIndex];
             nextEndpointIndex = (nextEndpointIndex + 1) % endpoints.length;
 
             try {
                 return await operation(endpoint.provider);
             } catch (error) {
                 lastError = error;
-
-                if (!isRateLimitError(error)) {
-                    throw error;
-                }
+                if (!isRetryableEndpointError(error)) throw error;
 
                 console.warn(
-                    `[RPC Router] Endpoint ${endpoint.index} rate-limited during ${operationName}; `
+                    `[RPC] Endpoint ${endpoint.index} failed temporarily during ${operationName}; `
                     + (attempt + 1 < endpoints.length
                         ? 'trying the next endpoint'
-                        : 'all configured endpoints were rate-limited')
+                        : 'all configured endpoints failed temporarily')
                     + `: ${formatError(error)}`
                 );
             }
@@ -67,15 +69,13 @@ export function createRpcRouterService() {
     };
 }
 
-let rpcRouterServiceInstance: ReturnType<typeof createRpcRouterService> | undefined;
+let rpcClientInstance: ReturnType<typeof createRpcClient> | undefined;
 
-export function getRpcRouterService() {
-    if (!rpcRouterServiceInstance) {
-        rpcRouterServiceInstance = createRpcRouterService();
-        console.log(
-            `[RPC Router] Loaded ${rpcRouterServiceInstance.getEndpointCount()} RPC endpoint(s)`
-        );
+export function getRpcClient() {
+    if (!rpcClientInstance) {
+        rpcClientInstance = createRpcClient();
+        console.log(`[RPC] Loaded ${rpcClientInstance.getEndpointCount()} endpoint(s)`);
     }
 
-    return rpcRouterServiceInstance;
+    return rpcClientInstance;
 }

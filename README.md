@@ -15,7 +15,7 @@ Ethereum Monitor monitors finalized native ETH transfers and ERC-20 Transfer eve
 ## Requirements
 
 - Node.js and npm
-- An Infura project ID with Ethereum mainnet HTTP JSON-RPC access
+- One or more Ethereum mainnet HTTP JSON-RPC endpoints
 
 ## Installation
 
@@ -28,9 +28,12 @@ npm install
 Create a `.env` file:
 
 ```env
-INFURA_PROJECT_ID=your-infura-project-id
+RPC_URL_1=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
+RPC_URL_2=https://YOUR_SECOND_PROVIDER_ENDPOINT
 DATABASE_URL=sqlite:./db.sqlite
 ```
+
+Configure at least `RPC_URL_1`. Additional `RPC_URL_N` endpoints are used as fallbacks when an endpoint is rate-limited, times out, or has a transient network error.
 
 ## Running
 
@@ -52,7 +55,8 @@ The API listens on port 8000.
 ## Scanner behavior
 
 - The scanner processes only finalized blocks, in ascending block order.
-- For each block, the scanner fetches the full block and all block receipts in parallel using `Promise.all`; if either request fails, both are retried together with bounded exponential backoff.
+- It fetches blocks and their receipts over HTTP JSON-RPC. Requests are sequential and retried with bounded exponential backoff.
+- The RPC client rotates across configured endpoints and retries rate-limited requests, timeouts, and transient network errors on another endpoint.
 - Native ETH transfers and successful ERC-20 `Transfer` logs are matched against active sender/recipient configuration filters.
 - Stored records include `transferType` (`native` or `erc20`), `tokenAddress` for ERC-20 transfers, and `logIndex` to distinguish multiple token transfers in one transaction.
 - During catch-up, it reads finalized blocks over HTTP and saves a persistent checkpoint after each fully processed block.
@@ -60,9 +64,7 @@ The API listens on port 8000.
 - After a restart, scanning continues from the block after the saved checkpoint.
 - If processing a block fails, the checkpoint does not advance and that block is retried.
 - Only finalized direct native ETH transfers with a recipient and successful ERC-20 `Transfer` events are stored. Pending transactions and internal transactions are not monitored.
-- Each configuration can filter by sender address, recipient address, both, or neither.
 - Reprocessing a block does not create duplicate records for the same configuration, transaction hash, transfer type, and log index.
-- Detailed console logs record RPC duration/retries, per-block processing time, transfer counts, database-write time, checkpoint progress, catch-up duration, and blocks per second.
 
 The first startup begins at the latest finalized block unless `START_BLOCK` is set. `START_BLOCK` is used only when no scanner checkpoint exists.
 
@@ -80,15 +82,13 @@ To rescan from an earlier block, set `RESCAN_FROM_BLOCK` to the desired block nu
 ### Transactions
 
 - `GET /api/transactions`: retrieve stored transactions.
-- `DELETE /api/transactions`: delete all stored transactions.
-- `DELETE /api/transactions/filter`: delete transactions matching the JSON `where` query parameter.
 - `DELETE /api/transactions/:id`: delete a transaction by its ID.
 
-The raw SQL query endpoint has been removed.
+Bulk deletion and query-based deletion endpoints are not exposed. The raw SQL query endpoint has been removed.
 
 ## Environment variables
 
-- `INFURA_PROJECT_ID`: Infura project ID used for HTTP JSON-RPC requests.
+- `RPC_URL_1`, `RPC_URL_2`, etc.: ordered Ethereum mainnet HTTP JSON-RPC endpoints. At least one is required.
 - `DATABASE_URL`: SQLite database URL. Defaults to `sqlite:./db.sqlite`.
 - `START_BLOCK`: optional initial block number, used only when no checkpoint exists.
 - `RESCAN_FROM_BLOCK`: optional one-time rewind to a block number. Each distinct value is applied once.

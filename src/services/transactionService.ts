@@ -1,7 +1,6 @@
-import { Request, Response } from 'express';
-import Transaction from '../models/transaction';
-import Configuration from '../models/configuration';
 import { TransactionResponse } from 'ethers';
+import Configuration from '../models/configuration';
+import { createTransaction, findExistingTransfer } from '../repositories/transactionRepository';
 
 export interface TransferMetadata {
     transferType: 'native' | 'erc20';
@@ -19,14 +18,12 @@ export async function createTransactionFromEthereumData(
     blockTimestamp: number,
     transfer: TransferMetadata
 ) {
-    const existing = await Transaction.findOne({
-        where: {
-            configurationId: config.id,
-            hash: tx.hash,
-            transferType: transfer.transferType,
-            logIndex: transfer.logIndex,
-        },
-    });
+    const existing = await findExistingTransfer(
+        config.id,
+        tx.hash,
+        transfer.transferType,
+        transfer.logIndex
+    );
 
     if (existing) {
         return existing;
@@ -65,66 +62,5 @@ export async function createTransactionFromEthereumData(
         blobGasUsed: receipt.blobGasUsed ? Number(BigInt(receipt.blobGasUsed)) : undefined,
     };
 
-    return Transaction.create(data);
-}
-
-export async function getAllStoredTransactions(req: Request, res: Response): Promise<void> {
-    try {
-        const transactions = await Transaction.findAll();
-        res.json(transactions);
-    } catch (error) {
-        console.error('Error fetching transactions:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-}
-
-export async function deleteAllTransactions(req: Request, res: Response): Promise<void> {
-    try {
-        await Transaction.destroy({ where: {} });
-        res.status(200).json({ message: 'All transactions deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting transactions:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-}
-
-export async function deleteTransactionById(req: Request, res: Response): Promise<void> {
-    const { id } = req.params;
-    try {
-        const result = await Transaction.destroy({ where: { id } });
-        if (result === 0) {
-            res.status(404).send('Transaction not found');
-        } else {
-            res.status(200).json({ message: 'Transaction deleted successfully' });
-        }
-    } catch (error) {
-        console.error('Error deleting transaction:', error);
-        res.status(500).send('Internal Server Error');
-    }
-}
-
-export async function deleteTransactionsWithQuery(req: Request, res: Response): Promise<void> {
-    try {
-        const { where } = req.query;
-        let whereClause: any = {};
-
-        if (where) {
-            try {
-                whereClause = JSON.parse(where as string);
-            } catch {
-                res.status(400).json({ message: 'Invalid "where" query parameter format' });
-                return;
-            }
-        }
-
-        const deleted = await Transaction.destroy({ where: whereClause });
-        if (deleted > 0) {
-            res.status(200).json({ message: `${deleted} transactions deleted successfully` });
-        } else {
-            res.status(404).json({ message: 'No transactions found to delete' });
-        }
-    } catch (error) {
-        console.error('Error deleting transactions:', error);
-        res.status(500).json({ message: 'Failed to delete transactions' });
-    }
+    return createTransaction(data);
 }
