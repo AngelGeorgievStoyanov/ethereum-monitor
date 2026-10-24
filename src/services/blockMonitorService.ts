@@ -80,6 +80,14 @@ export function createBlockMonitorService() {
                         const catchupStartedAt = Date.now();
                         const catchupStartBlock = state.lastProcessedBlock + 1;
                         let processedBlocks = 0;
+                        let totalTransactions = 0;
+                        let totalNativeMatches = 0;
+                        let totalErc20TransferLogsSeen = 0;
+                        let totalErc20Matches = 0;
+                        let totalFetchDurationMs = 0;
+                        let totalBlockDurationMs = 0;
+                        let totalNativeDatabaseWriteDurationMs = 0;
+                        let totalErc20DatabaseWriteDurationMs = 0;
 
                         while (state.lastProcessedBlock < finalized.number) {
                             const blockNumber = state.lastProcessedBlock + 1;
@@ -126,10 +134,24 @@ export function createBlockMonitorService() {
                             await saveScannerState(state);
 
                             const durationMs = Date.now() - blockStartedAt;
+                            const databaseWriteDurationMs =
+                                native.databaseWriteDurationMs + erc20.databaseWriteDurationMs;
+
+                            totalTransactions += transactions.length;
+                            totalNativeMatches += native.transfersMatched;
+                            totalErc20TransferLogsSeen += erc20.transferLogsSeen;
+                            totalErc20Matches += erc20.transfersMatched;
+                            totalFetchDurationMs += fetchDurationMs;
+                            totalBlockDurationMs += durationMs;
+                            totalNativeDatabaseWriteDurationMs += native.databaseWriteDurationMs;
+                            totalErc20DatabaseWriteDurationMs += erc20.databaseWriteDurationMs;
+
                             console.log(
                                 `[Scanner] Block ${blockNumber} processed: tx=${transactions.length}, ` +
-                                    `native matches=${native.transfersMatched}, ERC-20 matches=${erc20.transfersMatched}, ` +
-                                    `fetch=${fetchDurationMs}ms, total=${durationMs}ms, checkpoint=${state.lastProcessedBlock}` +
+                                    `native seen=${native.transfersSeen}, native matches=${native.transfersMatched}, ` +
+                                    `ERC-20 logs=${erc20.transferLogsSeen}, ERC-20 matches=${erc20.transfersMatched}, ` +
+                                    `fetch=${fetchDurationMs}ms, db writes=${databaseWriteDurationMs}ms, ` +
+                                    `total=${durationMs}ms, checkpoint=${state.lastProcessedBlock}` +
                                     (attempt > 1 ? `, fetch attempts=${attempt}` : ''),
                             );
 
@@ -143,9 +165,26 @@ export function createBlockMonitorService() {
                                 durationMs > 0
                                     ? ((processedBlocks * 1000) / durationMs).toFixed(2)
                                     : 'n/a';
+                            const averageFetchDurationMs = (
+                                totalFetchDurationMs / processedBlocks
+                            ).toFixed(1);
+                            const averageBlockDurationMs = (
+                                totalBlockDurationMs / processedBlocks
+                            ).toFixed(1);
+                            const averageDatabaseWriteDurationMs = (
+                                (totalNativeDatabaseWriteDurationMs +
+                                    totalErc20DatabaseWriteDurationMs) /
+                                processedBlocks
+                            ).toFixed(1);
+
                             console.log(
                                 `[Scanner] Catch-up complete: blocks ${catchupStartBlock}-${state.lastProcessedBlock}, ` +
-                                    `count=${processedBlocks}, speed=${blocksPerSecond} blocks/s`,
+                                    `count=${processedBlocks}, speed=${blocksPerSecond} blocks/s, ` +
+                                    `avg fetch=${averageFetchDurationMs}ms, avg block=${averageBlockDurationMs}ms, ` +
+                                    `avg db writes=${averageDatabaseWriteDurationMs}ms, tx=${totalTransactions}, ` +
+                                    `native matches=${totalNativeMatches}, ERC-20 logs=${totalErc20TransferLogsSeen}, ` +
+                                    `ERC-20 matches=${totalErc20Matches}, ` +
+                                    `total db writes=${totalNativeDatabaseWriteDurationMs + totalErc20DatabaseWriteDurationMs}ms`,
                             );
                         }
                     }
