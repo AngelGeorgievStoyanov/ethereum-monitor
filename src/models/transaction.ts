@@ -37,7 +37,7 @@ interface TransactionAttributes {
     blobGasUsed?: number;
 }
 
-export interface TransactionCreationAttributes extends Optional<TransactionAttributes, 'id'> { }
+export type TransactionCreationAttributes = Optional<TransactionAttributes, 'id'>;
 
 class Transaction extends Model<TransactionAttributes, TransactionCreationAttributes>
     implements TransactionAttributes {

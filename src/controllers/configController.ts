@@ -3,7 +3,6 @@ import {
     createConfiguration as insertConfiguration,
     deleteConfigurationById,
     findAllConfigurations,
-    findConfigurationById,
     updateConfiguration as persistConfiguration,
 } from '../repositories/configurationRepository';
 import { getConfigurationService } from '../services/configurationService';

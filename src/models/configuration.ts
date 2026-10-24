@@ -10,7 +10,7 @@ interface ConfigurationAttributes {
     isActive: boolean;
 }
 
-interface ConfigurationCreationAttributes extends Optional<ConfigurationAttributes, 'id' | 'isActive'> {}
+type ConfigurationCreationAttributes = Optional<ConfigurationAttributes, 'id' | 'isActive'>;
 
 class Configuration extends Model<ConfigurationAttributes, ConfigurationCreationAttributes> implements ConfigurationAttributes {
     public id!: string;

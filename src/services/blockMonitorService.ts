@@ -13,7 +13,6 @@ import { sleep } from '../utils/sleep';
 export function createBlockMonitorService() {
     const configurationService = getConfigurationService();
     let scannerStarted = false;
-    let stopping = false;
 
     async function start() {
         if (scannerStarted) return;
@@ -62,7 +61,7 @@ export function createBlockMonitorService() {
 
             console.log(`[Scanner] Started at checkpoint ${state.lastProcessedBlock}`);
 
-            while (!stopping) {
+            while (true) {
                 let processingBlock: number | undefined;
 
                 try {
@@ -80,7 +79,7 @@ export function createBlockMonitorService() {
                         const catchupStartBlock = state.lastProcessedBlock + 1;
                         let processedBlocks = 0;
 
-                        while (!stopping && state.lastProcessedBlock < finalized.number) {
+                        while (state.lastProcessedBlock < finalized.number) {
                             const blockNumber = state.lastProcessedBlock + 1;
                             processingBlock = blockNumber;
                             const blockStartedAt = Date.now();
