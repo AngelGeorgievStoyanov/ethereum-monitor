@@ -15,3 +15,14 @@ export function createScannerState(data: {
 export function saveScannerState(state: ScannerState) {
     return state.save();
 }
+
+export async function updateScannerCheckpoint(id: string, lastProcessedBlock: number) {
+    const [updatedRows] = await ScannerState.update(
+        { lastProcessedBlock },
+        { where: { id } },
+    );
+
+    if (updatedRows !== 1) {
+        throw new Error(`Unable to update scanner checkpoint for "${id}"`);
+    }
+}

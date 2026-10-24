@@ -5,6 +5,7 @@ import {
     createScannerState,
     findScannerState,
     saveScannerState,
+    updateScannerCheckpoint,
 } from '../repositories/scannerStateRepository';
 import { env } from '../config/env';
 import { SCANNER_ID, SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
@@ -19,15 +20,8 @@ async function advanceCheckpoint(
     state: ScannerState,
     blockNumber: number,
 ) {
-    const previousBlock = state.lastProcessedBlock;
+    await updateScannerCheckpoint(state.id, blockNumber);
     state.lastProcessedBlock = blockNumber;
-
-    try {
-        await saveScannerState(state);
-    } catch (error) {
-        state.lastProcessedBlock = previousBlock;
-        throw error;
-    }
 }
 
 export function createBlockMonitorService() {
