@@ -96,6 +96,7 @@ The API listens on port 8000.
 - If processing a block fails, the checkpoint does not advance and that block is retried.
 - Only finalized direct native ETH transfers with a recipient and successful ERC-20 `Transfer` events are stored. Pending transactions and internal transactions are not monitored.
 - Reprocessing a block does not create duplicate records for the same configuration, transaction hash, transfer type, and log index.
+- At startup, the application checks for existing duplicate transfer records and creates a unique SQLite index for that identity. If duplicates already exist, startup stops with examples; records are not deleted automatically.
 
 The first startup begins at the latest finalized block unless `START_BLOCK` is set. `START_BLOCK` is used only when no scanner checkpoint exists.
 
