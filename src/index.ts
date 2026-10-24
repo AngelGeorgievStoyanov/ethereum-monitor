@@ -24,13 +24,13 @@ async function startServer() {
         console.error(`[Scanner] Unable to start: ${formatError(error)}`);
     });
 
-    app.listen(HTTP_PORT, HTTP_HOST, () => {
+    const server = app.listen(HTTP_PORT, HTTP_HOST, () => {
         console.log(`Server is running on http://${HTTP_HOST}:${HTTP_PORT}`);
+    });
+
+    server.on('error', (error) => {
+        console.error(`Server error: ${formatError(error)}`);
     });
 }
 
 startServer();
-
-app.on('error', (error) => {
-    console.error(`Server error: ${formatError(error)}`);
-});
