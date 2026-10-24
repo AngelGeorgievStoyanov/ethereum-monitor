@@ -1,11 +1,12 @@
-import { ethers, TransactionReceipt, TransactionResponse } from 'ethers';
+import { ethers, TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
 import { ERC20_TRANSFER_TOPIC } from '../constants/erc20-transfer.constants';
+import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesConfiguration } from '../utils/matchesConfiguration';
 
 export async function processErc20Transfers(
-    receipts: readonly TransactionReceipt[],
+    receipts: readonly RpcTransactionReceipt[],
     transactionsByHash: Map<string, TransactionResponse>,
     configurations: Configuration[],
     blockNumber: number,
@@ -16,17 +17,18 @@ export async function processErc20Transfers(
     let databaseWriteDurationMs = 0;
 
     for (const receipt of receipts) {
-        if (receipt.status !== 1) continue;
+        if (Number(BigInt(receipt.status ?? '0x0')) !== 1) continue;
 
-        const txHash = receipt.hash.toLowerCase();
+        const txHash = receipt.transactionHash.toLowerCase();
         const tx = transactionsByHash.get(txHash);
         if (!tx) {
-            throw new Error(`Block transaction ${receipt.hash} was not found in block ${blockNumber}`);
+            throw new Error(`Block transaction ${receipt.transactionHash} was not found in block ${blockNumber}`);
         }
 
-        for (const log of receipt.logs) {
+        for (const log of receipt.logs ?? []) {
             if (
-                log.topics.length !== 3
+                !Array.isArray(log.topics)
+                || log.topics.length !== 3
                 || log.topics[0].toLowerCase() !== ERC20_TRANSFER_TOPIC
                 || !/^0x[0-9a-fA-F]{40}$/.test(log.address)
             ) {
@@ -37,7 +39,7 @@ export async function processErc20Transfers(
             const from = ethers.getAddress(`0x${log.topics[1].slice(-40)}`);
             const to = ethers.getAddress(`0x${log.topics[2].slice(-40)}`);
             const value = BigInt(log.data).toString();
-            const logIndex = log.index;
+            const logIndex = Number(BigInt(log.logIndex));
 
             const matchingConfigurations = configurations.filter(config =>
                 config.isActive

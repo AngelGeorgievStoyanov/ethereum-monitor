@@ -1,4 +1,5 @@
 import { TransactionResponse } from 'ethers';
+import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createScannerState, findScannerState, saveScannerState } from '../repositories/scannerStateRepository';
 import { env } from '../config/env';
 import { SCANNER_ID, SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
@@ -85,7 +86,7 @@ export function createBlockMonitorService() {
                             const blockStartedAt = Date.now();
                             const { block, receipts, durationMs: fetchDurationMs, attempt } = await fetchBlockData(blockNumber);
                             const transactions = block.prefetchedTransactions;
-                            const receiptsByHash = new Map<string, any>();
+                            const receiptsByHash = new Map<string, RpcTransactionReceipt>();
 
                             for (const receipt of receipts) {
                                 receiptsByHash.set(String(receipt.transactionHash).toLowerCase(), receipt);

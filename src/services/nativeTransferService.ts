@@ -1,11 +1,12 @@
-import { TransactionReceipt, TransactionResponse } from 'ethers';
+import { TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
+import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesConfiguration } from '../utils/matchesConfiguration';
 
 export async function processNativeTransfers(
     transactions: readonly TransactionResponse[],
-    receiptsByHash: Map<string, TransactionReceipt>,
+    receiptsByHash: Map<string, RpcTransactionReceipt>,
     configurations: Configuration[],
     blockNumber: number,
     blockTimestamp: number

@@ -1,5 +1,6 @@
-import { ethers, TransactionReceipt } from 'ethers';
+import { ethers } from 'ethers';
 import { MAX_BLOCK_FETCH_ATTEMPTS, RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS } from '../constants/ethereum-rpc.constants';
+import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 import { getRpcClient } from '../clients/rpcClient';
@@ -28,7 +29,7 @@ export async function fetchBlockData(blockNumber: number) {
 
             return {
                 block,
-                receipts: response as TransactionReceipt[],
+                receipts: response as RpcTransactionReceipt[],
                 durationMs: Date.now() - startedAt,
                 attempt,
             };

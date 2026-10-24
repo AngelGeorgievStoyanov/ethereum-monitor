@@ -1,5 +1,6 @@
-import { TransactionReceipt, TransactionResponse } from 'ethers';
+import { TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
+import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransaction, findExistingTransfer } from '../repositories/transactionRepository';
 
 export interface TransferMetadata {
@@ -13,7 +14,7 @@ export interface TransferMetadata {
 
 export async function createTransactionFromEthereumData(
     tx: TransactionResponse,
-    receipt: TransactionReceipt,
+    receipt: RpcTransactionReceipt,
     config: Configuration,
     blockTimestamp: number,
     transfer: TransferMetadata
@@ -34,18 +35,18 @@ export async function createTransactionFromEthereumData(
         hash: tx.hash,
         nonce: tx.nonce,
         blockHash: receipt.blockHash,
-        blockNumber: Number(receipt.blockNumber),
-        transactionIndex: receipt.transactionIndex,
+        blockNumber: Number(BigInt(receipt.blockNumber)),
+        transactionIndex: Number(BigInt(receipt.transactionIndex)),
         from: transfer.from,
         to: transfer.to,
         value: transfer.value,
         transferType: transfer.transferType,
         tokenAddress: transfer.tokenAddress,
         logIndex: transfer.logIndex,
-        gas: Number(receipt.gasUsed),
+        gas: Number(BigInt(receipt.gasUsed)),
         gasPrice: tx.gasPrice?.toString() ?? tx.maxFeePerGas?.toString() ?? '0',
         input: tx.data,
-        status: receipt.status === 1 ? 'success' : 'failed',
+        status: Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed',
         transactionType: tx.type?.toString(),
         contractAddress: receipt.contractAddress ?? undefined,
         timestamp: new Date(blockTimestamp * 1000),
@@ -56,10 +57,10 @@ export async function createTransactionFromEthereumData(
         accessList: tx.accessList ? JSON.stringify(tx.accessList) : undefined,
         blobVersionedHashes: tx.blobVersionedHashes ? JSON.stringify(tx.blobVersionedHashes) : undefined,
         logsBloom: receipt.logsBloom ?? undefined,
-        gasUsed: Number(receipt.gasUsed),
-        cumulativeGasUsed: Number(receipt.cumulativeGasUsed),
+        gasUsed: Number(BigInt(receipt.gasUsed)),
+        cumulativeGasUsed: Number(BigInt(receipt.cumulativeGasUsed)),
         root: receipt.root ?? undefined,
-        blobGasUsed: receipt.blobGasUsed ? Number(receipt.blobGasUsed) : undefined,
+        blobGasUsed: receipt.blobGasUsed ? Number(BigInt(receipt.blobGasUsed)) : undefined,
     };
 
     return createTransaction(data);
