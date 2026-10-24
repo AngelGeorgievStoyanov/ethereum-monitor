@@ -1,13 +1,14 @@
 {
   "name": "ethereum-monitor",
   "version": "1.0.0",
-  "description": "",
+  "description": "Ethereum mainnet native and ERC-20 transfer monitor",
   "main": "build/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "start": "node build/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon"
+    "dev": "nodemon",
+    "clean": "node -e \"require('node:fs').rmSync('build', { recursive: true, force: true })\""
   },
   "author": "Angel Stoyanov",
   "license": "ISC",
