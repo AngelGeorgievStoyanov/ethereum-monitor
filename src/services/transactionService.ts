@@ -1,7 +1,12 @@
 import { TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
-import { createTransaction, findExistingTransfer } from '../repositories/transactionRepository';
+import {
+    createTransaction,
+    deleteTransactionById,
+    findAllTransactions,
+    findExistingTransfer,
+} from '../repositories/transactionRepository';
 
 export interface TransferMetadata {
     transferType: 'native' | 'erc20';
@@ -66,4 +71,13 @@ export async function createTransactionFromEthereumData(
     };
 
     return createTransaction(data);
+}
+
+
+export function getAllStoredTransactions() {
+    return findAllTransactions();
+}
+
+export function deleteStoredTransaction(id: string) {
+    return deleteTransactionById(id);
 }

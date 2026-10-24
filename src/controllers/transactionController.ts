@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import {
-    deleteTransactionById as removeTransactionById,
-    findAllTransactions,
-} from '../repositories/transactionRepository';
+    deleteStoredTransaction,
+    getAllStoredTransactions,
+} from '../services/transactionService';
 
 export async function getAllStoredTransactions(_req: Request, res: Response): Promise<void> {
     try {
-        const transactions = await findAllTransactions();
+        const transactions = await getAllStoredTransactions();
         res.json(transactions);
     } catch (error) {
         console.error('Error fetching transactions:', error);
@@ -16,7 +16,7 @@ export async function getAllStoredTransactions(_req: Request, res: Response): Pr
 
 export async function deleteTransactionById(req: Request, res: Response): Promise<void> {
     try {
-        const deleted = await removeTransactionById(req.params.id);
+        const deleted = await deleteStoredTransaction(req.params.id);
         if (deleted === 0) {
             res.status(404).send('Transaction not found');
             return;
