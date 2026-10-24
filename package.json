@@ -19,21 +19,21 @@
     "author": "Angel Stoyanov",
     "license": "ISC",
     "dependencies": {
-        "dotenv": "^16.4.5",
+        "dotenv": "^18.0.9",
         "ethers": "^6.13.2",
-        "express": "^4.19.2",
+        "express": "^5.3.0",
         "sequelize": "^6.37.3",
         "sqlite3": "^6.0.1"
     },
     "devDependencies": {
-        "@types/express": "^4.17.21",
-        "@types/node": "^22.5.2",
-        "nodemon": "^3.1.4",
-        "ts-node": "^10.9.2",
-        "typescript": "^5.5.4",
+        "@types/express": "^5.0.6",
+        "@types/node": "^24.19.2",
         "eslint": "10.13.0",
-        "typescript-eslint": "8.71.1",
-        "prettier": "3.9.10"
+        "nodemon": "^3.1.4",
+        "prettier": "3.9.10",
+        "ts-node": "^10.9.2",
+        "typescript": "^6.0.3",
+        "typescript-eslint": "^8.72.0"
     },
     "allowScripts": {
         "sqlite3@6.0.1": true
