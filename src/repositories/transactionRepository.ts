@@ -31,8 +31,7 @@ export async function ensureTransferUniqueness() {
             .join('; ');
 
         throw new Error(
-            `Cannot enforce transfer uniqueness because duplicate records already exist.  +
-            `Resolve these records manually, then restart. Duplicate examples: ${examples}`,
+            `Cannot enforce transfer uniqueness because duplicate records already exist. Resolve these records manually, then restart. Duplicate examples: ${examples}`,
         );
     }
 
