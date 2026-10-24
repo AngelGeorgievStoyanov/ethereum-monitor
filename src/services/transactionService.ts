@@ -2,10 +2,9 @@ import { TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import {
-    createTransaction,
     deleteTransactionById,
     findAllTransactions,
-    findExistingTransfer,
+    findOrCreateTransfer,
 } from '../repositories/transactionRepository';
 
 export interface TransferMetadata {
@@ -24,17 +23,6 @@ export async function createTransactionFromEthereumData(
     blockTimestamp: number,
     transfer: TransferMetadata,
 ) {
-    const existing = await findExistingTransfer(
-        config.id,
-        tx.hash,
-        transfer.transferType,
-        transfer.logIndex,
-    );
-
-    if (existing) {
-        return existing;
-    }
-
     const data = {
         configurationId: config.id,
         hash: tx.hash,
@@ -70,7 +58,7 @@ export async function createTransactionFromEthereumData(
         blobGasUsed: receipt.blobGasUsed ? Number(BigInt(receipt.blobGasUsed)) : undefined,
     };
 
-    return createTransaction(data);
+    return findOrCreateTransfer(data);
 }
 
 export function listStoredTransactions() {
