@@ -22,8 +22,14 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Install dependencies
+      - name: Install application dependencies
         run: npm ci
+      - name: Install pinned code-quality tools
+        run: npm run tools:install
+      - name: Lint TypeScript
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
       - name: Build TypeScript
         run: npm run build
       - name: Audit dependencies

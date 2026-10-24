@@ -11,6 +11,8 @@ Ethereum Monitor monitors finalized native ETH transfers and ERC-20 Transfer eve
 - Ethers.js
 - TypeScript
 - Nodemon
+- ESLint
+- Prettier
 
 ## Project structure
 
@@ -27,7 +29,7 @@ Ethereum Monitor monitors finalized native ETH transfers and ERC-20 Transfer eve
 
 ## Continuous integration
 
-GitHub Actions runs the TypeScript build and an npm dependency audit on pushes and pull requests targeting `feature/ethereum-monitoring-refactor`. Automated tests are not configured yet.
+GitHub Actions runs ESLint, Prettier formatting checks, the TypeScript build, and an npm dependency audit on pushes and pull requests targeting `feature/ethereum-monitoring-refactor`. Automated tests are intentionally not configured at this stage.
 
 ## Requirements
 
@@ -68,6 +70,16 @@ npm start
 ```
 
 The build command clears the previous `build` output before compiling TypeScript.
+
+Install the pinned code-quality tools when setting up the project:
+
+```bash
+npm run tools:install
+npm run lint
+npm run format:check
+```
+
+Use `npm run format` to apply the configured formatting.
 
 The API listens on port 8000.
 
