@@ -12,6 +12,22 @@ Ethereum Monitor monitors finalized native ETH transfers and ERC-20 Transfer eve
 - TypeScript
 - Nodemon
 
+## Project structure
+
+- `src/clients`: external RPC client integration.
+- `src/config`: environment configuration.
+- `src/constants`: constants grouped by the feature or service that owns them.
+- `src/controllers`: HTTP request and response handling.
+- `src/models`: Sequelize data models.
+- `src/repositories`: database access.
+- `src/services`: scanner, Ethereum RPC, transfer processing, and configuration logic.
+- `src/utils`: small shared utilities.
+- `src/httpRouter.ts`: API route declarations, kept separate from controller logic.
+
+## Continuous integration
+
+GitHub Actions runs the TypeScript build and an npm dependency audit on pushes and pull requests targeting `feature/ethereum-monitoring-refactor`. Automated tests are not configured yet.
+
 ## Requirements
 
 - Node.js and npm

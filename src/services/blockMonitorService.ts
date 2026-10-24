@@ -1,15 +1,13 @@
 import { TransactionResponse } from 'ethers';
 import { createScannerState, findScannerState, saveScannerState } from '../repositories/scannerStateRepository';
 import { env } from '../config/env';
+import { SCANNER_ID, SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
 import { ethereumProvider, fetchBlockData } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
 import { getConfigurationService } from './configurationService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
-
-const SCANNER_ID = 'ethereum-mainnet';
-const POLL_INTERVAL_MS = 4000;
 
 export function createBlockMonitorService() {
     const configurationService = getConfigurationService();
@@ -146,7 +144,7 @@ export function createBlockMonitorService() {
                     console.error(`[Scanner] Processing failed${location}; checkpoint=${state.lastProcessedBlock}: ${message}`);
                 }
 
-                await sleep(POLL_INTERVAL_MS);
+                await sleep(SCANNER_POLL_INTERVAL_MS);
             }
         } catch (error) {
             scannerStarted = false;

@@ -1,13 +1,12 @@
 import express from 'express';
 import sequelize from './database';
 import httpRouter from './httpRouter';
+import { HTTP_HOST, HTTP_PORT } from './constants/http.constants';
 import { getEthereumService } from './services/ethereumService';
 import { getConfigurationService } from './services/configurationService';
 import { formatError } from './utils/formatError';
 
 const app = express();
-const PORT = 8000;
-const HOST = 'localhost';
 
 const ethereumService = getEthereumService();
 const configurationService = getConfigurationService();
@@ -25,8 +24,8 @@ async function startServer() {
         console.error(`[Scanner] Unable to start: ${formatError(error)}`);
     });
 
-    app.listen(PORT, () => {
-        console.log(`Server is running on http://${HOST}:${PORT}`);
+    app.listen(HTTP_PORT, HTTP_HOST, () => {
+        console.log(`Server is running on http://${HTTP_HOST}:${HTTP_PORT}`);
     });
 }
 

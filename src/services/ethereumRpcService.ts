@@ -1,11 +1,8 @@
 import { ethers } from 'ethers';
+import { MAX_BLOCK_FETCH_ATTEMPTS, RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS } from '../constants/ethereum-rpc.constants';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 import { getRpcClient } from '../clients/rpcClient';
-
-const MAX_BLOCK_FETCH_ATTEMPTS = 5;
-const RETRY_BASE_DELAY_MS = 1000;
-const RETRY_MAX_DELAY_MS = 15000;
 
 export const ethereumProvider = getRpcClient();
 

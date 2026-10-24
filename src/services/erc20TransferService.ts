@@ -1,9 +1,8 @@
 import { ethers, TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
+import { ERC20_TRANSFER_TOPIC } from '../constants/erc20-transfer.constants';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesConfiguration } from '../utils/matchesConfiguration';
-
-const TRANSFER_TOPIC = ethers.id('Transfer(address,address,uint256)').toLowerCase();
 
 export async function processErc20Transfers(
     receipts: any[],
@@ -29,7 +28,7 @@ export async function processErc20Transfers(
             if (
                 !Array.isArray(log.topics)
                 || log.topics.length !== 3
-                || String(log.topics[0]).toLowerCase() !== TRANSFER_TOPIC
+                || String(log.topics[0]).toLowerCase() !== ERC20_TRANSFER_TOPIC
                 || !/^0x[0-9a-fA-F]{40}$/.test(String(log.address))
             ) {
                 continue;
