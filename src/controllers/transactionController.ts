@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import {
     deleteStoredTransaction,
-    getAllStoredTransactions,
+    listStoredTransactions,
 } from '../services/transactionService';
 
 export async function getAllStoredTransactions(_req: Request, res: Response): Promise<void> {
     try {
-        const transactions = await getAllStoredTransactions();
+        const transactions = await listStoredTransactions();
         res.json(transactions);
     } catch (error) {
         console.error('Error fetching transactions:', error);

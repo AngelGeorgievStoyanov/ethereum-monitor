@@ -74,7 +74,7 @@ export async function createTransactionFromEthereumData(
 }
 
 
-export function getAllStoredTransactions() {
+export function listStoredTransactions() {
     return findAllTransactions();
 }
 
