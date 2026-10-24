@@ -4,7 +4,7 @@ export function findExistingTransfer(
     configurationId: string,
     hash: string,
     transferType: 'native' | 'erc20',
-    logIndex: number
+    logIndex: number,
 ) {
     return Transaction.findOne({
         where: { configurationId, hash, transferType, logIndex },

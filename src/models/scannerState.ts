@@ -27,7 +27,7 @@ ScannerState.init(
         tableName: 'ScannerStates',
         modelName: 'ScannerState',
         timestamps: true,
-    }
+    },
 );
 
 export default ScannerState;

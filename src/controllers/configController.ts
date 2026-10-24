@@ -43,7 +43,9 @@ export const updateConfiguration = async (req: Request, res: Response) => {
         const configuration = await persistConfiguration(id, {
             ...(name !== undefined ? { name } : {}),
             ...(senderAddress !== undefined ? { senderAddress: senderAddress || null } : {}),
-            ...(recipientAddress !== undefined ? { recipientAddress: recipientAddress || null } : {}),
+            ...(recipientAddress !== undefined
+                ? { recipientAddress: recipientAddress || null }
+                : {}),
             ...(isActive !== undefined ? { isActive } : {}),
         });
 

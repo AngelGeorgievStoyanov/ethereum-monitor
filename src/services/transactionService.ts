@@ -17,13 +17,13 @@ export async function createTransactionFromEthereumData(
     receipt: RpcTransactionReceipt,
     config: Configuration,
     blockTimestamp: number,
-    transfer: TransferMetadata
+    transfer: TransferMetadata,
 ) {
     const existing = await findExistingTransfer(
         config.id,
         tx.hash,
         transfer.transferType,
-        transfer.logIndex
+        transfer.logIndex,
     );
 
     if (existing) {
@@ -55,7 +55,9 @@ export async function createTransactionFromEthereumData(
         maxFeePerGas: tx.maxFeePerGas?.toString() ?? undefined,
         maxFeePerBlobGas: tx.maxFeePerBlobGas?.toString() ?? undefined,
         accessList: tx.accessList ? JSON.stringify(tx.accessList) : undefined,
-        blobVersionedHashes: tx.blobVersionedHashes ? JSON.stringify(tx.blobVersionedHashes) : undefined,
+        blobVersionedHashes: tx.blobVersionedHashes
+            ? JSON.stringify(tx.blobVersionedHashes)
+            : undefined,
         logsBloom: receipt.logsBloom ?? undefined,
         gasUsed: Number(BigInt(receipt.gasUsed)),
         cumulativeGasUsed: Number(BigInt(receipt.cumulativeGasUsed)),

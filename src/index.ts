@@ -20,7 +20,7 @@ async function startServer() {
 
     await configurationService.loadConfigurations();
 
-    void ethereumService.start().catch(error => {
+    void ethereumService.start().catch((error) => {
         console.error(`[Scanner] Unable to start: ${formatError(error)}`);
     });
 
@@ -31,6 +31,6 @@ async function startServer() {
 
 startServer();
 
-app.on('error', error => {
+app.on('error', (error) => {
     console.error(`Server error: ${formatError(error)}`);
 });

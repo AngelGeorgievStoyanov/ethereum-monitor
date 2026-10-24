@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
-import { deleteTransactionById as removeTransactionById, findAllTransactions } from '../repositories/transactionRepository';
+import {
+    deleteTransactionById as removeTransactionById,
+    findAllTransactions,
+} from '../repositories/transactionRepository';
 
 export async function getAllStoredTransactions(_req: Request, res: Response): Promise<void> {
     try {

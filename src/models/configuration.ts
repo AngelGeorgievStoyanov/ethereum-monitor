@@ -12,7 +12,10 @@ interface ConfigurationAttributes {
 
 type ConfigurationCreationAttributes = Optional<ConfigurationAttributes, 'id' | 'isActive'>;
 
-class Configuration extends Model<ConfigurationAttributes, ConfigurationCreationAttributes> implements ConfigurationAttributes {
+class Configuration
+    extends Model<ConfigurationAttributes, ConfigurationCreationAttributes>
+    implements ConfigurationAttributes
+{
     public id!: string;
     public name!: string;
     public senderAddress?: string | null;
@@ -54,7 +57,7 @@ Configuration.init(
         tableName: 'Configurations',
         modelName: 'Configuration',
         timestamps: true,
-    }
+    },
 );
 
 export default Configuration;

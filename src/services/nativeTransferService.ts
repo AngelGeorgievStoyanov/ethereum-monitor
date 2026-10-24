@@ -9,7 +9,7 @@ export async function processNativeTransfers(
     receiptsByHash: Map<string, RpcTransactionReceipt>,
     configurations: Configuration[],
     blockNumber: number,
-    blockTimestamp: number
+    blockTimestamp: number,
 ) {
     let transfersSeen = 0;
     let transfersMatched = 0;
@@ -19,31 +19,27 @@ export async function processNativeTransfers(
         if (!tx.to || tx.value <= 0n) continue;
         transfersSeen += 1;
 
-        const matchingConfigurations = configurations.filter(config =>
-            config.isActive && matchesConfiguration(tx.from, tx.to, config)
+        const matchingConfigurations = configurations.filter(
+            (config) => config.isActive && matchesConfiguration(tx.from, tx.to, config),
         );
         if (matchingConfigurations.length === 0) continue;
 
         const receipt = receiptsByHash.get(tx.hash.toLowerCase());
         if (!receipt) {
-            throw new Error(`Block receipts did not contain native transaction ${tx.hash} in block ${blockNumber}`);
+            throw new Error(
+                `Block receipts did not contain native transaction ${tx.hash} in block ${blockNumber}`,
+            );
         }
 
         for (const config of matchingConfigurations) {
             const startedAt = Date.now();
-            await createTransactionFromEthereumData(
-                tx,
-                receipt,
-                config,
-                blockTimestamp,
-                {
-                    transferType: 'native',
-                    logIndex: -1,
-                    from: tx.from,
-                    to: tx.to,
-                    value: tx.value.toString(),
-                }
-            );
+            await createTransactionFromEthereumData(tx, receipt, config, blockTimestamp, {
+                transferType: 'native',
+                logIndex: -1,
+                from: tx.from,
+                to: tx.to,
+                value: tx.value.toString(),
+            });
             databaseWriteDurationMs += Date.now() - startedAt;
             transfersMatched += 1;
         }

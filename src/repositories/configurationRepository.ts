@@ -28,14 +28,15 @@ export async function updateConfiguration(
         senderAddress?: string | null;
         recipientAddress?: string | null;
         isActive?: boolean;
-    }
+    },
 ) {
     const configuration = await Configuration.findByPk(id);
     if (!configuration) return null;
 
     if (updates.name !== undefined) configuration.name = updates.name;
     if (updates.senderAddress !== undefined) configuration.senderAddress = updates.senderAddress;
-    if (updates.recipientAddress !== undefined) configuration.recipientAddress = updates.recipientAddress;
+    if (updates.recipientAddress !== undefined)
+        configuration.recipientAddress = updates.recipientAddress;
     if (updates.isActive !== undefined) configuration.isActive = updates.isActive;
 
     await configuration.save();

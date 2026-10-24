@@ -7,7 +7,7 @@ export function createConfigurationService() {
     async function loadConfigurations() {
         const configs = await findActiveConfigurations();
         configurations.clear();
-        configs.forEach(config => configurations.set(config.id, config));
+        configs.forEach((config) => configurations.set(config.id, config));
         console.log(`[Scanner] Loaded ${configurations.size} active configuration(s)`);
     }
 

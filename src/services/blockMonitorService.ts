@@ -1,6 +1,10 @@
 import { TransactionResponse } from 'ethers';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
-import { createScannerState, findScannerState, saveScannerState } from '../repositories/scannerStateRepository';
+import {
+    createScannerState,
+    findScannerState,
+    saveScannerState,
+} from '../repositories/scannerStateRepository';
 import { env } from '../config/env';
 import { SCANNER_ID, SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
 import { ethereumProvider, fetchBlockData } from './ethereumRpcService';
@@ -23,11 +27,7 @@ export function createBlockMonitorService() {
             const rescanBlock = env.rescanFromBlock;
             const validRescanBlock = rescanBlock !== undefined;
 
-            if (
-                state
-                && validRescanBlock
-                && state.lastRescanFromBlock !== rescanBlock
-            ) {
+            if (state && validRescanBlock && state.lastRescanFromBlock !== rescanBlock) {
                 state.lastProcessedBlock = rescanBlock - 1;
                 state.lastRescanFromBlock = rescanBlock;
                 await saveScannerState(state);
@@ -41,9 +41,9 @@ export function createBlockMonitorService() {
                 if (rescanBlock !== undefined) {
                     initialBlock = rescanBlock;
                 } else if (
-                    startBlock !== undefined
-                    && Number.isSafeInteger(startBlock)
-                    && startBlock >= 0
+                    startBlock !== undefined &&
+                    Number.isSafeInteger(startBlock) &&
+                    startBlock >= 0
                 ) {
                     initialBlock = startBlock;
                 } else {
@@ -72,7 +72,9 @@ export function createBlockMonitorService() {
                         if (state.lastProcessedBlock < finalized.number) {
                             state.lastProcessedBlock = finalized.number;
                             await saveScannerState(state);
-                            console.log(`[Scanner] No active configurations; checkpoint advanced to ${finalized.number}`);
+                            console.log(
+                                `[Scanner] No active configurations; checkpoint advanced to ${finalized.number}`,
+                            );
                         }
                     } else {
                         const catchupStartedAt = Date.now();
@@ -83,12 +85,20 @@ export function createBlockMonitorService() {
                             const blockNumber = state.lastProcessedBlock + 1;
                             processingBlock = blockNumber;
                             const blockStartedAt = Date.now();
-                            const { block, receipts, durationMs: fetchDurationMs, attempt } = await fetchBlockData(blockNumber);
+                            const {
+                                block,
+                                receipts,
+                                durationMs: fetchDurationMs,
+                                attempt,
+                            } = await fetchBlockData(blockNumber);
                             const transactions = block.prefetchedTransactions;
                             const receiptsByHash = new Map<string, RpcTransactionReceipt>();
 
                             for (const receipt of receipts) {
-                                receiptsByHash.set(String(receipt.transactionHash).toLowerCase(), receipt);
+                                receiptsByHash.set(
+                                    String(receipt.transactionHash).toLowerCase(),
+                                    receipt,
+                                );
                             }
 
                             const transactionsByHash = new Map<string, TransactionResponse>();
@@ -102,14 +112,14 @@ export function createBlockMonitorService() {
                                 receiptsByHash,
                                 activeConfigurations,
                                 blockNumber,
-                                block.timestamp
+                                block.timestamp,
                             );
                             const erc20 = await processErc20Transfers(
                                 receipts,
                                 transactionsByHash,
                                 activeConfigurations,
                                 blockNumber,
-                                block.timestamp
+                                block.timestamp,
                             );
 
                             state.lastProcessedBlock = blockNumber;
@@ -117,10 +127,10 @@ export function createBlockMonitorService() {
 
                             const durationMs = Date.now() - blockStartedAt;
                             console.log(
-                                `[Scanner] Block ${blockNumber} processed: tx=${transactions.length}, `
-                                + `native matches=${native.transfersMatched}, ERC-20 matches=${erc20.transfersMatched}, `
-                                + `fetch=${fetchDurationMs}ms, total=${durationMs}ms, checkpoint=${state.lastProcessedBlock}`
-                                + (attempt > 1 ? `, fetch attempts=${attempt}` : '')
+                                `[Scanner] Block ${blockNumber} processed: tx=${transactions.length}, ` +
+                                    `native matches=${native.transfersMatched}, ERC-20 matches=${erc20.transfersMatched}, ` +
+                                    `fetch=${fetchDurationMs}ms, total=${durationMs}ms, checkpoint=${state.lastProcessedBlock}` +
+                                    (attempt > 1 ? `, fetch attempts=${attempt}` : ''),
                             );
 
                             processingBlock = undefined;
@@ -129,19 +139,23 @@ export function createBlockMonitorService() {
 
                         if (processedBlocks > 0) {
                             const durationMs = Date.now() - catchupStartedAt;
-                            const blocksPerSecond = durationMs > 0
-                                ? (processedBlocks * 1000 / durationMs).toFixed(2)
-                                : 'n/a';
+                            const blocksPerSecond =
+                                durationMs > 0
+                                    ? ((processedBlocks * 1000) / durationMs).toFixed(2)
+                                    : 'n/a';
                             console.log(
-                                `[Scanner] Catch-up complete: blocks ${catchupStartBlock}-${state.lastProcessedBlock}, `
-                                + `count=${processedBlocks}, speed=${blocksPerSecond} blocks/s`
+                                `[Scanner] Catch-up complete: blocks ${catchupStartBlock}-${state.lastProcessedBlock}, ` +
+                                    `count=${processedBlocks}, speed=${blocksPerSecond} blocks/s`,
                             );
                         }
                     }
                 } catch (error) {
-                    const location = processingBlock === undefined ? '' : ` at block ${processingBlock}`;
+                    const location =
+                        processingBlock === undefined ? '' : ` at block ${processingBlock}`;
                     const message = formatError(error);
-                    console.error(`[Scanner] Processing failed${location}; checkpoint=${state.lastProcessedBlock}: ${message}`);
+                    console.error(
+                        `[Scanner] Processing failed${location}; checkpoint=${state.lastProcessedBlock}: ${message}`,
+                    );
                 }
 
                 await sleep(SCANNER_POLL_INTERVAL_MS);

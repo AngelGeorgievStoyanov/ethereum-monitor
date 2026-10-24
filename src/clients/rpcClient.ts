@@ -12,7 +12,9 @@ function isRetryableEndpointError(error: unknown): boolean {
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    return /\b429\b|too many requests|-32005|rate.?limit|timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up|network error|\b50[234]\b/i.test(`${message} ${details}`);
+    return /\b429\b|too many requests|-32005|rate.?limit|timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up|network error|\b50[234]\b/i.test(
+        `${message} ${details}`,
+    );
 }
 
 export function createRpcClient() {
@@ -28,7 +30,7 @@ export function createRpcClient() {
 
     async function execute<T>(
         operationName: string,
-        operation: (provider: JsonRpcProvider) => Promise<T>
+        operation: (provider: JsonRpcProvider) => Promise<T>,
     ): Promise<T> {
         let lastError: unknown;
 
@@ -43,11 +45,11 @@ export function createRpcClient() {
                 if (!isRetryableEndpointError(error)) throw error;
 
                 console.warn(
-                    `[RPC] Endpoint ${endpoint.index} failed temporarily during ${operationName}; `
-                    + (attempt + 1 < endpoints.length
-                        ? 'trying the next endpoint'
-                        : 'all configured endpoints failed temporarily')
-                    + `: ${formatError(error)}`
+                    `[RPC] Endpoint ${endpoint.index} failed temporarily during ${operationName}; ` +
+                        (attempt + 1 < endpoints.length
+                            ? 'trying the next endpoint'
+                            : 'all configured endpoints failed temporarily') +
+                        `: ${formatError(error)}`,
                 );
             }
         }
@@ -57,13 +59,12 @@ export function createRpcClient() {
 
     return {
         getBlock(blockTag: string | number, includeTransactions = false) {
-            return execute(
-                `getBlock(${String(blockTag)})`,
-                provider => provider.getBlock(blockTag, includeTransactions)
+            return execute(`getBlock(${String(blockTag)})`, (provider) =>
+                provider.getBlock(blockTag, includeTransactions),
             );
         },
         send(method: string, params: unknown[]) {
-            return execute(method, provider => provider.send(method, params));
+            return execute(method, (provider) => provider.send(method, params));
         },
         getEndpointCount: () => endpoints.length,
     };

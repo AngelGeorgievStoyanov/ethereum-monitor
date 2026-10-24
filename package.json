@@ -1,39 +1,39 @@
 {
-  "name": "ethereum-monitor",
-  "version": "1.0.0",
-  "description": "Ethereum mainnet native and ERC-20 transfer monitor",
-  "main": "build/index.js",
-  "scripts": {
-    "build": "npm run clean && tsc",
-    "start": "node build/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon",
-    "clean": "node -e \"require('node:fs').rmSync('build', { recursive: true, force: true })\"",
-    "tools:install": "npm install --no-save --package-lock=false eslint@10.13.0 typescript-eslint@8.71.1 prettier@3.9.10",
-    "lint": "eslint .",
-    "format": "prettier --write \"src/**/*.ts\" \"package.json\" \"tsconfig.json\" \"nodemon.json\" \"README.md\" \"eslint.config.mjs\" \".prettierrc.json\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"package.json\" \"tsconfig.json\" \"nodemon.json\" \"README.md\" \"eslint.config.mjs\" \".prettierrc.json\""
-  },
-  "author": "Angel Stoyanov",
-  "license": "ISC",
-  "dependencies": {
-    "dotenv": "^16.4.5",
-    "ethers": "^6.13.2",
-    "express": "^4.19.2",
-    "sequelize": "^6.37.3",
-    "sqlite3": "^6.0.1"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^22.5.2",
-    "nodemon": "^3.1.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.5.4"
-  },
-  "allowScripts": {
-    "sqlite3@6.0.1": true
-  },
-  "overrides": {
-    "uuid": "11.1.1"
-  }
+    "name": "ethereum-monitor",
+    "version": "1.0.0",
+    "description": "Ethereum mainnet native and ERC-20 transfer monitor",
+    "main": "build/index.js",
+    "scripts": {
+        "build": "npm run clean && tsc",
+        "start": "node build/index.js",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev": "nodemon",
+        "clean": "node -e \"require('node:fs').rmSync('build', { recursive: true, force: true })\"",
+        "tools:install": "npm install --no-save --package-lock=false eslint@10.13.0 typescript-eslint@8.71.1 prettier@3.9.10",
+        "lint": "eslint .",
+        "format": "prettier --write \"src/**/*.ts\" \"package.json\" \"tsconfig.json\" \"nodemon.json\" \"README.md\" \"eslint.config.mjs\" \".prettierrc.json\"",
+        "format:check": "prettier --check \"src/**/*.ts\" \"package.json\" \"tsconfig.json\" \"nodemon.json\" \"README.md\" \"eslint.config.mjs\" \".prettierrc.json\""
+    },
+    "author": "Angel Stoyanov",
+    "license": "ISC",
+    "dependencies": {
+        "dotenv": "^16.4.5",
+        "ethers": "^6.13.2",
+        "express": "^4.19.2",
+        "sequelize": "^6.37.3",
+        "sqlite3": "^6.0.1"
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.21",
+        "@types/node": "^22.5.2",
+        "nodemon": "^3.1.4",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.5.4"
+    },
+    "allowScripts": {
+        "sqlite3@6.0.1": true
+    },
+    "overrides": {
+        "uuid": "11.1.1"
+    }
 }

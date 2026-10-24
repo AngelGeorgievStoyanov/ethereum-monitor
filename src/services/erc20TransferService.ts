@@ -10,7 +10,7 @@ export async function processErc20Transfers(
     transactionsByHash: Map<string, TransactionResponse>,
     configurations: Configuration[],
     blockNumber: number,
-    blockTimestamp: number
+    blockTimestamp: number,
 ) {
     let transferLogsSeen = 0;
     let transfersMatched = 0;
@@ -22,15 +22,17 @@ export async function processErc20Transfers(
         const txHash = receipt.transactionHash.toLowerCase();
         const tx = transactionsByHash.get(txHash);
         if (!tx) {
-            throw new Error(`Block transaction ${receipt.transactionHash} was not found in block ${blockNumber}`);
+            throw new Error(
+                `Block transaction ${receipt.transactionHash} was not found in block ${blockNumber}`,
+            );
         }
 
         for (const log of receipt.logs ?? []) {
             if (
-                !Array.isArray(log.topics)
-                || log.topics.length !== 3
-                || log.topics[0].toLowerCase() !== ERC20_TRANSFER_TOPIC
-                || !/^0x[0-9a-fA-F]{40}$/.test(log.address)
+                !Array.isArray(log.topics) ||
+                log.topics.length !== 3 ||
+                log.topics[0].toLowerCase() !== ERC20_TRANSFER_TOPIC ||
+                !/^0x[0-9a-fA-F]{40}$/.test(log.address)
             ) {
                 continue;
             }
@@ -41,27 +43,20 @@ export async function processErc20Transfers(
             const value = BigInt(log.data).toString();
             const logIndex = Number(BigInt(log.logIndex));
 
-            const matchingConfigurations = configurations.filter(config =>
-                config.isActive
-                && matchesConfiguration(from, to, config)
+            const matchingConfigurations = configurations.filter(
+                (config) => config.isActive && matchesConfiguration(from, to, config),
             );
 
             for (const config of matchingConfigurations) {
                 const startedAt = Date.now();
-                await createTransactionFromEthereumData(
-                    tx,
-                    receipt,
-                    config,
-                    blockTimestamp,
-                    {
-                        transferType: 'erc20',
-                        tokenAddress: ethers.getAddress(log.address),
-                        logIndex,
-                        from,
-                        to,
-                        value,
-                    }
-                );
+                await createTransactionFromEthereumData(tx, receipt, config, blockTimestamp, {
+                    transferType: 'erc20',
+                    tokenAddress: ethers.getAddress(log.address),
+                    logIndex,
+                    from,
+                    to,
+                    value,
+                });
                 databaseWriteDurationMs += Date.now() - startedAt;
                 transfersMatched += 1;
             }

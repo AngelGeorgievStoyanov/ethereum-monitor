@@ -15,12 +15,10 @@ function parseOptionalBlock(name: string): number | undefined {
 const rpcUrls = Object.entries(process.env)
     .flatMap(([name, value]) => {
         const match = /^RPC_URL_(\d+)$/.exec(name);
-        return match && value?.trim()
-            ? [{ index: Number(match[1]), url: value.trim() }]
-            : [];
+        return match && value?.trim() ? [{ index: Number(match[1]), url: value.trim() }] : [];
     })
     .sort((left, right) => left.index - right.index)
-    .map(item => item.url);
+    .map((item) => item.url);
 
 export const env = {
     databaseUrl: process.env.DATABASE_URL || 'sqlite:./db.sqlite',

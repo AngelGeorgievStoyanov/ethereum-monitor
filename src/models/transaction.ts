@@ -39,8 +39,10 @@ interface TransactionAttributes {
 
 export type TransactionCreationAttributes = Optional<TransactionAttributes, 'id'>;
 
-class Transaction extends Model<TransactionAttributes, TransactionCreationAttributes>
-    implements TransactionAttributes {
+class Transaction
+    extends Model<TransactionAttributes, TransactionCreationAttributes>
+    implements TransactionAttributes
+{
     public id!: string;
     public configurationId!: string;
     public hash!: string;
@@ -189,8 +191,8 @@ Transaction.init(
         sequelize,
         tableName: 'Transactions',
         modelName: 'Transaction',
-        timestamps: true
-    }
+        timestamps: true,
+    },
 );
 
 export default Transaction;
