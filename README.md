@@ -21,6 +21,7 @@ Ethereum Monitor monitors finalized native ETH transfers and ERC-20 Transfer eve
 - `src/models`: Sequelize data models.
 - `src/repositories`: database access.
 - `src/services`: scanner, Ethereum RPC, transfer processing, and configuration logic.
+- `src/types`: explicit types for Ethereum JSON-RPC responses.
 - `src/utils`: small shared utilities.
 - `src/httpRouter.ts`: API route declarations, kept separate from controller logic.
 
@@ -65,6 +66,8 @@ Production mode:
 npm run build
 npm start
 ```
+
+The build command clears the previous `build` output before compiling TypeScript.
 
 The API listens on port 8000.
 
