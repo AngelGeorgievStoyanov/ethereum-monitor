@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import { ethers, TransactionReceipt } from 'ethers';
 import { MAX_BLOCK_FETCH_ATTEMPTS, RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS } from '../constants/ethereum-rpc.constants';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
@@ -17,16 +17,21 @@ export async function fetchBlockData(blockNumber: number) {
                 throw new Error(`Unable to load block ${blockNumber}`);
             }
 
-            const receipts = await ethereumProvider.send(
+            const response: unknown = await ethereumProvider.send(
                 'eth_getBlockReceipts',
                 [ethers.toQuantity(blockNumber)]
             );
 
-            if (!Array.isArray(receipts)) {
+            if (!Array.isArray(response)) {
                 throw new Error('eth_getBlockReceipts returned a non-array response');
             }
 
-            return { block, receipts, durationMs: Date.now() - startedAt, attempt };
+            return {
+                block,
+                receipts: response as TransactionReceipt[],
+                durationMs: Date.now() - startedAt,
+                attempt,
+            };
         } catch (error) {
             const message = formatError(error);
             if (attempt === MAX_BLOCK_FETCH_ATTEMPTS) {

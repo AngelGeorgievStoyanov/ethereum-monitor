@@ -1,11 +1,11 @@
-import { ethers, TransactionResponse } from 'ethers';
+import { ethers, TransactionReceipt, TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
 import { ERC20_TRANSFER_TOPIC } from '../constants/erc20-transfer.constants';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesConfiguration } from '../utils/matchesConfiguration';
 
 export async function processErc20Transfers(
-    receipts: any[],
+    receipts: readonly TransactionReceipt[],
     transactionsByHash: Map<string, TransactionResponse>,
     configurations: Configuration[],
     blockNumber: number,
@@ -16,29 +16,28 @@ export async function processErc20Transfers(
     let databaseWriteDurationMs = 0;
 
     for (const receipt of receipts) {
-        if (Number(BigInt(receipt.status ?? '0x0')) !== 1) continue;
+        if (receipt.status !== 1) continue;
 
-        const txHash = String(receipt.transactionHash).toLowerCase();
+        const txHash = receipt.hash.toLowerCase();
         const tx = transactionsByHash.get(txHash);
         if (!tx) {
-            throw new Error(`Block transaction ${receipt.transactionHash} was not found in block ${blockNumber}`);
+            throw new Error(`Block transaction ${receipt.hash} was not found in block ${blockNumber}`);
         }
 
-        for (const log of receipt.logs ?? []) {
+        for (const log of receipt.logs) {
             if (
-                !Array.isArray(log.topics)
-                || log.topics.length !== 3
-                || String(log.topics[0]).toLowerCase() !== ERC20_TRANSFER_TOPIC
-                || !/^0x[0-9a-fA-F]{40}$/.test(String(log.address))
+                log.topics.length !== 3
+                || log.topics[0].toLowerCase() !== ERC20_TRANSFER_TOPIC
+                || !/^0x[0-9a-fA-F]{40}$/.test(log.address)
             ) {
                 continue;
             }
 
             transferLogsSeen += 1;
-            const from = ethers.getAddress(`0x${String(log.topics[1]).slice(-40)}`);
-            const to = ethers.getAddress(`0x${String(log.topics[2]).slice(-40)}`);
+            const from = ethers.getAddress(`0x${log.topics[1].slice(-40)}`);
+            const to = ethers.getAddress(`0x${log.topics[2].slice(-40)}`);
             const value = BigInt(log.data).toString();
-            const logIndex = Number(BigInt(log.logIndex));
+            const logIndex = log.index;
 
             const matchingConfigurations = configurations.filter(config =>
                 config.isActive

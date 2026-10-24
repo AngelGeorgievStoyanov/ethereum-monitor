@@ -1,11 +1,11 @@
-import { TransactionResponse } from 'ethers';
+import { TransactionReceipt, TransactionResponse } from 'ethers';
 import Configuration from '../models/configuration';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesConfiguration } from '../utils/matchesConfiguration';
 
 export async function processNativeTransfers(
     transactions: readonly TransactionResponse[],
-    receiptsByHash: Map<string, any>,
+    receiptsByHash: Map<string, TransactionReceipt>,
     configurations: Configuration[],
     blockNumber: number,
     blockTimestamp: number
