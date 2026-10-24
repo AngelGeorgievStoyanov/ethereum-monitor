@@ -71,10 +71,10 @@ npm start
 
 The build command clears the previous `build` output before compiling TypeScript.
 
-Install the pinned code-quality tools when setting up the project:
+Run the quality checks after installing dependencies:
 
 ```bash
-npm run tools:install
+npm ci
 npm run lint
 npm run format:check
 ```
