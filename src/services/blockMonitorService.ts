@@ -14,6 +14,21 @@ import { getConfigurationService } from './configurationService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 
+async function advanceCheckpoint(
+    state: Awaited<ReturnType<typeof findScannerState>> & {},
+    blockNumber: number,
+) {
+    const previousBlock = state.lastProcessedBlock;
+    state.lastProcessedBlock = blockNumber;
+
+    try {
+        await saveScannerState(state);
+    } catch (error) {
+        state.lastProcessedBlock = previousBlock;
+        throw error;
+    }
+}
+
 export function createBlockMonitorService() {
     const configurationService = getConfigurationService();
     let scannerStarted = false;
@@ -70,8 +85,7 @@ export function createBlockMonitorService() {
 
                     if (configurationService.getConfigurations().length === 0) {
                         if (state.lastProcessedBlock < finalized.number) {
-                            state.lastProcessedBlock = finalized.number;
-                            await saveScannerState(state);
+                            await advanceCheckpoint(state, finalized.number);
                             console.log(
                                 `[Scanner] No active configurations; checkpoint advanced to ${finalized.number}`,
                             );
@@ -130,8 +144,7 @@ export function createBlockMonitorService() {
                                 block.timestamp,
                             );
 
-                            state.lastProcessedBlock = blockNumber;
-                            await saveScannerState(state);
+                            await advanceCheckpoint(state, blockNumber);
 
                             const durationMs = Date.now() - blockStartedAt;
                             const databaseWriteDurationMs =
