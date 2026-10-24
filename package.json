@@ -11,8 +11,8 @@
     "clean": "node -e \"require('node:fs').rmSync('build', { recursive: true, force: true })\"",
     "tools:install": "npm install --no-save --package-lock=false eslint@10.13.0 typescript-eslint@8.71.1 prettier@3.9.10",
     "lint": "eslint .",
-    "format": "prettier --write \"src/**/*.ts\" \"package.json\" \"tsconfig.json\" \"nodemon.json\" \"README.md\" \".github/workflows/ci.yml\" \"eslint.config.mjs\" \".prettierrc.json\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"package.json\" \"tsconfig.json\" \"nodemon.json\" \"README.md\" \".github/workflows/ci.yml\" \"eslint.config.mjs\" \".prettierrc.json\""
+    "format": "prettier --write \"src/**/*.ts\" \"package.json\" \"tsconfig.json\" \"nodemon.json\" \"README.md\" \"eslint.config.mjs\" \".prettierrc.json\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"package.json\" \"tsconfig.json\" \"nodemon.json\" \"README.md\" \"eslint.config.mjs\" \".prettierrc.json\""
   },
   "author": "Angel Stoyanov",
   "license": "ISC",
