@@ -12,20 +12,23 @@
   "author": "Angel Stoyanov",
   "license": "ISC",
   "dependencies": {
-    "async": "^3.2.6",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.2",
     "express": "^4.19.2",
-    "p-limit": "^6.1.0",
     "sequelize": "^6.37.3",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
-    "@types/async": "^3.2.24",
     "@types/express": "^4.17.21",
     "@types/node": "^22.5.2",
     "nodemon": "^3.1.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
+  },
+  "allowScripts": {
+    "sqlite3@6.0.1": true
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }
