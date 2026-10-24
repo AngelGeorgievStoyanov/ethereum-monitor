@@ -10,6 +10,7 @@ import { getEthereumService } from './services/ethereumService';
 import { getConfigurationService } from './services/configurationService';
 import { formatError } from './utils/formatError';
 import { sleep } from './utils/sleep';
+import { ensureTransferUniqueness } from './repositories/transactionRepository';
 
 const app = express();
 
@@ -44,6 +45,9 @@ async function startScannerWithRetry() {
 async function startServer() {
     await sequelize.sync();
     console.log('Database connected');
+
+    await ensureTransferUniqueness();
+    console.log('Transfer uniqueness constraint verified');
 
     await configurationService.loadConfigurations();
 
