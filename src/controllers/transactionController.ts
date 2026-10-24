@@ -11,7 +11,10 @@ export async function getAllStoredTransactions(_req: Request, res: Response): Pr
     }
 }
 
-export async function deleteTransactionById(req: Request, res: Response): Promise<void> {
+export async function deleteTransactionById(
+    req: Request<{ id: string }>,
+    res: Response,
+): Promise<void> {
     try {
         const deleted = await deleteStoredTransaction(req.params.id);
         if (deleted === 0) {

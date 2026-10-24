@@ -28,7 +28,10 @@ export const createConfiguration = async (req: Request, res: Response) => {
     }
 };
 
-export const updateConfiguration = async (req: Request, res: Response) => {
+export const updateConfiguration = async (
+    req: Request<{ id: string }>,
+    res: Response,
+) => {
     const { id } = req.params;
     const { name, senderAddress, recipientAddress, isActive } = req.body;
 
@@ -53,7 +56,10 @@ export const updateConfiguration = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteConfiguration = async (req: Request, res: Response) => {
+export const deleteConfiguration = async (
+    req: Request<{ id: string }>,
+    res: Response,
+) => {
     const { id } = req.params;
 
     try {
