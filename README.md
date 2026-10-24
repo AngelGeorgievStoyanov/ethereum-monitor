@@ -30,7 +30,7 @@ GitHub Actions runs the TypeScript build and an npm dependency audit on pushes a
 
 ## Requirements
 
-- Node.js and npm
+- Node.js 24 and npm
 - One or more Ethereum mainnet HTTP JSON-RPC endpoints
 
 ## Installation
