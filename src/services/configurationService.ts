@@ -1,5 +1,11 @@
-import { findActiveConfigurations } from '../repositories/configurationRepository';
 import Configuration from '../models/configuration';
+import {
+    createConfiguration as insertConfiguration,
+    deleteConfigurationById,
+    findActiveConfigurations,
+    findAllConfigurations,
+    updateConfiguration as persistConfiguration,
+} from '../repositories/configurationRepository';
 
 export function createConfigurationService() {
     const configurations = new Map<string, Configuration>();
@@ -16,14 +22,46 @@ export function createConfigurationService() {
         else configurations.delete(config.id);
     }
 
+    async function getAllConfigurations() {
+        return findAllConfigurations();
+    }
+
+    async function createConfiguration(data: {
+        name: string;
+        senderAddress: string | null;
+        recipientAddress: string | null;
+        isActive: boolean;
+    }) {
+        const configuration = await insertConfiguration(data);
+        syncConfiguration(configuration);
+        return configuration;
+    }
+
+    async function updateConfiguration(
+        id: string,
+        updates: {
+            name?: string;
+            senderAddress?: string | null;
+            recipientAddress?: string | null;
+            isActive?: boolean;
+        },
+    ) {
+        const configuration = await persistConfiguration(id, updates);
+        if (configuration) syncConfiguration(configuration);
+        return configuration;
+    }
+
     async function removeConfiguration(id: string) {
-        configurations.delete(id);
+        const deleted = await deleteConfigurationById(id);
+        if (deleted > 0) configurations.delete(id);
+        return deleted;
     }
 
     return {
         loadConfigurations,
-        addConfiguration: syncConfiguration,
-        updateConfiguration: syncConfiguration,
+        getAllConfigurations,
+        createConfiguration,
+        updateConfiguration,
         removeConfiguration,
         getConfigurations: () => Array.from(configurations.values()),
     };
