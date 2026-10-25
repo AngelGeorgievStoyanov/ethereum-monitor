@@ -36,26 +36,9 @@ export async function createTransactionFromEthereumData(
         transferType: transfer.transferType,
         tokenAddress: transfer.tokenAddress,
         logIndex: transfer.logIndex,
-        gas: Number(BigInt(receipt.gasUsed)),
-        gasPrice: tx.gasPrice?.toString() ?? tx.maxFeePerGas?.toString() ?? '0',
-        input: tx.data,
         status: Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed',
         transactionType: tx.type?.toString(),
-        contractAddress: receipt.contractAddress ?? undefined,
         timestamp: new Date(blockTimestamp * 1000),
-        gasLimit: Number(tx.gasLimit),
-        maxPriorityFeePerGas: tx.maxPriorityFeePerGas?.toString() ?? undefined,
-        maxFeePerGas: tx.maxFeePerGas?.toString() ?? undefined,
-        maxFeePerBlobGas: tx.maxFeePerBlobGas?.toString() ?? undefined,
-        accessList: tx.accessList ? JSON.stringify(tx.accessList) : undefined,
-        blobVersionedHashes: tx.blobVersionedHashes
-            ? JSON.stringify(tx.blobVersionedHashes)
-            : undefined,
-        logsBloom: receipt.logsBloom ?? undefined,
-        gasUsed: Number(BigInt(receipt.gasUsed)),
-        cumulativeGasUsed: Number(BigInt(receipt.cumulativeGasUsed)),
-        root: receipt.root ?? undefined,
-        blobGasUsed: receipt.blobGasUsed ? Number(BigInt(receipt.blobGasUsed)) : undefined,
     };
 
     return findOrCreateTransfer(data);
