@@ -1,9 +1,9 @@
-import Configuration from '../models/configuration';
+import TxFilter from '../models/txFilter';
 
-export function matchesConfiguration(
+export function matchesTxFilter(
     from: string | null | undefined,
     to: string | null | undefined,
-    config: Configuration,
+    config: TxFilter,
 ): boolean {
     if (!config.senderAddress && !config.recipientAddress) {
         return false;
