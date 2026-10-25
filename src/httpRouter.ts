@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import {
-    createConfiguration,
-    deleteConfiguration,
-    getConfigurations,
-    updateConfiguration,
+    createTxFilter,
+    deleteTxFilter,
+    getTxFilters,
+    updateTxFilter,
 } from './controllers/configController';
 import {
     deleteTransactionById,
@@ -12,10 +12,10 @@ import {
 
 const router = Router();
 
-router.get('/configurations', getConfigurations);
-router.post('/configurations', createConfiguration);
-router.put('/configurations/:id', updateConfiguration);
-router.delete('/configurations/:id', deleteConfiguration);
+router.get('/txFilters', getTxFilters);
+router.post('/txFilters', createTxFilter);
+router.put('/txFilters/:id', updateTxFilter);
+router.delete('/txFilters/:id', deleteTxFilter);
 
 router.get('/transactions', getAllStoredTransactions);
 router.delete('/transactions/:id', deleteTransactionById);
