@@ -78,7 +78,7 @@ export async function processErc20Transfers(
             failedAttemptsSeen += 1;
             const matchingTxFilters = txFilters.filter(
                 (txFilter) =>
-                    txFilter.isActive && matchesTxFilter(attempt.from, attempt.to, config),
+                    txFilter.isActive && matchesTxFilter(attempt.from, attempt.to, txFilter),
             );
 
             for (const txFilter of matchingTxFilters) {
@@ -115,7 +115,7 @@ export async function processErc20Transfers(
             const logIndex = Number(BigInt(log.logIndex));
 
             const matchingTxFilters = txFilters.filter(
-                (txFilter) => txFilter.isActive && matchesTxFilter(from, to, config),
+                (txFilter) => txFilter.isActive && matchesTxFilter(from, to, txFilter),
             );
 
             for (const txFilter of matchingTxFilters) {
