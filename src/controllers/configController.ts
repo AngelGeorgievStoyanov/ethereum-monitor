@@ -1,39 +1,39 @@
 import { Request, Response } from 'express';
-import { getConfigurationService } from '../services/configurationService';
+import { getTxFilterService } from '../services/txFilterService';
 
-const configurationService = getConfigurationService();
+const txFilterService = getTxFilterService();
 
-export const getConfigurations = async (_req: Request, res: Response) => {
+export const getTxFilters = async (_req: Request, res: Response) => {
     try {
-        res.json(await configurationService.getAllConfigurations());
+        res.json(await txFilterService.getAllTxFilters());
     } catch {
-        res.status(500).json({ message: 'Error retrieving configurations' });
+        res.status(500).json({ message: 'Error retrieving txFilters' });
     }
 };
 
-export const createConfiguration = async (req: Request, res: Response) => {
+export const createTxFilter = async (req: Request, res: Response) => {
     const { name, senderAddress, recipientAddress, isActive } = req.body;
 
     try {
-        const configuration = await configurationService.createConfiguration({
+        const txFilter = await txFilterService.createTxFilter({
             name,
             senderAddress: senderAddress || null,
             recipientAddress: recipientAddress || null,
             isActive: isActive ?? true,
         });
 
-        res.status(201).json(configuration);
+        res.status(201).json(txFilter);
     } catch {
-        res.status(500).json({ message: 'Error creating configuration' });
+        res.status(500).json({ message: 'Error creating txFilter' });
     }
 };
 
-export const updateConfiguration = async (req: Request<{ id: string }>, res: Response) => {
+export const updateTxFilter = async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
     const { name, senderAddress, recipientAddress, isActive } = req.body;
 
     try {
-        const configuration = await configurationService.updateConfiguration(id, {
+        const txFilter = await txFilterService.updateTxFilter(id, {
             ...(name !== undefined ? { name } : {}),
             ...(senderAddress !== undefined ? { senderAddress: senderAddress || null } : {}),
             ...(recipientAddress !== undefined
@@ -42,29 +42,29 @@ export const updateConfiguration = async (req: Request<{ id: string }>, res: Res
             ...(isActive !== undefined ? { isActive } : {}),
         });
 
-        if (!configuration) {
-            res.status(404).json({ message: 'Configuration not found' });
+        if (!txFilter) {
+            res.status(404).json({ message: 'TxFilter not found' });
             return;
         }
 
-        res.json(configuration);
+        res.json(txFilter);
     } catch {
-        res.status(500).json({ message: 'Error updating configuration' });
+        res.status(500).json({ message: 'Error updating txFilter' });
     }
 };
 
-export const deleteConfiguration = async (req: Request<{ id: string }>, res: Response) => {
+export const deleteTxFilter = async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
 
     try {
-        const deleted = await configurationService.removeConfiguration(id);
+        const deleted = await txFilterService.removeTxFilter(id);
         if (deleted === 0) {
-            res.status(404).json({ message: 'Configuration not found' });
+            res.status(404).json({ message: 'TxFilter not found' });
             return;
         }
 
-        res.json({ message: 'Configuration deleted' });
+        res.json({ message: 'TxFilter deleted' });
     } catch {
-        res.status(500).json({ message: 'Error deleting configuration' });
+        res.status(500).json({ message: 'Error deleting txFilter' });
     }
 };
