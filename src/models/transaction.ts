@@ -16,25 +16,9 @@ interface TransactionAttributes {
     from: string;
     to?: string;
     value: string;
-    gas: number;
-    gasPrice: string;
-    input?: string;
     status?: string;
     transactionType?: string;
-    contractAddress?: string;
     timestamp?: Date;
-    requiredConfirmations?: number;
-    gasLimit?: number;
-    maxPriorityFeePerGas?: string;
-    maxFeePerGas?: string;
-    maxFeePerBlobGas?: string;
-    accessList?: string;
-    blobVersionedHashes?: string;
-    logsBloom?: string;
-    gasUsed?: number;
-    cumulativeGasUsed?: number;
-    root?: string;
-    blobGasUsed?: number;
 }
 
 export type TransactionCreationAttributes = Optional<TransactionAttributes, 'id'>;
@@ -56,25 +40,9 @@ class Transaction
     public from!: string;
     public to?: string;
     public value!: string;
-    public gas!: number;
-    public gasPrice!: string;
-    public input?: string;
     public status?: string;
     public transactionType?: string;
-    public contractAddress?: string;
     public timestamp?: Date;
-    public requiredConfirmations?: number;
-    public gasLimit?: number;
-    public maxPriorityFeePerGas?: string;
-    public maxFeePerGas?: string;
-    public maxFeePerBlobGas?: string;
-    public accessList?: string;
-    public blobVersionedHashes?: string;
-    public logsBloom?: string;
-    public gasUsed?: number;
-    public cumulativeGasUsed?: number;
-    public root?: string;
-    public blobGasUsed?: number;
 
     public static associate() {
         this.belongsTo(Configuration, { foreignKey: 'configurationId' });
@@ -126,65 +94,14 @@ Transaction.init(
             type: DataTypes.STRING,
             allowNull: false,
         },
-        gas: {
-            type: DataTypes.INTEGER,
-            allowNull: false,
-        },
-        gasPrice: {
-            type: DataTypes.STRING,
-            allowNull: false,
-        },
-        input: {
-            type: DataTypes.STRING,
-            allowNull: true,
-        },
         status: {
             type: DataTypes.STRING,
         },
         transactionType: {
             type: DataTypes.STRING,
         },
-        contractAddress: {
-            type: DataTypes.STRING,
-        },
         timestamp: {
             type: DataTypes.DATE,
-        },
-        requiredConfirmations: {
-            type: DataTypes.INTEGER,
-        },
-        gasLimit: {
-            type: DataTypes.INTEGER,
-        },
-        maxPriorityFeePerGas: {
-            type: DataTypes.STRING,
-        },
-        maxFeePerGas: {
-            type: DataTypes.STRING,
-        },
-        maxFeePerBlobGas: {
-            type: DataTypes.STRING,
-        },
-        accessList: {
-            type: DataTypes.TEXT,
-        },
-        blobVersionedHashes: {
-            type: DataTypes.TEXT,
-        },
-        logsBloom: {
-            type: DataTypes.STRING,
-        },
-        gasUsed: {
-            type: DataTypes.INTEGER,
-        },
-        cumulativeGasUsed: {
-            type: DataTypes.INTEGER,
-        },
-        root: {
-            type: DataTypes.STRING,
-        },
-        blobGasUsed: {
-            type: DataTypes.INTEGER,
         },
     },
     {
