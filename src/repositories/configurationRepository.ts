@@ -1,27 +1,27 @@
-import Configuration from '../models/configuration';
+import TxFilter from '../models/txFilter';
 
-export function findAllConfigurations() {
-    return Configuration.findAll();
+export function findAllTxFilters() {
+    return TxFilter.findAll();
 }
 
-export function findActiveConfigurations() {
-    return Configuration.findAll({ where: { isActive: true } });
+export function findActiveTxFilters() {
+    return TxFilter.findAll({ where: { isActive: true } });
 }
 
-export function findConfigurationById(id: string) {
-    return Configuration.findByPk(id);
+export function findTxFilterById(id: string) {
+    return TxFilter.findByPk(id);
 }
 
-export function createConfiguration(data: {
+export function createTxFilter(data: {
     name: string;
     senderAddress: string | null;
     recipientAddress: string | null;
     isActive: boolean;
 }) {
-    return Configuration.create(data);
+    return TxFilter.create(data);
 }
 
-export async function updateConfiguration(
+export async function updateTxFilter(
     id: string,
     updates: {
         name?: string;
@@ -30,19 +30,19 @@ export async function updateConfiguration(
         isActive?: boolean;
     },
 ) {
-    const configuration = await Configuration.findByPk(id);
-    if (!configuration) return null;
+    const txFilter = await TxFilter.findByPk(id);
+    if (!txFilter) return null;
 
-    if (updates.name !== undefined) configuration.name = updates.name;
-    if (updates.senderAddress !== undefined) configuration.senderAddress = updates.senderAddress;
+    if (updates.name !== undefined) txFilter.name = updates.name;
+    if (updates.senderAddress !== undefined) txFilter.senderAddress = updates.senderAddress;
     if (updates.recipientAddress !== undefined)
-        configuration.recipientAddress = updates.recipientAddress;
-    if (updates.isActive !== undefined) configuration.isActive = updates.isActive;
+        txFilter.recipientAddress = updates.recipientAddress;
+    if (updates.isActive !== undefined) txFilter.isActive = updates.isActive;
 
-    await configuration.save();
-    return configuration;
+    await txFilter.save();
+    return txFilter;
 }
 
-export function deleteConfigurationById(id: string) {
-    return Configuration.destroy({ where: { id } });
+export function deleteTxFilterById(id: string) {
+    return TxFilter.destroy({ where: { id } });
 }
