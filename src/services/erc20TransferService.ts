@@ -1,9 +1,9 @@
 import { ethers, TransactionResponse } from 'ethers';
-import Configuration from '../models/configuration';
+import TxFilter from '../models/txFilter';
 import { ERC20_TRANSFER_TOPIC } from '../constants/erc20-transfer.constants';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
-import { matchesConfiguration } from '../utils/matchesConfiguration';
+import { matchesTxFilter } from '../utils/matchesTxFilter';
 
 const ERC20_INTERFACE = new ethers.Interface([
     'function transfer(address to, uint256 value)',
@@ -52,7 +52,7 @@ function decodeFailedErc20TransferAttempt(
 export async function processErc20Transfers(
     receipts: readonly RpcTransactionReceipt[],
     transactionsByHash: Map<string, TransactionResponse>,
-    configurations: Configuration[],
+    txFilters: TxFilter[],
     blockNumber: number,
     blockTimestamp: number,
 ) {
@@ -76,12 +76,12 @@ export async function processErc20Transfers(
             if (!attempt) continue;
 
             failedAttemptsSeen += 1;
-            const matchingConfigurations = configurations.filter(
+            const matchingTxFilters = txFilters.filter(
                 (config) =>
-                    config.isActive && matchesConfiguration(attempt.from, attempt.to, config),
+                    config.isActive && matchesTxFilter(attempt.from, attempt.to, config),
             );
 
-            for (const config of matchingConfigurations) {
+            for (const config of matchingTxFilters) {
                 const startedAt = Date.now();
                 await createTransactionFromEthereumData(tx, receipt, config, blockTimestamp, {
                     transferType: 'erc20',
@@ -114,11 +114,11 @@ export async function processErc20Transfers(
             const value = BigInt(log.data).toString();
             const logIndex = Number(BigInt(log.logIndex));
 
-            const matchingConfigurations = configurations.filter(
-                (config) => config.isActive && matchesConfiguration(from, to, config),
+            const matchingTxFilters = txFilters.filter(
+                (config) => config.isActive && matchesTxFilter(from, to, config),
             );
 
-            for (const config of matchingConfigurations) {
+            for (const config of matchingTxFilters) {
                 const startedAt = Date.now();
                 await createTransactionFromEthereumData(tx, receipt, config, blockTimestamp, {
                     transferType: 'erc20',
