@@ -11,15 +11,15 @@ export function createTxFilterService() {
     const txFilters = new Map<string, TxFilter>();
 
     async function loadTxFilters() {
-        const configs = await findActiveTxFilters();
+        const activeTxFilters = await findActiveTxFilters();
         txFilters.clear();
-        configs.forEach((config) => txFilters.set(config.id, config));
-        console.log(`[Scanner] Loaded ${txFilters.size} active txFilter(s)`);
+        activeTxFilters.forEach((txFilter) => txFilters.set(txFilter.id, txFilter));
+        console.log(`[Scanner] Loaded ${txFilters.size} active tx filter(s)`);
     }
 
-    function syncTxFilter(config: TxFilter) {
-        if (config.isActive) txFilters.set(config.id, config);
-        else txFilters.delete(config.id);
+    function syncTxFilter(txFilter: TxFilter) {
+        if (txFilter.isActive) txFilters.set(txFilter.id, txFilter);
+        else txFilters.delete(txFilter.id);
     }
 
     async function getAllTxFilters() {
