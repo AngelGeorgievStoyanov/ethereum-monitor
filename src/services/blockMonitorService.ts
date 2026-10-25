@@ -162,7 +162,8 @@ export function createBlockMonitorService() {
                                 `[Scanner] Block ${blockNumber} processed: tx=${transactions.length}, ` +
                                     `native seen=${native.transfersSeen}, native matches=${native.transfersMatched}, ` +
                                     `ERC-20 logs=${erc20.transferLogsSeen}, ERC-20 matches=${erc20.transfersMatched}, ` +
-                                    `ERC-20 failed attempts=${erc20.failedAttemptsSeen}, failed matches=${erc20.failedAttemptsMatched}, ` +
+                                    `ERC-20 failed attempts=${erc20.failedAttemptsSeen}, ` +
+                                    `failed matches=${erc20.failedAttemptsMatched}, ` +
                                     `fetch=${fetchDurationMs}ms, db writes=${databaseWriteDurationMs}ms, ` +
                                     `total=${durationMs}ms, checkpoint=${state.lastProcessedBlock}` +
                                     (attempt > 1 ? `, fetch attempts=${attempt}` : ''),
@@ -196,7 +197,8 @@ export function createBlockMonitorService() {
                                     `avg fetch=${averageFetchDurationMs}ms, avg block=${averageBlockDurationMs}ms, ` +
                                     `avg db writes=${averageDatabaseWriteDurationMs}ms, tx=${totalTransactions}, ` +
                                     `native matches=${totalNativeMatches}, ERC-20 logs=${totalErc20TransferLogsSeen}, ` +
-                                    `ERC-20 matches=${totalErc20Matches}, ERC-20 failed attempts=${totalErc20FailedAttemptsSeen}, ` +
+                                    `ERC-20 matches=${totalErc20Matches}, ` +
+                                    `ERC-20 failed attempts=${totalErc20FailedAttemptsSeen}, ` +
                                     `failed attempt matches=${totalErc20FailedAttemptsMatched}, ` +
                                     `total db writes=${totalNativeDatabaseWriteDurationMs + totalErc20DatabaseWriteDurationMs}ms`,
                             );
