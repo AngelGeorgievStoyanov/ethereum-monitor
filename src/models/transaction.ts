@@ -1,10 +1,10 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../database';
-import Configuration from './configuration';
+import TxFilter from './txFilter';
 
 interface TransactionAttributes {
     id: string;
-    configurationId: string;
+    txFilterId: string;
     hash: string;
     transferType: 'native' | 'erc20';
     tokenAddress?: string;
@@ -28,7 +28,7 @@ class Transaction
     implements TransactionAttributes
 {
     public id!: string;
-    public configurationId!: string;
+    public txFilterId!: string;
     public hash!: string;
     public transferType!: 'native' | 'erc20';
     public tokenAddress?: string;
@@ -45,7 +45,7 @@ class Transaction
     public timestamp?: Date;
 
     public static associate() {
-        this.belongsTo(Configuration, { foreignKey: 'configurationId' });
+        this.belongsTo(TxFilter, { foreignKey: 'txFilterId' });
     }
 }
 
@@ -56,7 +56,7 @@ Transaction.init(
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
-        configurationId: {
+        txFilterId: {
             type: DataTypes.UUID,
             allowNull: false,
         },
