@@ -1,13 +1,13 @@
 import { TransactionResponse } from 'ethers';
-import Configuration from '../models/configuration';
+import TxFilter from '../models/txFilter';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
-import { matchesConfiguration } from '../utils/matchesConfiguration';
+import { matchesTxFilter } from '../utils/matchesTxFilter';
 
 export async function processNativeTransfers(
     transactions: readonly TransactionResponse[],
     receiptsByHash: Map<string, RpcTransactionReceipt>,
-    configurations: Configuration[],
+    txFilters: TxFilter[],
     blockNumber: number,
     blockTimestamp: number,
 ) {
@@ -19,10 +19,10 @@ export async function processNativeTransfers(
         if (!tx.to || tx.value <= 0n) continue;
         transfersSeen += 1;
 
-        const matchingConfigurations = configurations.filter(
-            (config) => config.isActive && matchesConfiguration(tx.from, tx.to, config),
+        const matchingTxFilters = txFilters.filter(
+            (config) => config.isActive && matchesTxFilter(tx.from, tx.to, config),
         );
-        if (matchingConfigurations.length === 0) continue;
+        if (matchingTxFilters.length === 0) continue;
 
         const receipt = receiptsByHash.get(tx.hash.toLowerCase());
         if (!receipt) {
@@ -31,7 +31,7 @@ export async function processNativeTransfers(
             );
         }
 
-        for (const config of matchingConfigurations) {
+        for (const config of matchingTxFilters) {
             const startedAt = Date.now();
             await createTransactionFromEthereumData(tx, receipt, config, blockTimestamp, {
                 transferType: 'native',
