@@ -20,7 +20,7 @@ export async function processNativeTransfers(
         transfersSeen += 1;
 
         const matchingTxFilters = txFilters.filter(
-            (txFilter) => txFilter.isActive && matchesTxFilter(tx.from, tx.to, config),
+            (txFilter) => txFilter.isActive && matchesTxFilter(tx.from, tx.to, txFilter),
         );
         if (matchingTxFilters.length === 0) continue;
 
