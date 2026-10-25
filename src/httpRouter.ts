@@ -4,7 +4,7 @@ import {
     deleteTxFilter,
     getTxFilters,
     updateTxFilter,
-} from './controllers/configController';
+} from './controllers/txFilterController';
 import {
     deleteTransactionById,
     getAllStoredTransactions,
@@ -12,10 +12,10 @@ import {
 
 const router = Router();
 
-router.get('/txFilters', getTxFilters);
-router.post('/txFilters', createTxFilter);
-router.put('/txFilters/:id', updateTxFilter);
-router.delete('/txFilters/:id', deleteTxFilter);
+router.get('/tx-filters', getTxFilters);
+router.post('/tx-filters', createTxFilter);
+router.put('/tx-filters/:id', updateTxFilter);
+router.delete('/tx-filters/:id', deleteTxFilter);
 
 router.get('/transactions', getAllStoredTransactions);
 router.delete('/transactions/:id', deleteTransactionById);
