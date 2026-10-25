@@ -1,39 +1,39 @@
 import { Request, Response } from 'express';
-import { getTxFilterService } from '../services/txFilterService';
+import { gettransaction filterService } from '../services/transaction filterService';
 
-const txFilterService = getTxFilterService();
+const transaction filterService = gettransaction filterService();
 
-export const getTxFilters = async (_req: Request, res: Response) => {
+export const gettransaction filters = async (_req: Request, res: Response) => {
     try {
-        res.json(await txFilterService.getAllTxFilters());
+        res.json(await transaction filterService.getAlltransaction filters());
     } catch {
-        res.status(500).json({ message: 'Error retrieving txFilters' });
+        res.status(500).json({ message: 'Error retrieving transaction filters' });
     }
 };
 
-export const createTxFilter = async (req: Request, res: Response) => {
+export const createtransaction filter = async (req: Request, res: Response) => {
     const { name, senderAddress, recipientAddress, isActive } = req.body;
 
     try {
-        const txFilter = await txFilterService.createTxFilter({
+        const transaction filter = await transaction filterService.createtransaction filter({
             name,
             senderAddress: senderAddress || null,
             recipientAddress: recipientAddress || null,
             isActive: isActive ?? true,
         });
 
-        res.status(201).json(txFilter);
+        res.status(201).json(transaction filter);
     } catch {
-        res.status(500).json({ message: 'Error creating txFilter' });
+        res.status(500).json({ message: 'Error creating transaction filter' });
     }
 };
 
-export const updateTxFilter = async (req: Request<{ id: string }>, res: Response) => {
+export const updatetransaction filter = async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
     const { name, senderAddress, recipientAddress, isActive } = req.body;
 
     try {
-        const txFilter = await txFilterService.updateTxFilter(id, {
+        const transaction filter = await transaction filterService.updatetransaction filter(id, {
             ...(name !== undefined ? { name } : {}),
             ...(senderAddress !== undefined ? { senderAddress: senderAddress || null } : {}),
             ...(recipientAddress !== undefined
@@ -42,29 +42,29 @@ export const updateTxFilter = async (req: Request<{ id: string }>, res: Response
             ...(isActive !== undefined ? { isActive } : {}),
         });
 
-        if (!txFilter) {
-            res.status(404).json({ message: 'TxFilter not found' });
+        if (!transaction filter) {
+            res.status(404).json({ message: 'transaction filter not found' });
             return;
         }
 
-        res.json(txFilter);
+        res.json(transaction filter);
     } catch {
-        res.status(500).json({ message: 'Error updating txFilter' });
+        res.status(500).json({ message: 'Error updating transaction filter' });
     }
 };
 
-export const deleteTxFilter = async (req: Request<{ id: string }>, res: Response) => {
+export const deletetransaction filter = async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
 
     try {
-        const deleted = await txFilterService.removeTxFilter(id);
+        const deleted = await transaction filterService.removetransaction filter(id);
         if (deleted === 0) {
-            res.status(404).json({ message: 'TxFilter not found' });
+            res.status(404).json({ message: 'transaction filter not found' });
             return;
         }
 
-        res.json({ message: 'TxFilter deleted' });
+        res.json({ message: 'transaction filter deleted' });
     } catch {
-        res.status(500).json({ message: 'Error deleting txFilter' });
+        res.status(500).json({ message: 'Error deleting transaction filter' });
     }
 };
