@@ -20,7 +20,7 @@ export async function processNativeTransfers(
         transfersSeen += 1;
 
         const matchingTxFilters = txFilters.filter(
-            (config) => config.isActive && matchesTxFilter(tx.from, tx.to, config),
+            (txFilter) => txFilter.isActive && matchesTxFilter(tx.from, tx.to, config),
         );
         if (matchingTxFilters.length === 0) continue;
 
@@ -31,9 +31,9 @@ export async function processNativeTransfers(
             );
         }
 
-        for (const config of matchingTxFilters) {
+        for (const txFilter of matchingTxFilters) {
             const startedAt = Date.now();
-            await createTransactionFromEthereumData(tx, receipt, config, blockTimestamp, {
+            await createTransactionFromEthereumData(tx, receipt, txFilter, blockTimestamp, {
                 transferType: 'native',
                 logIndex: -1,
                 from: tx.from,
