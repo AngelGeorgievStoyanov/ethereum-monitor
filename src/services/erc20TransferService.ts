@@ -77,13 +77,13 @@ export async function processErc20Transfers(
 
             failedAttemptsSeen += 1;
             const matchingTxFilters = txFilters.filter(
-                (config) =>
-                    config.isActive && matchesTxFilter(attempt.from, attempt.to, config),
+                (txFilter) =>
+                    txFilter.isActive && matchesTxFilter(attempt.from, attempt.to, config),
             );
 
-            for (const config of matchingTxFilters) {
+            for (const txFilter of matchingTxFilters) {
                 const startedAt = Date.now();
-                await createTransactionFromEthereumData(tx, receipt, config, blockTimestamp, {
+                await createTransactionFromEthereumData(tx, receipt, txFilter, blockTimestamp, {
                     transferType: 'erc20',
                     tokenAddress: ethers.getAddress(tx.to!),
                     logIndex: -1,
@@ -115,12 +115,12 @@ export async function processErc20Transfers(
             const logIndex = Number(BigInt(log.logIndex));
 
             const matchingTxFilters = txFilters.filter(
-                (config) => config.isActive && matchesTxFilter(from, to, config),
+                (txFilter) => txFilter.isActive && matchesTxFilter(from, to, config),
             );
 
-            for (const config of matchingTxFilters) {
+            for (const txFilter of matchingTxFilters) {
                 const startedAt = Date.now();
-                await createTransactionFromEthereumData(tx, receipt, config, blockTimestamp, {
+                await createTransactionFromEthereumData(tx, receipt, txFilter, blockTimestamp, {
                     transferType: 'erc20',
                     tokenAddress: ethers.getAddress(log.address),
                     logIndex,
