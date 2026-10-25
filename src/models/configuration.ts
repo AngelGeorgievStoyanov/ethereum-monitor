@@ -2,7 +2,7 @@ import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../database';
 import Transaction from './transaction';
 
-interface ConfigurationAttributes {
+interface TxFilterAttributes {
     id: string;
     name: string;
     senderAddress?: string | null;
@@ -10,11 +10,11 @@ interface ConfigurationAttributes {
     isActive: boolean;
 }
 
-type ConfigurationCreationAttributes = Optional<ConfigurationAttributes, 'id' | 'isActive'>;
+type TxFilterCreationAttributes = Optional<TxFilterAttributes, 'id' | 'isActive'>;
 
-class Configuration
-    extends Model<ConfigurationAttributes, ConfigurationCreationAttributes>
-    implements ConfigurationAttributes
+class TxFilter
+    extends Model<TxFilterAttributes, TxFilterCreationAttributes>
+    implements TxFilterAttributes
 {
     public id!: string;
     public name!: string;
@@ -23,11 +23,11 @@ class Configuration
     public isActive!: boolean;
 
     public static associate() {
-        this.hasMany(Transaction, { foreignKey: 'configurationId' });
+        this.hasMany(Transaction, { foreignKey: 'txFilterId' });
     }
 }
 
-Configuration.init(
+TxFilter.init(
     {
         id: {
             type: DataTypes.UUID,
@@ -54,10 +54,10 @@ Configuration.init(
     },
     {
         sequelize,
-        tableName: 'Configurations',
-        modelName: 'Configuration',
+        tableName: 'TxFilters',
+        modelName: 'TxFilter',
         timestamps: true,
     },
 );
 
-export default Configuration;
+export default TxFilter;
