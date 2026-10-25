@@ -88,7 +88,7 @@ The API listens on port 8000.
 - The scanner processes only finalized blocks, in ascending block order.
 - It fetches blocks and their receipts over HTTP JSON-RPC. Requests are sequential and retried with bounded exponential backoff.
 - The RPC client rotates across configured endpoints and retries rate-limited requests, timeouts, and transient network errors on another endpoint.
-- Native ETH transactions and successful ERC-20 `Transfer` logs are matched against active sender/recipient transaction filter filters.
+- Native ETH transactions and successful ERC-20 `Transfer` logs are matched against active sender/recipient transaction filters.
 - Failed ERC-20 `transfer` and `transferFrom` attempts are stored as `failed` records when their decoded sender and recipient match an active transaction filter. Reverted attempts are not treated as completed token transfers.
 - Stored records include `transferType` (`native` or `erc20`), `tokenAddress` for ERC-20 transfers, and `logIndex` to distinguish multiple token transfers in one transaction.
 - During catch-up, it reads finalized blocks over HTTP and saves a persistent checkpoint after each fully processed block.
@@ -105,7 +105,7 @@ To rescan from an earlier block, set `RESCAN_FROM_BLOCK` to the desired block nu
 
 ## API
 
-### TxFilters
+### Transaction filters
 
 - `GET /api/tx-filters`: retrieve transaction filters.
 - `POST /api/tx-filters`: create a transaction filter. Provide `name`, and optionally `senderAddress`, `recipientAddress`, and `isActive`.
