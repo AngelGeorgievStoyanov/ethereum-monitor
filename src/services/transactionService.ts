@@ -19,12 +19,12 @@ export interface TransferMetadata {
 export async function createTransactionFromEthereumData(
     tx: TransactionResponse,
     receipt: RpcTransactionReceipt,
-    config: TxFilter,
+    txFilter: TxFilter,
     blockTimestamp: number,
     transfer: TransferMetadata,
 ) {
     const data = {
-        txFilterId: config.id,
+        txFilterId: txFilter.id,
         hash: tx.hash,
         nonce: tx.nonce,
         blockHash: receipt.blockHash,
