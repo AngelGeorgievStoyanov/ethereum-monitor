@@ -5,7 +5,7 @@ import Transaction, { TransactionCreationAttributes } from '../models/transactio
 const TRANSFER_UNIQUE_INDEX = 'transactions_transfer_identity_unique';
 
 interface DuplicateTransfer {
-    configurationId: string;
+    txFilterId: string;
     hash: string;
     transferType: 'native' | 'erc20';
     logIndex: number;
@@ -14,9 +14,9 @@ interface DuplicateTransfer {
 
 export async function ensureTransferUniqueness() {
     const duplicateGroups = await sequelize.query<DuplicateTransfer>(
-        `SELECT "configurationId", "hash", "transferType", "logIndex", COUNT(*) AS "count"
+        `SELECT "txFilterId", "hash", "transferType", "logIndex", COUNT(*) AS "count"
          FROM "Transactions"
-         GROUP BY "configurationId", "hash", "transferType", "logIndex"
+         GROUP BY "txFilterId", "hash", "transferType", "logIndex"
          HAVING COUNT(*) > 1
          LIMIT 10`,
         { type: QueryTypes.SELECT },
@@ -25,8 +25,8 @@ export async function ensureTransferUniqueness() {
     if (duplicateGroups.length > 0) {
         const examples = duplicateGroups
             .map(
-                ({ configurationId, hash, transferType, logIndex, count }) =>
-                    `configurationId=${configurationId}, hash=${hash}, type=${transferType}, logIndex=${logIndex}, count=${count}`,
+                ({ txFilterId, hash, transferType, logIndex, count }) =>
+                    `txFilterId=${txFilterId}, hash=${hash}, type=${transferType}, logIndex=${logIndex}, count=${count}`,
             )
             .join('; ');
 
@@ -41,7 +41,7 @@ export async function ensureTransferUniqueness() {
 
     await queryInterface.addIndex(
         'Transactions',
-        ['configurationId', 'hash', 'transferType', 'logIndex'],
+        ['txFilterId', 'hash', 'transferType', 'logIndex'],
         {
             name: TRANSFER_UNIQUE_INDEX,
             unique: true,
@@ -52,7 +52,7 @@ export async function ensureTransferUniqueness() {
 export async function findOrCreateTransfer(data: TransactionCreationAttributes) {
     const [transaction] = await Transaction.findOrCreate({
         where: {
-            configurationId: data.configurationId,
+            txFilterId: data.txFilterId,
             hash: data.hash,
             transferType: data.transferType,
             logIndex: data.logIndex,
