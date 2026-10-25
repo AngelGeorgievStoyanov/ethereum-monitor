@@ -7,7 +7,7 @@ import {
     SCANNER_START_RETRY_MAX_DELAY_MS,
 } from './constants/scanner.constants';
 import { getEthereumService } from './services/ethereumService';
-import { getConfigurationService } from './services/configurationService';
+import { getTxFilterService } from './services/txFilterService';
 import { formatError } from './utils/formatError';
 import { sleep } from './utils/sleep';
 import { ensureTransferUniqueness } from './repositories/transactionRepository';
@@ -15,7 +15,7 @@ import { ensureTransferUniqueness } from './repositories/transactionRepository';
 const app = express();
 
 const ethereumService = getEthereumService();
-const configurationService = getConfigurationService();
+const txFilterService = getTxFilterService();
 
 app.use(express.json());
 app.use('/api', httpRouter);
@@ -49,7 +49,7 @@ async function startServer() {
     await ensureTransferUniqueness();
     console.log('Transfer uniqueness constraint verified');
 
-    await configurationService.loadConfigurations();
+    await txFilterService.loadTxFilters();
 
     void startScannerWithRetry();
 
