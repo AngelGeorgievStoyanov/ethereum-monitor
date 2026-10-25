@@ -12,7 +12,7 @@ import { SCANNER_ID, SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.const
 import { ethereumProvider, fetchBlockData } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
-import { getConfigurationService } from './configurationService';
+import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 
@@ -25,7 +25,7 @@ async function advanceCheckpoint(
 }
 
 export function createBlockMonitorService() {
-    const configurationService = getConfigurationService();
+    const txFilterService = getTxFilterService();
     let scannerStarted = false;
 
     async function start() {
@@ -78,11 +78,11 @@ export function createBlockMonitorService() {
                     const finalized = await ethereumProvider.getBlock('finalized');
                     if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
-                    if (configurationService.getConfigurations().length === 0) {
+                    if (txFilterService.getTxFilters().length === 0) {
                         if (state.lastProcessedBlock < finalized.number) {
                             await advanceCheckpoint(state, finalized.number);
                             console.log(
-                                `[Scanner] No active configurations; checkpoint advanced to ${finalized.number}`,
+                                `[Scanner] No active txFilters; checkpoint advanced to ${finalized.number}`,
                             );
                         }
                     } else {
@@ -125,18 +125,18 @@ export function createBlockMonitorService() {
                                 transactionsByHash.set(tx.hash.toLowerCase(), tx);
                             }
 
-                            const activeConfigurations = configurationService.getConfigurations();
+                            const activeTxFilters = txFilterService.getTxFilters();
                             const native = await processNativeTransfers(
                                 transactions,
                                 receiptsByHash,
-                                activeConfigurations,
+                                activeTxFilters,
                                 blockNumber,
                                 block.timestamp,
                             );
                             const erc20 = await processErc20Transfers(
                                 receipts,
                                 transactionsByHash,
-                                activeConfigurations,
+                                activeTxFilters,
                                 blockNumber,
                                 block.timestamp,
                             );
