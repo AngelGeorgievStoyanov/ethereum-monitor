@@ -3,16 +3,16 @@ import TxFilter from '../models/txFilter';
 export function matchesTxFilter(
     from: string | null | undefined,
     to: string | null | undefined,
-    config: TxFilter,
+    txFilter: TxFilter,
 ): boolean {
-    if (!config.senderAddress && !config.recipientAddress) {
+    if (!txFilter.senderAddress && !txFilter.recipientAddress) {
         return false;
     }
 
     const senderMatches =
-        !config.senderAddress || from?.toLowerCase() === config.senderAddress.toLowerCase();
+        !txFilter.senderAddress || from?.toLowerCase() === txFilter.senderAddress.toLowerCase();
     const recipientMatches =
-        !config.recipientAddress || to?.toLowerCase() === config.recipientAddress.toLowerCase();
+        !txFilter.recipientAddress || to?.toLowerCase() === txFilter.recipientAddress.toLowerCase();
 
     return senderMatches && recipientMatches;
 }
