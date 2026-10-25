@@ -1,5 +1,5 @@
 import { TransactionResponse } from 'ethers';
-import Configuration from '../models/configuration';
+import TxFilter from '../models/txFilter';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import {
     deleteTransactionById,
@@ -19,12 +19,12 @@ export interface TransferMetadata {
 export async function createTransactionFromEthereumData(
     tx: TransactionResponse,
     receipt: RpcTransactionReceipt,
-    config: Configuration,
+    config: TxFilter,
     blockTimestamp: number,
     transfer: TransferMetadata,
 ) {
     const data = {
-        configurationId: config.id,
+        txFilterId: config.id,
         hash: tx.hash,
         nonce: tx.nonce,
         blockHash: receipt.blockHash,
