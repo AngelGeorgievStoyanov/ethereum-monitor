@@ -1,6 +1,6 @@
 # Ethereum Monitor
 
-Ethereum Monitor monitors finalized native ETH transfers and ERC-20 Transfer events on Ethereum mainnet, storing transfers that match active configurations.
+Ethereum Monitor monitors finalized native ETH transfers and ERC-20 transfer activity on Ethereum mainnet, storing records that match active configurations.
 
 ## Technologies
 
@@ -88,13 +88,14 @@ The API listens on port 8000.
 - The scanner processes only finalized blocks, in ascending block order.
 - It fetches blocks and their receipts over HTTP JSON-RPC. Requests are sequential and retried with bounded exponential backoff.
 - The RPC client rotates across configured endpoints and retries rate-limited requests, timeouts, and transient network errors on another endpoint.
-- Native ETH transfers and successful ERC-20 `Transfer` logs are matched against active sender/recipient configuration filters.
+- Native ETH transactions and successful ERC-20 `Transfer` logs are matched against active sender/recipient configuration filters.
+- Failed ERC-20 `transfer` and `transferFrom` attempts are stored as `failed` records when their decoded sender and recipient match an active configuration. Reverted attempts are not treated as completed token transfers.
 - Stored records include `transferType` (`native` or `erc20`), `tokenAddress` for ERC-20 transfers, and `logIndex` to distinguish multiple token transfers in one transaction.
 - During catch-up, it reads finalized blocks over HTTP and saves a persistent checkpoint after each fully processed block.
 - It checks the finalized block height over HTTP every 4 seconds and processes newly finalized blocks.
 - After a restart, scanning continues from the block after the saved checkpoint.
 - If processing a block fails, the checkpoint does not advance and that block is retried.
-- Only finalized direct native ETH transfers with a recipient and successful ERC-20 `Transfer` events are stored. Pending transactions and internal transactions are not monitored.
+- Failed native ETH attempts with a direct recipient are retained with `status=failed` for traceability. Failed ERC-20 attempts are retained only when standard `transfer` or `transferFrom` calldata can be decoded. Pending transactions and internal transactions are not monitored.
 - Reprocessing a block does not create duplicate records for the same configuration, transaction hash, transfer type, and log index.
 - At startup, the application checks for existing duplicate transfer records and creates a unique SQLite index for that identity. If duplicates already exist, startup stops with examples; records are not deleted automatically.
 
