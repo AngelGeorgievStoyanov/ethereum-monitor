@@ -73,6 +73,5 @@ The API listens on port `8000`.
 - `DATABASE_URL` — PostgreSQL connection URL.
 - `RPC_URL_1`, `RPC_URL_2`, etc. — RPC endpoints; additional endpoints act as fallbacks.
 - `START_BLOCK` — initial block, used when no checkpoint exists.
-- `RESCAN_FROM_BLOCK` — one-time rewind to an earlier block.
 
 A fresh PostgreSQL schema is expected. Existing schemas and old SQLite data are not migrated automatically.
