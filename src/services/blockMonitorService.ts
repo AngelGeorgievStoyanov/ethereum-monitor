@@ -5,7 +5,7 @@ import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
-import { catchUpToFinalizedBlock } from './blockCatchupService';
+import { processFinalizedBlocks } from './blockProcessor';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
 import { isScannerPausePendingOrActive } from './scannerControlService';
 
@@ -65,7 +65,7 @@ export function createBlockMonitorService() {
                         waitingForFilters = false;
                     }
 
-                    await catchUpToFinalizedBlock(
+                    await processFinalizedBlocks(
                         state,
                         finalized.number,
                         () => txFilterService.getTxFilters(),
