@@ -25,8 +25,7 @@ export async function processBlock(
     activeTxFilters: TxFilter[],
 ): Promise<ProcessedBlockMetrics> {
     const blockStartedAt = Date.now();
-    const { block, receipts, durationMs: fetchDurationMs, attempt } =
-        await fetchBlockData(blockNumber);
+    const { block, receipts, durationMs: fetchDurationMs, attempt } = await fetchBlockData(blockNumber);
     const transactions = block.prefetchedTransactions;
     const receiptsByHash = new Map<string, RpcTransactionReceipt>();
 
