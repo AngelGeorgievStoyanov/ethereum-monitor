@@ -165,10 +165,9 @@ export function createTxFilterService() {
     }
 
     async function removeTxFilter(id: number) {
-        const deleted = await sequelize.transaction(async (transaction) => {
-            await saveRuleForFilter(id, null, transaction);
-            return deleteTxFilterById(id, transaction);
-        });
+        const deleted = await sequelize.transaction(async (transaction) =>
+            deleteTxFilterById(id, transaction),
+        );
         if (deleted > 0) txFilters.delete(id);
         return deleted;
     }
