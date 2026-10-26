@@ -10,9 +10,12 @@ function parseId(value: string): number | undefined {
 
 function sendError(res: Response, message: string, error: unknown) {
     const details = error instanceof Error ? error.message : String(error);
-    const status = /unsupported|requires|invalid|must have|must contain|only supported|every filter group/i.test(details)
-        ? 400
-        : 500;
+    const status =
+        /unsupported|requires|invalid|must have|must contain|only supported|every filter group/i.test(
+            details,
+        )
+            ? 400
+            : 500;
     res.status(status).json({ message, details });
 }
 
@@ -34,7 +37,10 @@ export const createTxFilter = async (req: Request, res: Response) => {
         res.status(400).json({ message: 'isActive must be a boolean' });
         return;
     }
-    if ((from !== undefined && from !== null && typeof from !== 'string') || (to !== undefined && to !== null && typeof to !== 'string')) {
+    if (
+        (from !== undefined && from !== null && typeof from !== 'string') ||
+        (to !== undefined && to !== null && typeof to !== 'string')
+    ) {
         res.status(400).json({ message: 'from and to must be strings or null' });
         return;
     }
@@ -61,7 +67,10 @@ export const updateTxFilter = async (req: Request<{ id: string }>, res: Response
     }
 
     const { description, from, to, isActive, rule } = req.body ?? {};
-    if (description !== undefined && (typeof description !== 'string' || description.trim().length === 0)) {
+    if (
+        description !== undefined &&
+        (typeof description !== 'string' || description.trim().length === 0)
+    ) {
         res.status(400).json({ message: 'Filter description must be a non-empty string' });
         return;
     }
