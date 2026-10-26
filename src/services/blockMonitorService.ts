@@ -45,17 +45,20 @@ export function createBlockMonitorService() {
                     if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
                     if (waitingForFilters) {
-                        if (
-                            !isScannerPausePendingOrActive() &&
-                            state.lastProcessedBlock < finalized.number
-                        ) {
-                            await updateScannerCheckpoint(state.id, finalized.number);
-                            state.lastProcessedBlock = finalized.number;
+                        if (!isScannerPausePendingOrActive()) {
+                            const activationStartBlock = Math.min(
+                                ...activeTxFilters.map((filter) => filter.activeFromBlock ?? finalized.number + 1),
+                            );
+                            const activationCheckpoint = activationStartBlock - 1;
+                            if (state.lastProcessedBlock < activationCheckpoint) {
+                                await updateScannerCheckpoint(state.id, activationCheckpoint);
+                                state.lastProcessedBlock = activationCheckpoint;
+                            }
                         }
                         console.log(
                             isScannerPausePendingOrActive()
                                 ? `[Scanner] Active filters detected while paused; preserving checkpoint ${state.lastProcessedBlock}`
-                                : `[Scanner] Active filters detected; starting after finalized block ${state.lastProcessedBlock}`,
+                                : `[Scanner] Active filters detected; starting at block ${state.lastProcessedBlock + 1}`,
                         );
                         waitingForFilters = false;
                     }
