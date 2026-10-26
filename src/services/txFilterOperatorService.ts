@@ -86,12 +86,17 @@ export function evaluateTxFilterOperator(
             expectedValue.some(
                 (item) => actual === normalize(item, definition.type, Boolean(definition.caseInsensitive)),
             );
-        return operator === 'in' ? found : !found;
+        if (operator === 'in') return found;
+        return actual !== null && actual !== undefined && !found;
     }
     const expected = normalize(expectedValue, definition.type, Boolean(definition.caseInsensitive));
 
     if (operator === 'eq') return actual === expected;
-    if (operator === 'ne') return actual !== expected;
+    if (operator === 'ne') {
+        if (actual === null || actual === undefined) return false;
+        if (expected === null || expected === undefined) return true;
+        return actual !== expected;
+    }
     if (operator === 'contains') {
         return typeof actual === 'string' && typeof expected === 'string' && actual.includes(expected);
     }
