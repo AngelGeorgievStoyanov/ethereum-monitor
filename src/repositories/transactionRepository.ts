@@ -38,12 +38,10 @@ export async function createTransfersBatch(items: readonly TransferBatchItem[]):
             },
             transaction: dbTransaction,
         });
-        const transactionsByIdentity = new Map(
-            storedTransactions.map((transaction) => [
-                getTransferIdentity(transaction),
-                transaction,
-            ]),
-        );
+        const transactionsByIdentity = new Map<string, Transaction>();
+        for (const transaction of storedTransactions) {
+            transactionsByIdentity.set(getTransferIdentity(transaction), transaction);
+        }
 
         const filterIds = [
             ...new Set(items.flatMap((item) => item.matchingTxFilterIds)),
@@ -55,7 +53,10 @@ export async function createTransfersBatch(items: readonly TransferBatchItem[]):
             attributes: ['id', 'description'],
             transaction: dbTransaction,
         });
-        const descriptionsById = new Map(filters.map((filter) => [filter.id, filter.description]));
+        const descriptionsById = new Map<number, string>();
+        for (const filter of filters) {
+            descriptionsById.set(filter.id, filter.description);
+        }
         const matches: Array<{
             txId: number;
             txFilterId: number;
