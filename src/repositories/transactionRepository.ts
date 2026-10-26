@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import Transaction, { TransactionCreationAttributes } from '../models/transaction';
 import TxFilter from '../models/txFilter';
 import TxMatch from '../models/txMatch';
@@ -42,8 +43,17 @@ export async function findOrCreateInternalTransfer(data: TransactionCreationAttr
 export async function createTxMatches(txId: number, txFilterIds: number[]) {
     if (txFilterIds.length === 0) return;
 
+    const filters = await TxFilter.findAll({
+        where: { id: { [Op.in]: txFilterIds } },
+        attributes: ['id', 'description'],
+    });
+
     await TxMatch.bulkCreate(
-        txFilterIds.map((txFilterId) => ({ txId, txFilterId })),
+        filters.map((filter) => ({
+            txId,
+            txFilterId: filter.id,
+            txFilterDescription: filter.description,
+        })),
         { ignoreDuplicates: true },
     );
 }
