@@ -11,8 +11,8 @@ import { getNextFilterStartBlock } from './txFilterActivationService';
 import {
     ActiveTxFilter,
     TxFilterGroupRule,
-    validateTxFilterGroup,
 } from './txFilterEvaluatorService';
+import { validateTxFilterGroup } from './txFilterValidationService';
 
 function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
     const conditions = [];
