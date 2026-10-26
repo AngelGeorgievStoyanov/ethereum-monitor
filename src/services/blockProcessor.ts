@@ -9,6 +9,7 @@ import { processBlock } from './blockProcessingService';
 import { persistProcessedBlockBatch } from './transactionService';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
+import { isScannerLockHeld } from './scannerLockService';
 
 export async function processFinalizedBlocks(
     state: ScannerState,
@@ -54,6 +55,13 @@ export async function processFinalizedBlocks(
             );
 
             const candidates = preparedBlocks.flatMap(({ result }) => result.candidates);
+            if (!(await isScannerLockHeld())) {
+                console.warn(
+                    `[Scanner] Advisory lock lost before committing batch at block ${currentBatchStart}; yielding to the lock owner`,
+                );
+                return;
+            }
+
             const databaseWriteStartedAt = Date.now();
             const committedCheckpoint = await persistProcessedBlockBatch(
                 candidates,
