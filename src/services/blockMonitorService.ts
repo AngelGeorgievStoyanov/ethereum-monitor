@@ -25,6 +25,15 @@ export function createBlockMonitorService() {
             throw error;
         }
 
+        // If the process starts with active filters, preserve the checkpoint and catch up.
+        // If it starts without filters, the first later activation begins at the latest
+        // finalized block instead of replaying a period during which nothing was monitored.
+        let waitingForFilters = txFilterService.getTxFilters().length === 0;
+
+        if (waitingForFilters) {
+            console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
+        }
+
         while (true) {
             try {
                 const finalized = await ethereumProvider.getBlock('finalized');
@@ -33,14 +42,22 @@ export function createBlockMonitorService() {
                 const activeTxFilters = txFilterService.getTxFilters();
 
                 if (activeTxFilters.length === 0) {
-                    if (state.lastProcessedBlock < finalized.number) {
-                        await updateScannerCheckpoint(state.id, finalized.number);
-                        state.lastProcessedBlock = finalized.number;
-                        console.log(
-                            `[Scanner] No active tx filters; checkpoint advanced to ${finalized.number}`,
-                        );
+                    if (!waitingForFilters) {
+                        console.log('[Scanner] No active tx filters; scanning paused until a filter is activated');
                     }
+                    waitingForFilters = true;
                 } else {
+                    if (waitingForFilters) {
+                        if (state.lastProcessedBlock < finalized.number) {
+                            await updateScannerCheckpoint(state.id, finalized.number);
+                            state.lastProcessedBlock = finalized.number;
+                        }
+                        console.log(
+                            `[Scanner] Active filters detected; starting after finalized block ${state.lastProcessedBlock}`,
+                        );
+                        waitingForFilters = false;
+                    }
+
                     await catchUpToFinalizedBlock(state, finalized.number, activeTxFilters);
                 }
             } catch (error) {
