@@ -3,6 +3,7 @@ import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesTxFilter } from '../utils/matchesTxFilter';
+import { mapTransactionFilterContext } from '../mappers/transactionContextMapper';
 
 export async function processNativeTransfers(
     transactions: readonly TransactionResponse[],
@@ -26,23 +27,20 @@ export async function processNativeTransfers(
             );
         }
 
-        const context = {
-            txHash: tx.hash,
-            transferType: 'native',
-            tokenAddress: null,
+        const transfer = {
+            transferType: 'native' as const,
             logIndex: -1,
-            nonce: tx.nonce,
-            blockHash: receipt.blockHash,
-            blockNumber,
-            transactionIndex: Number(BigInt(receipt.transactionIndex)),
             from: tx.from,
             to: tx.to,
             value: tx.value.toString(),
-            internalCount: null,
-            status: Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed',
-            transactionType: tx.type?.toString() ?? null,
-            timestamp: new Date(blockTimestamp * 1000),
         };
+        const context = mapTransactionFilterContext(
+            tx,
+            receipt,
+            blockNumber,
+            blockTimestamp,
+            transfer,
+        );
 
         const matchingTxFilters = txFilters.filter((filter) =>
             matchesTxFilter(context, filter, blockNumber),
@@ -54,13 +52,7 @@ export async function processNativeTransfers(
             tx,
             receipt,
             blockTimestamp,
-            {
-                transferType: 'native',
-                logIndex: -1,
-                from: tx.from,
-                to: tx.to,
-                value: tx.value.toString(),
-            },
+            transfer,
             matchingTxFilters,
         );
         databaseWriteDurationMs += Date.now() - startedAt;
