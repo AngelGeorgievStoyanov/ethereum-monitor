@@ -16,6 +16,11 @@ const state: ScannerControlState = {
 
 let targetBlock: number | null = null;
 
+export function isScannerPausePendingOrActive(): boolean {
+    refreshTimeout();
+    return state.paused || targetBlock !== null;
+}
+
 export function getScannerControlState(): ScannerControlState {
     refreshTimeout();
     return { ...state };
