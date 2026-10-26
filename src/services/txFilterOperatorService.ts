@@ -59,6 +59,9 @@ export function validateTxFilterOperator(field: string, operator: string, value:
     if (operator === 'contains' && definition.type !== 'string') {
         throw new Error(`Operator "contains" is only supported for string fields`);
     }
+    if (operator === 'contains' && typeof value !== 'string') {
+        throw new Error('Operator "contains" requires a string value');
+    }
     if ((operator === 'in' || operator === 'notIn') && !Array.isArray(value)) {
         throw new Error(`Operator "${operator}" requires an array value`);
     }
