@@ -1,12 +1,24 @@
 import sequelize from '../database';
 import { SCANNER_ADVISORY_LOCK_KEY } from '../constants/scanner.constants';
 
-let lockConnection: any;
+interface PgConnection {
+    query(
+        sql: string,
+        values?: unknown[],
+    ): Promise<{ rows?: Array<{ locked?: boolean }> }>;
+}
+
+interface ConnectionManager {
+    getConnection(options: { type: 'WRITE'; useMaster: boolean }): Promise<PgConnection>;
+    releaseConnection(connection: PgConnection): Promise<void>;
+}
+
+let lockConnection: PgConnection | undefined;
 
 export async function tryAcquireScannerLock(): Promise<boolean> {
     if (lockConnection) return true;
 
-    const connectionManager = (sequelize as any).connectionManager;
+    const connectionManager = sequelize.connectionManager as unknown as ConnectionManager;
     const connection = await connectionManager.getConnection({
         type: 'WRITE',
         useMaster: true,
