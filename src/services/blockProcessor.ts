@@ -81,6 +81,7 @@ export async function processFinalizedBlocks(
                     result,
                     blockDurationMs,
                     state.lastProcessedBlock,
+                    finalizedBlockNumber,
                 );
                 accumulateBlockMetrics(totals, result, blockDurationMs);
             }
