@@ -1,5 +1,6 @@
 import ScannerState from '../models/scannerState';
-import TxFilter from '../models/txFilter';
+import { ActiveTxFilter } from './txFilterEvaluatorService';
+import { shouldPauseBeforeBlock } from './scannerControlService';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
 import { formatError } from '../utils/formatError';
 import { processBlock } from './blockProcessingService';
@@ -7,7 +8,7 @@ import { processBlock } from './blockProcessingService';
 export async function catchUpToFinalizedBlock(
     state: ScannerState,
     finalizedBlockNumber: number,
-    activeTxFilters: TxFilter[],
+    getActiveTxFilters: () => ActiveTxFilter[],
 ): Promise<void> {
     const catchupStartedAt = Date.now();
     const catchupStartBlock = state.lastProcessedBlock + 1;
@@ -25,6 +26,9 @@ export async function catchUpToFinalizedBlock(
 
     while (state.lastProcessedBlock < finalizedBlockNumber) {
         const blockNumber = state.lastProcessedBlock + 1;
+        if (shouldPauseBeforeBlock(blockNumber, state.lastProcessedBlock)) return;
+        const activeTxFilters = getActiveTxFilters();
+        if (activeTxFilters.length === 0) return;
 
         try {
             const metrics = await processBlock(blockNumber, activeTxFilters);
