@@ -3,6 +3,8 @@ import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import {
     createTxMatches,
+    createTransfersBatch,
+    TransferBatchItem,
     deleteTransactionById,
     findTransactionsPage,
     findOrCreateTransfer,
@@ -13,6 +15,30 @@ import {
 } from '../mappers/transactionContextMapper';
 
 export type TransferMetadata = TransferContextMetadata;
+
+export interface TransferBatchCandidate {
+    tx: TransactionResponse;
+    receipt: RpcTransactionReceipt;
+    blockTimestamp: number;
+    transfer: TransferMetadata;
+    matchingTxFilters: ActiveTxFilter[];
+}
+
+export async function createTransactionsFromEthereumDataBatch(
+    candidates: readonly TransferBatchCandidate[],
+): Promise<void> {
+    const items: TransferBatchItem[] = candidates.map((candidate) => ({
+        data: mapTransactionCreationData(
+            candidate.tx,
+            candidate.receipt,
+            candidate.blockTimestamp,
+            candidate.transfer,
+        ),
+        matchingTxFilterIds: candidate.matchingTxFilters.map((filter) => filter.id),
+    }));
+
+    await createTransfersBatch(items);
+}
 
 export async function createTransactionFromEthereumData(
     tx: TransactionResponse,
