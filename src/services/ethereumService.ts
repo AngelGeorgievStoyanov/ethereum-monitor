@@ -1,5 +1,5 @@
 import { createBlockMonitorService } from './blockMonitorService';
-export { matchesConfiguration } from '../utils/matchesConfiguration';
+export { matchesTxFilter } from '../utils/matchesTxFilter';
 
 let ethereumServiceInstance: ReturnType<typeof createBlockMonitorService> | undefined;
 
