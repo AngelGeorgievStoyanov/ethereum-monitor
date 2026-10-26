@@ -80,6 +80,9 @@ export function createTxFilterService() {
         isActive: boolean;
         rule?: TxFilterGroupRule;
     }) {
+        if (!data.rule && !data.from && !data.to) {
+            throw new Error('A filter requires at least one condition');
+        }
         if (data.rule) validateTxFilterGroup(data.rule);
         const activeFromBlock = data.isActive ? await getNextFilterStartBlock() : null;
         const filter = await insertTxFilter({
@@ -108,6 +111,9 @@ export function createTxFilterService() {
         const existing = await findAllTxFilters();
         const current = existing.find((item) => item.id === id);
         if (!current) return null;
+        if (updates.rule === null && !current.from && !current.to && updates.from == null && updates.to == null) {
+            throw new Error('A filter requires at least one condition');
+        }
 
         const activatingOrChangingRule =
             updates.isActive === true ||
