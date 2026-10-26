@@ -27,7 +27,12 @@ export function getScannerControlState(): ScannerControlState {
 }
 
 function refreshTimeout(): void {
-    if (state.paused && state.mode === 'temporary' && state.pauseUntil !== null && Date.now() >= state.pauseUntil) {
+    if (
+        state.paused &&
+        state.mode === 'temporary' &&
+        state.pauseUntil !== null &&
+        Date.now() >= state.pauseUntil
+    ) {
         console.log('[Scanner] Temporary pause expired; resuming automatically');
         resumeScanner();
     }
@@ -53,9 +58,10 @@ export function shouldPauseBeforeBlock(nextBlock: number, lastProcessedBlock: nu
         state.paused = true;
         targetBlock = null;
         state.pauseUntil = state.mode === 'temporary' ? Date.now() + 5 * 60 * 1000 : null;
-        console.log(
-            `[Scanner] Paused at checkpoint ${lastProcessedBlock}${state.pauseUntil ? '; auto-resume in 5 minutes' : '; manual resume required'}`,
-        );
+        const resumeMessage = state.pauseUntil
+            ? '; auto-resume in 5 minutes'
+            : '; manual resume required';
+        console.log(`[Scanner] Paused at checkpoint ${lastProcessedBlock}${resumeMessage}`);
         return true;
     }
     return false;
