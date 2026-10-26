@@ -14,20 +14,26 @@ export const ethereumProvider = getRpcClient();
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
         const startedAt = Date.now();
+        let getBlockDurationMs = 0;
+        let getBlockReceiptsDurationMs = 0;
 
         try {
             const { block, receipts } = await ethereumProvider.execute(
                 `fetchBlockData(${blockNumber})`,
                 async (provider) => {
+                    const getBlockStartedAt = Date.now();
                     const block = await provider.getBlock(blockNumber, true);
+                    getBlockDurationMs = Date.now() - getBlockStartedAt;
 
                     if (!block) {
                         throw new Error(`Unable to load block ${blockNumber}`);
                     }
 
+                    const getReceiptsStartedAt = Date.now();
                     const response: unknown = await provider.send('eth_getBlockReceipts', [
                         ethers.toQuantity(blockNumber),
                     ]);
+                    getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
 
                     if (!Array.isArray(response)) {
                         throw new Error('eth_getBlockReceipts returned a non-array response');
@@ -44,6 +50,8 @@ export async function fetchBlockData(blockNumber: number) {
                 block,
                 receipts,
                 durationMs: Date.now() - startedAt,
+                getBlockDurationMs,
+                getBlockReceiptsDurationMs,
                 attempt,
             };
         } catch (error) {
