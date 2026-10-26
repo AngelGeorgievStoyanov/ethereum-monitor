@@ -7,13 +7,35 @@ import {
 import ScannerState from '../models/scannerState';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { HttpError, sendHttpError } from '../utils/httpError';
+import { ethereumProvider } from '../services/ethereumRpcService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
         const checkpoint = await ScannerState.findByPk(SCANNER_ID);
+        let latestFinalizedBlock: number | null = null;
+        let rpcAvailable = false;
+
+        try {
+            const finalized = await ethereumProvider.getBlock('finalized');
+            if (finalized) {
+                latestFinalizedBlock = finalized.number;
+                rpcAvailable = true;
+            }
+        } catch {
+            // Keep scanner status available even when the RPC providers are temporarily down.
+        }
+
+        const lastProcessedBlock = checkpoint?.lastProcessedBlock ?? null;
         res.json({
             ...getScannerControlState(),
-            lastProcessedBlock: checkpoint?.lastProcessedBlock ?? null,
+            lastProcessedBlock,
+            latestFinalizedBlock,
+            lagBlocks:
+                lastProcessedBlock !== null && latestFinalizedBlock !== null
+                    ? latestFinalizedBlock - lastProcessedBlock
+                    : null,
+            rpcAvailable,
+            checkedAt: new Date().toISOString(),
         });
     } catch (error) {
         sendHttpError(res, 'Unable to retrieve scanner status', error);
