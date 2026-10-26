@@ -1,134 +1,74 @@
 # Ethereum Monitor
 
-Ethereum Monitor monitors finalized native ETH transfers and ERC-20 transfer activity on Ethereum mainnet, storing transfers that match active transaction filters.
+A service for monitoring ETH and ERC-20 transfers on Ethereum Mainnet and storing transfers that match configured filters.
 
 ## Technologies
 
-- Node.js
-- Express
-- Sequelize
-- PostgreSQL
-- Ethers.js
-- TypeScript
-- Nodemon
-- ESLint
-- Prettier
+Node.js 24, TypeScript, Express, ethers.js, Sequelize, and PostgreSQL.
 
-## Project structure
+## Getting started
 
-- `src/clients`: external RPC client integration.
-- `src/config`: environment configuration.
-- `src/constants`: constants grouped by the feature or service that owns them.
-- `src/controllers`: HTTP request and response handling.
-- `src/models`: Sequelize data models.
-- `src/repositories`: database access.
-- `src/services`: scanner, Ethereum RPC, transfer processing, and transaction filter logic.
-- `src/types`: explicit types for Ethereum JSON-RPC responses.
-- `src/utils`: small shared utilities.
-- `src/httpRouter.ts`: API route declarations, kept separate from controller logic.
+Requirements: Node.js 24, npm, PostgreSQL, and an Ethereum Mainnet RPC endpoint.
 
-## Continuous integration
+1. Install dependencies:
 
-GitHub Actions runs ESLint, the TypeScript build, and an npm dependency audit on pushes and pull requests targeting `feature/ethereum-monitoring-refactor`. Automated tests are intentionally not configured at this stage. The Prettier check is temporarily disabled in CI.
+   ```bash
+   npm install
+   ```
 
-## Requirements
+2. Create an empty PostgreSQL database named `ethereum_monitor`.
 
-- Node.js 24 and npm
-- PostgreSQL
-- One or more Ethereum mainnet HTTP JSON-RPC endpoints
+3. Create a `.env` file:
 
-## Installation
+   ```env
+   DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/ethereum_monitor
+   RPC_URL_1=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
+   ```
 
-```bash
-git clone https://github.com/AngelGeorgievStoyanov/ethereum-monitor.git
-cd ethereum-monitor
-npm install
-```
+4. Start the server:
 
-Create a fresh PostgreSQL database named `ethereum_monitor` and configure a `.env` file:
+   ```bash
+   npm run dev
+   ```
 
-```env
-DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/ethereum_monitor
-RPC_URL_1=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
-RPC_URL_2=https://YOUR_SECOND_PROVIDER_ENDPOINT
-```
-
-Configure `DATABASE_URL` and at least `RPC_URL_1`. Additional `RPC_URL_N` endpoints are used as fallbacks when an endpoint is rate-limited, times out, or has a transient network error. This version uses a fresh PostgreSQL schema; it does not migrate old SQLite data or alter an existing PostgreSQL schema.
-
-## Running
-
-Development mode:
-
-```bash
-npm run dev
-```
-
-Production mode:
+For a production build:
 
 ```bash
 npm run build
 npm start
 ```
 
-The build command clears the previous `build` output before compiling TypeScript.
+The API listens on port `8000`.
 
-Run the quality checks after installing dependencies:
+## How it works
 
-```bash
-npm ci
-npm run lint
-```
+- Processes finalized blocks in order and stores a checkpoint in the database to resume after a restart.
+- Monitors native ETH transfers and ERC-20 `Transfer` events, including recognized failed attempts.
+- Stores each transfer once in `Transactions` and records filter matches in `TxMatches`.
+- Does not advance the checkpoint when block processing fails.
 
-Use `npm run format` to apply the configured formatting.
+## Transfer uniqueness
 
-The API listens on port 8000.
-
-## Scanner behavior
-
-- The scanner processes only finalized blocks, in ascending block order.
-- It fetches blocks and their receipts over HTTP JSON-RPC. Requests are sequential and retried with bounded exponential backoff.
-- The RPC client rotates across configured endpoints and retries rate-limited requests, timeouts, and transient network errors on another endpoint.
-- Native ETH transactions and successful ERC-20 `Transfer` logs are matched against active sender/recipient transaction filters.
-- Failed ERC-20 `transfer` and `transferFrom` attempts are stored with status `failed` when their decoded sender and recipient match an active transaction filter. Reverted attempts are not treated as completed token transfers.
-- Transfer amounts are stored as strings in their smallest units. Formatting into ETH or token units belongs in the API or UI layer.
-- `Transactions` stores each matching transfer once. `TxMatches` records every filter that matched it, so one transfer can be associated with multiple filters.
-- Native transfers are unique by `txHash + transferType`. ERC-20 transfers are unique by `txHash + transferType + logIndex`. Internal transfers do not have a database unique index; identical trace records are grouped in `internalCount`, which is null for native and ERC-20 transfers.
-- Internal transaction tracing is not implemented yet; the schema supports the planned `internal` transfer type.
-- During catch-up, the scanner reads finalized blocks over HTTP and saves a persistent checkpoint after each fully processed block.
-- It checks the finalized block height over HTTP every 4 seconds and processes newly finalized blocks.
-- After a restart, scanning continues from the block after the saved checkpoint.
-- If processing a block fails, the checkpoint does not advance and that block is retried.
-- Failed native ETH attempts with a direct recipient are retained with status `failed` for traceability. Pending transactions are not monitored.
-- At startup, the application checks for duplicate native and ERC-20 transfer records and creates separate partial unique indexes. Duplicate records stop startup with examples; records are not deleted automatically.
-
-The first startup begins at the latest finalized block unless `START_BLOCK` is set. `START_BLOCK` is used only when no scanner checkpoint exists.
-
-To rescan from an earlier block, set `RESCAN_FROM_BLOCK` to the desired block number and restart the application. A given value is applied once and recorded in the database. To intentionally apply another rewind, change the value to a different block number.
+- **Native ETH:** unique by `txHash + transferType`.
+- **ERC-20:** unique by `txHash + transferType + logIndex`, because a transaction can contain multiple token transfers.
+- **Internal transfers:** are not processed by this service and have no unique index. A transaction can contain distinct trace records with identical data. Processing them is planned for a separate microservice.
 
 ## API
 
-### Transaction filters
+- `GET /api/tx-filters` — list filters.
+- `POST /api/tx-filters` — create a filter.
+- `PUT /api/tx-filters/:id` — update a filter.
+- `DELETE /api/tx-filters/:id` — delete a filter.
+- `GET /api/transactions?page=1&limit=20` — list transfers with pagination.
+- `DELETE /api/transactions/:id` — delete a transfer.
+- `GET /api/scanner/status` — get scanner status.
+- `POST /api/scanner/pause` and `POST /api/scanner/resume` — pause and resume scanning.
 
-- `GET /api/tx-filters`: retrieve transaction filters.
-- `POST /api/tx-filters`: create a filter. Provide `description`, and optionally `from`, `to`, and `isActive`.
-- `PUT /api/tx-filters/:id`: update a filter.
-- `DELETE /api/tx-filters/:id`: delete a filter. Matched transfers remain stored.
+## Configuration
 
-### Transactions
+- `DATABASE_URL` — PostgreSQL connection URL.
+- `RPC_URL_1`, `RPC_URL_2`, etc. — RPC endpoints; additional endpoints act as fallbacks.
+- `START_BLOCK` — initial block, used when no checkpoint exists.
+- `RESCAN_FROM_BLOCK` — one-time rewind to an earlier block.
 
-- `GET /api/transactions?page=1&limit=20`: retrieve a page of stored transfers, including their filter matches. Both parameters are optional; defaults are `page=1` and `limit=20`. `limit` must be between 1 and 100. Results are ordered by block number, transaction index, and ID, descending.
-- The response contains `items` and `pagination` (`page`, `limit`, `total`, `totalPages`).
-- `DELETE /api/transactions/:id`: delete a transfer by its integer ID.
-
-Bulk deletion and query-based deletion endpoints are not exposed. The raw SQL query endpoint has been removed.
-
-## Environment variables
-
-- `DATABASE_URL`: PostgreSQL connection URL; required.
-- `RPC_URL_1`, `RPC_URL_2`, etc.: ordered Ethereum mainnet HTTP JSON-RPC endpoints. At least one is required.
-- `START_BLOCK`: optional initial block number, used only when no checkpoint exists.
-- `RESCAN_FROM_BLOCK`: optional one-time rewind to a block number. Each distinct value is applied once.
-
-## License
-
-ISC
+A fresh PostgreSQL schema is expected. Existing schemas and old SQLite data are not migrated automatically.
