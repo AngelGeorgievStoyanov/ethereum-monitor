@@ -23,6 +23,7 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
 export const pauseScanner = (req: Request, res: Response): void => {
     const mode = req.body?.mode ?? 'temporary';
     const atBlock = req.body?.atBlock;
+    const durationMinutes = req.body?.durationMinutes;
 
     if (mode !== 'manual' && mode !== 'temporary') {
         sendHttpError(
@@ -40,9 +41,24 @@ export const pauseScanner = (req: Request, res: Response): void => {
         );
         return;
     }
+    if (
+        durationMinutes !== undefined &&
+        (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440)
+    ) {
+        sendHttpError(
+            res,
+            'Invalid scanner pause duration',
+            new HttpError(400, 'durationMinutes must be an integer between 1 and 1440'),
+        );
+        return;
+    }
 
     try {
-        requestScannerPause(mode, atBlock ?? null);
+        requestScannerPause(
+            mode,
+            atBlock ?? null,
+            mode === 'temporary' ? durationMinutes ?? 5 : 5,
+        );
         res.json({ message: 'Scanner pause requested', ...getScannerControlState() });
     } catch (error) {
         sendHttpError(res, 'Unable to request scanner pause', error);
