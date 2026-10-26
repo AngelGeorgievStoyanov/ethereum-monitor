@@ -67,10 +67,12 @@ export function createTxFilterService() {
 
     async function getAllTxFilters() {
         const filters = await findAllTxFilters();
-        return Promise.all(filters.map(async (filter) => ({
-            ...filter.toJSON(),
-            rule: (await findRuleForFilter(filter.id)) ?? legacyRule(filter),
-        })));
+        return Promise.all(
+            filters.map(async (filter) => ({
+                ...filter.toJSON(),
+                rule: (await findRuleForFilter(filter.id)) ?? legacyRule(filter),
+            })),
+        );
     }
 
     async function createTxFilter(data: {
@@ -111,7 +113,13 @@ export function createTxFilterService() {
         const existing = await findAllTxFilters();
         const current = existing.find((item) => item.id === id);
         if (!current) return null;
-        if (updates.rule === null && !current.from && !current.to && !updates.from && !updates.to) {
+        if (
+            updates.rule === null &&
+            !current.from &&
+            !current.to &&
+            !updates.from &&
+            !updates.to
+        ) {
             throw new Error('A filter requires at least one condition');
         }
 
@@ -136,7 +144,12 @@ export function createTxFilterService() {
         });
         if (updates.rule !== undefined) await saveRuleForFilter(id, updates.rule);
         await refreshFilter(filter);
-        return filter ? { ...filter.toJSON(), rule: updates.rule !== undefined ? updates.rule : (await findRuleForFilter(filter.id)) ?? legacyRule(filter) } : null;
+        if (!filter) return null;
+        const rule =
+            updates.rule !== undefined
+                ? updates.rule
+                : (await findRuleForFilter(filter.id)) ?? legacyRule(filter);
+        return { ...filter.toJSON(), rule };
     }
 
     async function removeTxFilter(id: number) {
