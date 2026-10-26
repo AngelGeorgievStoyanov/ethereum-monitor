@@ -1,7 +1,6 @@
 import { TransactionResponse } from 'ethers';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
-import { createTransactionFromEthereumData } from './transactionService';
 import { matchesTxFilter } from '../utils/matchesTxFilter';
 import { mapTransactionFilterContext } from '../mappers/transactionContextMapper';
 import type { TransferBatchCandidate } from './transactionService';
