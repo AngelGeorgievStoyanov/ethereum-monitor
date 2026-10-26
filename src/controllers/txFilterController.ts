@@ -30,6 +30,14 @@ export const createTxFilter = async (req: Request, res: Response) => {
         res.status(400).json({ message: 'A filter description is required' });
         return;
     }
+    if (isActive !== undefined && typeof isActive !== 'boolean') {
+        res.status(400).json({ message: 'isActive must be a boolean' });
+        return;
+    }
+    if ((from !== undefined && from !== null && typeof from !== 'string') || (to !== undefined && to !== null && typeof to !== 'string')) {
+        res.status(400).json({ message: 'from and to must be strings or null' });
+        return;
+    }
 
     try {
         const txFilter = await txFilterService.createTxFilter({
@@ -55,6 +63,14 @@ export const updateTxFilter = async (req: Request<{ id: string }>, res: Response
     const { description, from, to, isActive, rule } = req.body ?? {};
     if (description !== undefined && (typeof description !== 'string' || description.trim().length === 0)) {
         res.status(400).json({ message: 'Filter description must be a non-empty string' });
+        return;
+    }
+    if (isActive !== undefined && typeof isActive !== 'boolean') {
+        res.status(400).json({ message: 'isActive must be a boolean' });
+        return;
+    }
+    if ((from !== undefined && from !== null && typeof from !== 'string') || (to !== undefined && to !== null && typeof to !== 'string')) {
+        res.status(400).json({ message: 'from and to must be strings or null' });
         return;
     }
 
