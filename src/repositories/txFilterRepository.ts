@@ -15,14 +15,17 @@ export function findTxFilterById(id: number) {
     return TxFilter.findByPk(id);
 }
 
-export function createTxFilter(data: {
-    description: string;
-    from: string | null;
-    to: string | null;
-    isActive: boolean;
-    activeFromBlock: number | null;
-}) {
-    return TxFilter.create(data);
+export function createTxFilter(
+    data: {
+        description: string;
+        from: string | null;
+        to: string | null;
+        isActive: boolean;
+        activeFromBlock: number | null;
+    },
+    transaction?: SequelizeTransaction,
+) {
+    return TxFilter.create(data, transaction ? { transaction } : undefined);
 }
 
 export async function updateTxFilter(
@@ -34,8 +37,9 @@ export async function updateTxFilter(
         isActive?: boolean;
         activeFromBlock?: number | null;
     },
+    transaction?: SequelizeTransaction,
 ) {
-    const txFilter = await TxFilter.findByPk(id);
+    const txFilter = await TxFilter.findByPk(id, transaction ? { transaction } : undefined);
     if (!txFilter) return null;
 
     if (updates.description !== undefined) txFilter.description = updates.description;
@@ -44,13 +48,16 @@ export async function updateTxFilter(
     if (updates.isActive !== undefined) txFilter.isActive = updates.isActive;
     if (updates.activeFromBlock !== undefined) txFilter.activeFromBlock = updates.activeFromBlock;
 
-    await txFilter.save();
+    await txFilter.save(transaction ? { transaction } : undefined);
     return txFilter;
 }
 
-export async function deleteTxFilterById(id: number) {
-    return sequelize.transaction(async (transaction: SequelizeTransaction) => {
-        await TxMatch.destroy({ where: { txFilterId: id }, transaction });
-        return TxFilter.destroy({ where: { id }, transaction });
-    });
+export async function deleteTxFilterById(id: number, transaction?: SequelizeTransaction) {
+    const remove = async (activeTransaction: SequelizeTransaction) => {
+        await TxMatch.destroy({ where: { txFilterId: id }, transaction: activeTransaction });
+        return TxFilter.destroy({ where: { id }, transaction: activeTransaction });
+    };
+
+    if (transaction) return remove(transaction);
+    return sequelize.transaction(remove);
 }
