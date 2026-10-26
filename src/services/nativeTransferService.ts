@@ -26,8 +26,8 @@ export async function processNativeTransfers(
             );
         }
 
-        // A failed transaction does not transfer its requested ETH value to the recipient.
-        if (Number(BigInt(receipt.status ?? '0x0')) !== 1) continue;
+        // Keep failed attempts too; the receipt status is persisted as "failed".
+        // This records the attempted value without treating it as a successful transfer.
         transfersSeen += 1;
 
         const transfer = {
