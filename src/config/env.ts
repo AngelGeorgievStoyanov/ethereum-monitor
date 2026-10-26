@@ -20,8 +20,13 @@ const rpcUrls = Object.entries(process.env)
     .sort((left, right) => left.index - right.index)
     .map((item) => item.url);
 
+const databaseUrl = process.env.DATABASE_URL?.trim();
+if (!databaseUrl) {
+    throw new Error('DATABASE_URL must be configured for PostgreSQL');
+}
+
 export const env = {
-    databaseUrl: process.env.DATABASE_URL || 'sqlite:./db.sqlite',
+    databaseUrl,
     rpcUrls,
     startBlock: parseOptionalBlock('START_BLOCK'),
     rescanFromBlock: parseOptionalBlock('RESCAN_FROM_BLOCK'),

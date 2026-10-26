@@ -8,7 +8,7 @@ import {
 } from '../repositories/txFilterRepository';
 
 export function createTxFilterService() {
-    const txFilters = new Map<string, TxFilter>();
+    const txFilters = new Map<number, TxFilter>();
 
     async function loadTxFilters() {
         const activeTxFilters = await findActiveTxFilters();
@@ -27,9 +27,9 @@ export function createTxFilterService() {
     }
 
     async function createTxFilter(data: {
-        name: string;
-        senderAddress: string | null;
-        recipientAddress: string | null;
+        description: string;
+        from: string | null;
+        to: string | null;
         isActive: boolean;
     }) {
         const txFilter = await insertTxFilter(data);
@@ -38,11 +38,11 @@ export function createTxFilterService() {
     }
 
     async function updateTxFilter(
-        id: string,
+        id: number,
         updates: {
-            name?: string;
-            senderAddress?: string | null;
-            recipientAddress?: string | null;
+            description?: string;
+            from?: string | null;
+            to?: string | null;
             isActive?: boolean;
         },
     ) {
@@ -51,7 +51,7 @@ export function createTxFilterService() {
         return txFilter;
     }
 
-    async function removeTxFilter(id: string) {
+    async function removeTxFilter(id: number) {
         const deleted = await deleteTxFilterById(id);
         if (deleted > 0) txFilters.delete(id);
         return deleted;

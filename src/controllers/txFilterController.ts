@@ -3,6 +3,11 @@ import { getTxFilterService } from '../services/txFilterService';
 
 const txFilterService = getTxFilterService();
 
+function parseId(value: string): number | undefined {
+    const id = Number(value);
+    return Number.isSafeInteger(id) && id > 0 ? id : undefined;
+}
+
 export const getTxFilters = async (_req: Request, res: Response) => {
     try {
         res.json(await txFilterService.getAllTxFilters());
@@ -12,13 +17,13 @@ export const getTxFilters = async (_req: Request, res: Response) => {
 };
 
 export const createTxFilter = async (req: Request, res: Response) => {
-    const { name, senderAddress, recipientAddress, isActive } = req.body;
+    const { description, from, to, isActive } = req.body;
 
     try {
         const txFilter = await txFilterService.createTxFilter({
-            name,
-            senderAddress: senderAddress || null,
-            recipientAddress: recipientAddress || null,
+            description,
+            from: from || null,
+            to: to || null,
             isActive: isActive ?? true,
         });
 
@@ -29,16 +34,19 @@ export const createTxFilter = async (req: Request, res: Response) => {
 };
 
 export const updateTxFilter = async (req: Request<{ id: string }>, res: Response) => {
-    const { id } = req.params;
-    const { name, senderAddress, recipientAddress, isActive } = req.body;
+    const id = parseId(req.params.id);
+    if (id === undefined) {
+        res.status(400).json({ message: 'Invalid transaction filter ID' });
+        return;
+    }
+
+    const { description, from, to, isActive } = req.body;
 
     try {
         const txFilter = await txFilterService.updateTxFilter(id, {
-            ...(name !== undefined ? { name } : {}),
-            ...(senderAddress !== undefined ? { senderAddress: senderAddress || null } : {}),
-            ...(recipientAddress !== undefined
-                ? { recipientAddress: recipientAddress || null }
-                : {}),
+            ...(description !== undefined ? { description } : {}),
+            ...(from !== undefined ? { from: from || null } : {}),
+            ...(to !== undefined ? { to: to || null } : {}),
             ...(isActive !== undefined ? { isActive } : {}),
         });
 
@@ -54,7 +62,11 @@ export const updateTxFilter = async (req: Request<{ id: string }>, res: Response
 };
 
 export const deleteTxFilter = async (req: Request<{ id: string }>, res: Response) => {
-    const { id } = req.params;
+    const id = parseId(req.params.id);
+    if (id === undefined) {
+        res.status(400).json({ message: 'Invalid transaction filter ID' });
+        return;
+    }
 
     try {
         const deleted = await txFilterService.removeTxFilter(id);

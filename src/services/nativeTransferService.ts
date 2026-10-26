@@ -31,18 +31,22 @@ export async function processNativeTransfers(
             );
         }
 
-        for (const txFilter of matchingTxFilters) {
-            const startedAt = Date.now();
-            await createTransactionFromEthereumData(tx, receipt, txFilter, blockTimestamp, {
+        const startedAt = Date.now();
+        await createTransactionFromEthereumData(
+            tx,
+            receipt,
+            blockTimestamp,
+            {
                 transferType: 'native',
                 logIndex: -1,
                 from: tx.from,
                 to: tx.to,
                 value: tx.value.toString(),
-            });
-            databaseWriteDurationMs += Date.now() - startedAt;
-            transfersMatched += 1;
-        }
+            },
+            matchingTxFilters,
+        );
+        databaseWriteDurationMs += Date.now() - startedAt;
+        transfersMatched += 1;
     }
 
     return { transfersSeen, transfersMatched, databaseWriteDurationMs };

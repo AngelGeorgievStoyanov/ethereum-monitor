@@ -80,21 +80,25 @@ export async function processErc20Transfers(
                 (txFilter) =>
                     txFilter.isActive && matchesTxFilter(attempt.from, attempt.to, txFilter),
             );
+            if (matchingTxFilters.length === 0) continue;
 
-            for (const txFilter of matchingTxFilters) {
-                const startedAt = Date.now();
-                await createTransactionFromEthereumData(tx, receipt, txFilter, blockTimestamp, {
+            const startedAt = Date.now();
+            await createTransactionFromEthereumData(
+                tx,
+                receipt,
+                blockTimestamp,
+                {
                     transferType: 'erc20',
                     tokenAddress: ethers.getAddress(tx.to!),
                     logIndex: -1,
                     from: attempt.from,
                     to: attempt.to,
                     value: attempt.value,
-                });
-                databaseWriteDurationMs += Date.now() - startedAt;
-                failedAttemptsMatched += 1;
-            }
-
+                },
+                matchingTxFilters,
+            );
+            databaseWriteDurationMs += Date.now() - startedAt;
+            failedAttemptsMatched += 1;
             continue;
         }
 
@@ -117,20 +121,25 @@ export async function processErc20Transfers(
             const matchingTxFilters = txFilters.filter(
                 (txFilter) => txFilter.isActive && matchesTxFilter(from, to, txFilter),
             );
+            if (matchingTxFilters.length === 0) continue;
 
-            for (const txFilter of matchingTxFilters) {
-                const startedAt = Date.now();
-                await createTransactionFromEthereumData(tx, receipt, txFilter, blockTimestamp, {
+            const startedAt = Date.now();
+            await createTransactionFromEthereumData(
+                tx,
+                receipt,
+                blockTimestamp,
+                {
                     transferType: 'erc20',
                     tokenAddress: ethers.getAddress(log.address),
                     logIndex,
                     from,
                     to,
                     value,
-                });
-                databaseWriteDurationMs += Date.now() - startedAt;
-                transfersMatched += 1;
-            }
+                },
+                matchingTxFilters,
+            );
+            databaseWriteDurationMs += Date.now() - startedAt;
+            transfersMatched += 1;
         }
     }
 

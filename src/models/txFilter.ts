@@ -1,49 +1,44 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../database';
-import Transaction from './transaction';
 
 interface TxFilterAttributes {
-    id: string;
-    name: string;
-    senderAddress?: string | null;
-    recipientAddress?: string | null;
+    id: number;
+    description: string;
+    from?: string | null;
+    to?: string | null;
     isActive: boolean;
 }
 
-type TxFilterCreationAttributes = Optional<TxFilterAttributes, 'id' | 'isActive'>;
+export type TxFilterCreationAttributes = Optional<TxFilterAttributes, 'id' | 'isActive'>;
 
 class TxFilter
     extends Model<TxFilterAttributes, TxFilterCreationAttributes>
     implements TxFilterAttributes
 {
-    public id!: string;
-    public name!: string;
-    public senderAddress?: string | null;
-    public recipientAddress?: string | null;
+    public id!: number;
+    public description!: string;
+    public from?: string | null;
+    public to?: string | null;
     public isActive!: boolean;
-
-    public static associate() {
-        this.hasMany(Transaction, { foreignKey: 'txFilterId' });
-    }
 }
 
 TxFilter.init(
     {
         id: {
-            type: DataTypes.UUID,
-            defaultValue: DataTypes.UUIDV4,
+            type: DataTypes.INTEGER,
+            autoIncrement: true,
             primaryKey: true,
         },
-        name: {
+        description: {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        senderAddress: {
-            type: DataTypes.STRING,
+        from: {
+            type: DataTypes.STRING(42),
             allowNull: true,
         },
-        recipientAddress: {
-            type: DataTypes.STRING,
+        to: {
+            type: DataTypes.STRING(42),
             allowNull: true,
         },
         isActive: {
