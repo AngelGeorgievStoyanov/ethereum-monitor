@@ -47,7 +47,9 @@ export function createBlockMonitorService() {
                     if (waitingForFilters) {
                         if (!isScannerPausePendingOrActive()) {
                             const activationStartBlock = Math.min(
-                                ...activeTxFilters.map((filter) => filter.activeFromBlock ?? finalized.number + 1),
+                                ...activeTxFilters.map(
+                                    (filter) => filter.activeFromBlock ?? finalized.number + 1,
+                                ),
                             );
                             const activationCheckpoint = activationStartBlock - 1;
                             if (state.lastProcessedBlock < activationCheckpoint) {
