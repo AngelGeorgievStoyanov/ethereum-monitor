@@ -32,7 +32,7 @@ export async function updateTxFilter(
         from?: string | null;
         to?: string | null;
         isActive?: boolean;
-        activeFromBlock?: number | null;
+        activeFromBlock: number | null;
     },
 ) {
     const txFilter = await TxFilter.findByPk(id);
