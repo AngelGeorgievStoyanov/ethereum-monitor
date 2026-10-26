@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { deleteStoredTransaction, listStoredTransactions } from '../services/transactionService';
-import { HttpError, sendHttpError } from '../utils/httpError';
+import { sendHttpError } from '../utils/httpError';
 import { parsePositiveId } from '../utils/parsePositiveId';
 
 export async function getAllStoredTransactions(_req: Request, res: Response): Promise<void> {
@@ -17,18 +17,14 @@ export async function deleteTransactionById(
 ): Promise<void> {
     const id = parsePositiveId(req.params.id);
     if (id === undefined) {
-        sendHttpError(res, 'Invalid transaction ID', new HttpError(400, 'Invalid transaction ID'));
+        res.status(400).json({ message: 'Invalid transaction ID' });
         return;
     }
 
     try {
         const deleted = await deleteStoredTransaction(id);
         if (deleted === 0) {
-            sendHttpError(
-                res,
-                'Transaction not found',
-                new HttpError(404, 'Transaction not found'),
-            );
+            res.status(404).send('Transaction not found');
             return;
         }
 
