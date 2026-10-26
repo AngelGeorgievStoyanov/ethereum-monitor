@@ -1,18 +1,13 @@
 import { Request, Response } from 'express';
 import { deleteStoredTransaction, listStoredTransactions } from '../services/transactionService';
-
-function parseId(value: string): number | undefined {
-    const id = Number(value);
-    return Number.isSafeInteger(id) && id > 0 ? id : undefined;
-}
+import { HttpError, sendHttpError } from '../utils/httpError';
+import { parsePositiveId } from '../utils/parsePositiveId';
 
 export async function getAllStoredTransactions(_req: Request, res: Response): Promise<void> {
     try {
-        const transactions = await listStoredTransactions();
-        res.json(transactions);
+        res.json(await listStoredTransactions());
     } catch (error) {
-        console.error('Error fetching transactions:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        sendHttpError(res, 'Error fetching transactions', error);
     }
 }
 
@@ -20,22 +15,25 @@ export async function deleteTransactionById(
     req: Request<{ id: string }>,
     res: Response,
 ): Promise<void> {
-    const id = parseId(req.params.id);
+    const id = parsePositiveId(req.params.id);
     if (id === undefined) {
-        res.status(400).json({ message: 'Invalid transaction ID' });
+        sendHttpError(res, 'Invalid transaction ID', new HttpError(400, 'Invalid transaction ID'));
         return;
     }
 
     try {
         const deleted = await deleteStoredTransaction(id);
         if (deleted === 0) {
-            res.status(404).send('Transaction not found');
+            sendHttpError(
+                res,
+                'Transaction not found',
+                new HttpError(404, 'Transaction not found'),
+            );
             return;
         }
 
         res.status(200).json({ message: 'Transaction deleted successfully' });
     } catch (error) {
-        console.error('Error deleting transaction:', error);
-        res.status(500).send('Internal Server Error');
+        sendHttpError(res, 'Error deleting transaction', error);
     }
 }
