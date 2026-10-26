@@ -14,7 +14,7 @@ export interface UpdateTxFilterInput {
     from?: string | null;
     to?: string | null;
     isActive?: boolean;
-    rule?: TxFilterGroupRule;
+    rule?: TxFilterGroupRule | null;
 }
 
 function getBody(body: unknown): Record<string, unknown> {
@@ -50,7 +50,7 @@ export function validateCreateTxFilterInput(body: unknown): CreateTxFilterInput 
         from: typeof from === 'string' && from.length > 0 ? from : null,
         to: typeof to === 'string' && to.length > 0 ? to : null,
         isActive: (isActive as boolean | undefined) ?? true,
-        ...(rule !== undefined ? { rule: rule as TxFilterGroupRule } : {}),
+        ...(rule !== undefined && rule !== null ? { rule: rule as TxFilterGroupRule } : {}),
     };
 }
 
