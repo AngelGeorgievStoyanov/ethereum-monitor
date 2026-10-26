@@ -25,7 +25,8 @@ export const createTxFilter = async (req: Request, res: Response): Promise<void>
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
-                message: 'Filter saved to the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                message:
+                    'Filter saved to the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });
@@ -35,7 +36,10 @@ export const createTxFilter = async (req: Request, res: Response): Promise<void>
     }
 };
 
-export const updateTxFilter = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+export const updateTxFilter = async (
+    req: Request<{ id: string }>,
+    res: Response,
+): Promise<void> => {
     const id = parsePositiveId(req.params.id);
     if (id === undefined) {
         res.status(400).json({ message: 'Invalid transaction filter ID' });
@@ -54,7 +58,8 @@ export const updateTxFilter = async (req: Request<{ id: string }>, res: Response
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
-                message: 'Filter changes were saved to the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                message:
+                    'Filter changes were saved to the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });
@@ -64,7 +69,10 @@ export const updateTxFilter = async (req: Request<{ id: string }>, res: Response
     }
 };
 
-export const deleteTxFilter = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+export const deleteTxFilter = async (
+    req: Request<{ id: string }>,
+    res: Response,
+): Promise<void> => {
     const id = parsePositiveId(req.params.id);
     if (id === undefined) {
         res.status(400).json({ message: 'Invalid transaction filter ID' });
@@ -81,7 +89,8 @@ export const deleteTxFilter = async (req: Request<{ id: string }>, res: Response
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
-                message: 'Filter was deleted from the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                message:
+                    'Filter was deleted from the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });

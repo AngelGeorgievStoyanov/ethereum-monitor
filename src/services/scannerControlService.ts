@@ -50,9 +50,7 @@ export function requestScannerPause(
     state.pauseRequestedAtBlock = atBlock;
     pauseDurationMinutes = durationMinutes;
     state.pauseUntil =
-        state.paused && mode === 'temporary'
-            ? Date.now() + pauseDurationMinutes * 60 * 1000
-            : null;
+        state.paused && mode === 'temporary' ? Date.now() + pauseDurationMinutes * 60 * 1000 : null;
     console.log(
         state.paused
             ? `[Scanner] Paused (${mode}); checkpoint will be preserved`
@@ -67,9 +65,7 @@ export function shouldPauseBeforeBlock(nextBlock: number, lastProcessedBlock: nu
         state.paused = true;
         targetBlock = null;
         state.pauseUntil =
-            state.mode === 'temporary'
-                ? Date.now() + pauseDurationMinutes * 60 * 1000
-                : null;
+            state.mode === 'temporary' ? Date.now() + pauseDurationMinutes * 60 * 1000 : null;
         const resumeMessage = state.pauseUntil
             ? `; auto-resume in ${pauseDurationMinutes} minute(s)`
             : '; manual resume required';
@@ -87,5 +83,6 @@ export function resumeScanner(): void {
     state.pauseUntil = null;
     targetBlock = null;
     pauseDurationMinutes = 5;
-    if (wasPaused) console.log('[Scanner] Resumed; catch-up will continue from the saved checkpoint');
+    if (wasPaused)
+        console.log('[Scanner] Resumed; catch-up will continue from the saved checkpoint');
 }

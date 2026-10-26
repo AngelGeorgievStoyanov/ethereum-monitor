@@ -1,18 +1,18 @@
 import { getTxFilterField } from './txFilterFieldRegistry';
 
 export type TxFilterOperator =
-    | 'eq'
-    | 'ne'
-    | 'gt'
-    | 'gte'
-    | 'lt'
-    | 'lte'
-    | 'in'
-    | 'notIn'
-    | 'contains';
+    'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'notIn' | 'contains';
 
 const OPERATORS = new Set<TxFilterOperator>([
-    'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'contains',
+    'eq',
+    'ne',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'in',
+    'notIn',
+    'contains',
 ]);
 
 function normalize(value: unknown, type: string, caseInsensitive: boolean): unknown {
@@ -67,8 +67,9 @@ export function validateTxFilterOperator(field: string, operator: string, value:
     if ((operator === 'in' || operator === 'notIn') && !Array.isArray(value)) {
         throw new Error(`Operator "${operator}" requires an array value`);
     }
-    const values = operator === 'in' || operator === 'notIn' ? value as unknown[] : [value];
-    for (const item of values) normalize(item, definition.type, Boolean(definition.caseInsensitive));
+    const values = operator === 'in' || operator === 'notIn' ? (value as unknown[]) : [value];
+    for (const item of values)
+        normalize(item, definition.type, Boolean(definition.caseInsensitive));
 }
 
 export function evaluateTxFilterOperator(
@@ -84,7 +85,9 @@ export function evaluateTxFilterOperator(
         const found =
             Array.isArray(expectedValue) &&
             expectedValue.some(
-                (item) => actual === normalize(item, definition.type, Boolean(definition.caseInsensitive)),
+                (item) =>
+                    actual ===
+                    normalize(item, definition.type, Boolean(definition.caseInsensitive)),
             );
         if (operator === 'in') return found;
         return actual !== null && actual !== undefined && !found;
@@ -98,7 +101,9 @@ export function evaluateTxFilterOperator(
         return actual !== expected;
     }
     if (operator === 'contains') {
-        return typeof actual === 'string' && typeof expected === 'string' && actual.includes(expected);
+        return (
+            typeof actual === 'string' && typeof expected === 'string' && actual.includes(expected)
+        );
     }
     if (actual === null || actual === undefined || expected === null || expected === undefined) {
         return false;
@@ -106,20 +111,30 @@ export function evaluateTxFilterOperator(
 
     if (typeof actual === 'bigint' && typeof expected === 'bigint') {
         switch (operator) {
-            case 'gt': return actual > expected;
-            case 'gte': return actual >= expected;
-            case 'lt': return actual < expected;
-            case 'lte': return actual <= expected;
-            default: return false;
+            case 'gt':
+                return actual > expected;
+            case 'gte':
+                return actual >= expected;
+            case 'lt':
+                return actual < expected;
+            case 'lte':
+                return actual <= expected;
+            default:
+                return false;
         }
     }
     if (typeof actual === 'number' && typeof expected === 'number') {
         switch (operator) {
-            case 'gt': return actual > expected;
-            case 'gte': return actual >= expected;
-            case 'lt': return actual < expected;
-            case 'lte': return actual <= expected;
-            default: return false;
+            case 'gt':
+                return actual > expected;
+            case 'gte':
+                return actual >= expected;
+            case 'lt':
+                return actual < expected;
+            case 'lte':
+                return actual <= expected;
+            default:
+                return false;
         }
     }
     return false;

@@ -57,7 +57,7 @@ export const pauseScanner = (req: Request, res: Response): void => {
         requestScannerPause(
             mode,
             atBlock ?? null,
-            mode === 'temporary' ? durationMinutes ?? 5 : 5,
+            mode === 'temporary' ? (durationMinutes ?? 5) : 5,
         );
         res.json({ message: 'Scanner pause requested', ...getScannerControlState() });
     } catch (error) {

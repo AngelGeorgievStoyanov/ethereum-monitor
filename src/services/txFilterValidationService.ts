@@ -10,7 +10,9 @@ export function validateTxFilterGroup(group: TxFilterGroupRule): void {
         throw new ValidationError('Every filter group must contain conditions and groups arrays');
     }
     if (group.conditions.length === 0 && group.groups.length === 0) {
-        throw new ValidationError('Every filter group must contain at least one condition or subgroup');
+        throw new ValidationError(
+            'Every filter group must contain at least one condition or subgroup',
+        );
     }
     for (const condition of group.conditions) {
         if (
@@ -19,7 +21,9 @@ export function validateTxFilterGroup(group: TxFilterGroupRule): void {
             typeof condition.operator !== 'string' ||
             condition.value === undefined
         ) {
-            throw new ValidationError('Every filter condition requires a field, operator, and value');
+            throw new ValidationError(
+                'Every filter condition requires a field, operator, and value',
+            );
         }
         try {
             evaluateTxFilterOperator(condition.field, condition.operator, null, condition.value);

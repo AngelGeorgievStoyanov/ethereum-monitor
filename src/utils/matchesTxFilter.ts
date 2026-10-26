@@ -1,4 +1,8 @@
-import { ActiveTxFilter, TransactionFilterContext, evaluateTxFilterGroup } from '../services/txFilterEvaluatorService';
+import {
+    ActiveTxFilter,
+    TransactionFilterContext,
+    evaluateTxFilterGroup,
+} from '../services/txFilterEvaluatorService';
 
 export function matchesTxFilter(
     transaction: TransactionFilterContext,

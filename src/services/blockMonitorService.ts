@@ -38,7 +38,9 @@ export function createBlockMonitorService() {
 
                 if (activeTxFilters.length === 0) {
                     if (!waitingForFilters) {
-                        console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
+                        console.log(
+                            '[Scanner] No active tx filters; waiting without advancing checkpoint',
+                        );
                     }
                     waitingForFilters = true;
                     waitingForPause = false;
@@ -73,10 +75,8 @@ export function createBlockMonitorService() {
                         waitingForFilters = false;
                     }
 
-                    await processFinalizedBlocks(
-                        state,
-                        finalized.number,
-                        () => txFilterService.getTxFilters(),
+                    await processFinalizedBlocks(state, finalized.number, () =>
+                        txFilterService.getTxFilters(),
                     );
                 }
             } catch (error) {

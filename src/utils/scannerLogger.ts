@@ -45,12 +45,17 @@ export function logCatchUpComplete(summary: CatchUpSummary): void {
         summary.durationMs > 0
             ? ((summary.processedBlocks * 1000) / summary.durationMs).toFixed(2)
             : 'n/a';
-    const averageFetchDurationMs = (summary.totalFetchDurationMs / summary.processedBlocks).toFixed(1);
-    const averageBlockDurationMs = (summary.totalBlockDurationMs / summary.processedBlocks).toFixed(1);
+    const averageFetchDurationMs = (summary.totalFetchDurationMs / summary.processedBlocks).toFixed(
+        1,
+    );
+    const averageBlockDurationMs = (summary.totalBlockDurationMs / summary.processedBlocks).toFixed(
+        1,
+    );
     const totalDatabaseWriteDurationMs =
         summary.totalNativeDatabaseWriteDurationMs + summary.totalErc20DatabaseWriteDurationMs;
-    const averageDatabaseWriteDurationMs =
-        (totalDatabaseWriteDurationMs / summary.processedBlocks).toFixed(1);
+    const averageDatabaseWriteDurationMs = (
+        totalDatabaseWriteDurationMs / summary.processedBlocks
+    ).toFixed(1);
 
     console.log(
         `[Scanner] Catch-up complete: blocks ${summary.startBlock}-${summary.endBlock}, ` +

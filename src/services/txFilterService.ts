@@ -14,10 +14,7 @@ import {
     saveRuleForFilter,
 } from '../repositories/txFilterRuleRepository';
 import { getNextFilterStartBlock } from './txFilterActivationService';
-import {
-    ActiveTxFilter,
-    TxFilterGroupRule,
-} from './txFilterEvaluatorService';
+import { ActiveTxFilter, TxFilterGroupRule } from './txFilterEvaluatorService';
 import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
 import { sleep } from '../utils/sleep';
@@ -25,7 +22,9 @@ import { formatError } from '../utils/formatError';
 
 export class TxFilterSyncError extends Error {
     constructor(public readonly result: unknown) {
-        super('The filter change was saved to the database, but the scanner filters were not refreshed.');
+        super(
+            'The filter change was saved to the database, but the scanner filters were not refreshed.',
+        );
         this.name = 'TxFilterSyncError';
     }
 }
@@ -69,28 +68,33 @@ export function createTxFilterService() {
     }
 
     async function reloadTxFiltersWithRetry(): Promise<boolean> {
-        const task = reloadQueue.catch(() => undefined).then(async () => {
-            const retryDelaysMs = [1000, 2000, 5000];
-            for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
-                try {
-                    await loadTxFilters();
-                    return true;
-                } catch (error) {
-                    if (attempt === retryDelaysMs.length) {
+        const task = reloadQueue
+            .catch(() => undefined)
+            .then(async () => {
+                const retryDelaysMs = [1000, 2000, 5000];
+                for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+                    try {
+                        await loadTxFilters();
+                        return true;
+                    } catch (error) {
+                        if (attempt === retryDelaysMs.length) {
+                            console.error(
+                                `[Scanner] Failed to reload tx filters after ${attempt + 1} attempt(s): ${formatError(error)}`,
+                            );
+                            return false;
+                        }
                         console.error(
-                            `[Scanner] Failed to reload tx filters after ${attempt + 1} attempt(s): ${formatError(error)}`,
+                            `[Scanner] Failed to reload tx filters (attempt ${attempt + 1}/${retryDelaysMs.length + 1}); retrying: ${formatError(error)}`,
                         );
-                        return false;
+                        await sleep(retryDelaysMs[attempt]);
                     }
-                    console.error(
-                        `[Scanner] Failed to reload tx filters (attempt ${attempt + 1}/${retryDelaysMs.length + 1}); retrying: ${formatError(error)}`,
-                    );
-                    await sleep(retryDelaysMs[attempt]);
                 }
-            }
-            return false;
-        });
-        reloadQueue = task.then(() => undefined, () => undefined);
+                return false;
+            });
+        reloadQueue = task.then(
+            () => undefined,
+            () => undefined,
+        );
         return task;
     }
 
@@ -116,13 +120,16 @@ export function createTxFilterService() {
         if (data.rule) validateTxFilterGroup(data.rule);
         const activeFromBlock = data.isActive ? await getNextFilterStartBlock() : null;
         const filter = await sequelize.transaction(async (transaction) => {
-            const createdFilter = await insertTxFilter({
-                description: data.description,
-                from: data.from ?? null,
-                to: data.to ?? null,
-                isActive: data.isActive,
-                activeFromBlock,
-            }, transaction);
+            const createdFilter = await insertTxFilter(
+                {
+                    description: data.description,
+                    from: data.from ?? null,
+                    to: data.to ?? null,
+                    isActive: data.isActive,
+                    activeFromBlock,
+                },
+                transaction,
+            );
             if (data.rule) await saveRuleForFilter(createdFilter.id, data.rule, transaction);
             return createdFilter;
         });
@@ -146,13 +153,7 @@ export function createTxFilterService() {
         const current = await findTxFilterById(id);
         if (!current) return null;
         const existingRule = updates.rule === undefined ? await findRuleForFilter(id) : null;
-        if (
-            updates.rule === null &&
-            !current.from &&
-            !current.to &&
-            !updates.from &&
-            !updates.to
-        ) {
+        if (updates.rule === null && !current.from && !current.to && !updates.from && !updates.to) {
             throw new ValidationError('A filter requires at least one condition');
         }
 
@@ -169,13 +170,19 @@ export function createTxFilterService() {
                   : current.activeFromBlock;
 
         const filter = await sequelize.transaction(async (transaction) => {
-            const updatedFilter = await persistTxFilter(id, {
-                ...(updates.description !== undefined ? { description: updates.description } : {}),
-                ...(updates.from !== undefined ? { from: updates.from } : {}),
-                ...(updates.to !== undefined ? { to: updates.to } : {}),
-                ...(updates.isActive !== undefined ? { isActive: updates.isActive } : {}),
-                ...(activeFromBlock !== undefined ? { activeFromBlock } : {}),
-            }, transaction);
+            const updatedFilter = await persistTxFilter(
+                id,
+                {
+                    ...(updates.description !== undefined
+                        ? { description: updates.description }
+                        : {}),
+                    ...(updates.from !== undefined ? { from: updates.from } : {}),
+                    ...(updates.to !== undefined ? { to: updates.to } : {}),
+                    ...(updates.isActive !== undefined ? { isActive: updates.isActive } : {}),
+                    ...(activeFromBlock !== undefined ? { activeFromBlock } : {}),
+                },
+                transaction,
+            );
             if (updates.rule !== undefined) {
                 await saveRuleForFilter(id, updates.rule, transaction);
             }
@@ -185,8 +192,8 @@ export function createTxFilterService() {
         if (!filter) return null;
         const rule =
             updates.rule !== undefined
-                ? updates.rule ?? legacyRule(filter)
-                : existingRule ?? legacyRule(filter);
+                ? (updates.rule ?? legacyRule(filter))
+                : (existingRule ?? legacyRule(filter));
         const result = { ...filter.toJSON(), rule };
         if (!(await reloadTxFiltersWithRetry())) throw new TxFilterSyncError(result);
         return result;

@@ -16,17 +16,14 @@ function parsePositiveQueryInteger(value: unknown): number | undefined {
 
 export async function getAllStoredTransactions(req: Request, res: Response): Promise<void> {
     const page =
-        req.query.page === undefined
-            ? DEFAULT_PAGE
-            : parsePositiveQueryInteger(req.query.page);
+        req.query.page === undefined ? DEFAULT_PAGE : parsePositiveQueryInteger(req.query.page);
     const limit =
-        req.query.limit === undefined
-            ? DEFAULT_LIMIT
-            : parsePositiveQueryInteger(req.query.limit);
+        req.query.limit === undefined ? DEFAULT_LIMIT : parsePositiveQueryInteger(req.query.limit);
 
     if (page === undefined || limit === undefined || limit > MAX_LIMIT) {
         res.status(400).json({
-            message: 'Invalid pagination parameters. page must be a positive integer and limit must be between 1 and 100.',
+            message:
+                'Invalid pagination parameters. page must be a positive integer and limit must be between 1 and 100.',
         });
         return;
     }

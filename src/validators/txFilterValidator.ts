@@ -74,9 +74,7 @@ export function validateUpdateTxFilterInput(body: unknown): UpdateTxFilterInput 
         ...(from !== undefined
             ? { from: typeof from === 'string' && from.length > 0 ? from : null }
             : {}),
-        ...(to !== undefined
-            ? { to: typeof to === 'string' && to.length > 0 ? to : null }
-            : {}),
+        ...(to !== undefined ? { to: typeof to === 'string' && to.length > 0 ? to : null } : {}),
         ...(isActive !== undefined ? { isActive: isActive as boolean } : {}),
         ...(rule !== undefined ? { rule: rule === null ? null : (rule as TxFilterGroupRule) } : {}),
     };
