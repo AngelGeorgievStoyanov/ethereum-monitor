@@ -38,7 +38,7 @@ export function createBlockMonitorService() {
         let lastProgressAt = Date.now();
         let lastStallWarningAt = 0;
 
-        const stallWatchdog = setInterval(() => {
+        setInterval(() => {
             if (!processingFinalizedBlocks) return;
 
             if (state.lastProcessedBlock !== lastObservedCheckpoint) {
