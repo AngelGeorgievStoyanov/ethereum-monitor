@@ -7,7 +7,7 @@ import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
 import { processFinalizedBlocks } from './blockProcessor';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
-import { isScannerPausePendingOrActive } from './scannerControlService';
+import { getScannerControlState, isScannerPausePendingOrActive } from './scannerControlService';
 
 export function createBlockMonitorService() {
     const txFilterService = getTxFilterService();
@@ -27,6 +27,7 @@ export function createBlockMonitorService() {
         }
 
         let waitingForFilters = txFilterService.getTxFilters().length === 0;
+        let waitingForPause = false;
         if (waitingForFilters) {
             console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
         }
@@ -40,7 +41,14 @@ export function createBlockMonitorService() {
                         console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
                     }
                     waitingForFilters = true;
+                    waitingForPause = false;
+                } else if (getScannerControlState().paused) {
+                    if (!waitingForPause) {
+                        console.log('[Scanner] Paused; skipping finalized-block RPC polling');
+                    }
+                    waitingForPause = true;
                 } else {
+                    waitingForPause = false;
                     const finalized = await ethereumProvider.getBlock('finalized');
                     if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
