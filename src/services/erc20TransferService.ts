@@ -1,5 +1,5 @@
 import { ethers, TransactionResponse } from 'ethers';
-import TxFilter from '../models/txFilter';
+import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { ERC20_TRANSFER_TOPIC } from '../constants/erc20-transfer.constants';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
@@ -52,7 +52,7 @@ function decodeFailedErc20TransferAttempt(
 export async function processErc20Transfers(
     receipts: readonly RpcTransactionReceipt[],
     transactionsByHash: Map<string, TransactionResponse>,
-    txFilters: TxFilter[],
+    txFilters: ActiveTxFilter[],
     blockNumber: number,
     blockTimestamp: number,
 ) {
@@ -71,14 +71,33 @@ export async function processErc20Transfers(
             );
         }
 
-        if (Number(BigInt(receipt.status ?? '0x0')) !== 1) {
+        const status = Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed';
+
+        if (status !== 'success') {
             const attempt = decodeFailedErc20TransferAttempt(tx);
             if (!attempt) continue;
 
             failedAttemptsSeen += 1;
-            const matchingTxFilters = txFilters.filter(
-                (txFilter) =>
-                    txFilter.isActive && matchesTxFilter(attempt.from, attempt.to, txFilter),
+            const tokenAddress = ethers.getAddress(tx.to!);
+            const context = {
+                txHash: tx.hash,
+                transferType: 'erc20',
+                tokenAddress,
+                logIndex: -1,
+                nonce: tx.nonce,
+                blockHash: receipt.blockHash,
+                blockNumber,
+                transactionIndex: Number(BigInt(receipt.transactionIndex)),
+                from: attempt.from,
+                to: attempt.to,
+                value: attempt.value,
+                internalCount: null,
+                status,
+                transactionType: tx.type?.toString() ?? null,
+                timestamp: new Date(blockTimestamp * 1000),
+            };
+            const matchingTxFilters = txFilters.filter((filter) =>
+                matchesTxFilter(context, filter, blockNumber),
             );
             if (matchingTxFilters.length === 0) continue;
 
@@ -89,7 +108,7 @@ export async function processErc20Transfers(
                 blockTimestamp,
                 {
                     transferType: 'erc20',
-                    tokenAddress: ethers.getAddress(tx.to!),
+                    tokenAddress,
                     logIndex: -1,
                     from: attempt.from,
                     to: attempt.to,
@@ -117,9 +136,26 @@ export async function processErc20Transfers(
             const to = ethers.getAddress(`0x${log.topics[2].slice(-40)}`);
             const value = BigInt(log.data).toString();
             const logIndex = Number(BigInt(log.logIndex));
-
-            const matchingTxFilters = txFilters.filter(
-                (txFilter) => txFilter.isActive && matchesTxFilter(from, to, txFilter),
+            const tokenAddress = ethers.getAddress(log.address);
+            const context = {
+                txHash: tx.hash,
+                transferType: 'erc20',
+                tokenAddress,
+                logIndex,
+                nonce: tx.nonce,
+                blockHash: receipt.blockHash,
+                blockNumber,
+                transactionIndex: Number(BigInt(receipt.transactionIndex)),
+                from,
+                to,
+                value,
+                internalCount: null,
+                status,
+                transactionType: tx.type?.toString() ?? null,
+                timestamp: new Date(blockTimestamp * 1000),
+            };
+            const matchingTxFilters = txFilters.filter((filter) =>
+                matchesTxFilter(context, filter, blockNumber),
             );
             if (matchingTxFilters.length === 0) continue;
 
@@ -130,7 +166,7 @@ export async function processErc20Transfers(
                 blockTimestamp,
                 {
                     transferType: 'erc20',
-                    tokenAddress: ethers.getAddress(log.address),
+                    tokenAddress,
                     logIndex,
                     from,
                     to,
