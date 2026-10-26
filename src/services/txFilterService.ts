@@ -111,7 +111,7 @@ export function createTxFilterService() {
         const existing = await findAllTxFilters();
         const current = existing.find((item) => item.id === id);
         if (!current) return null;
-        if (updates.rule === null && !current.from && !current.to && updates.from == null && updates.to == null) {
+        if (updates.rule === null && !current.from && !current.to && !updates.from && !updates.to) {
             throw new Error('A filter requires at least one condition');
         }
 
