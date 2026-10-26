@@ -49,7 +49,7 @@ export function requestScannerPause(mode: ScannerPauseMode, atBlock: number | nu
 export function shouldPauseBeforeBlock(nextBlock: number, lastProcessedBlock: number): boolean {
     refreshTimeout();
     if (state.paused) return true;
-    if (targetBlock !== null && lastProcessedBlock >= targetBlock) {
+    if (targetBlock !== null && nextBlock > targetBlock && lastProcessedBlock >= targetBlock) {
         state.paused = true;
         targetBlock = null;
         state.pauseUntil = state.mode === 'temporary' ? Date.now() + 5 * 60 * 1000 : null;
