@@ -66,18 +66,18 @@ export function evaluateTxFilterOperator(
     validateTxFilterOperator(field, operator, expectedValue);
     const definition = getTxFilterField(field);
     const actual = normalize(actualValue, definition.type, Boolean(definition.caseInsensitive));
+    if (operator === 'in' || operator === 'notIn') {
+        const found = Array.isArray(expectedValue) && expectedValue.some(
+            (item) => actual === normalize(item, definition.type, Boolean(definition.caseInsensitive)),
+        );
+        return operator === 'in' ? found : !found;
+    }
     const expected = normalize(expectedValue, definition.type, Boolean(definition.caseInsensitive));
 
     if (operator === 'eq') return actual === expected;
     if (operator === 'ne') return actual !== expected;
     if (operator === 'contains') {
         return typeof actual === 'string' && typeof expected === 'string' && actual.includes(expected);
-    }
-    if (operator === 'in' || operator === 'notIn') {
-        const found = (expectedValue as unknown[]).some(
-            (item) => actual === normalize(item, definition.type, Boolean(definition.caseInsensitive)),
-        );
-        return operator === 'in' ? found : !found;
     }
     if (actual === null || actual === undefined || expected === null || expected === undefined) {
         return false;
