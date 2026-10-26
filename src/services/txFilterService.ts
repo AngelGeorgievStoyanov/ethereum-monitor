@@ -5,9 +5,14 @@ import {
     deleteTxFilterById,
     findActiveTxFilters,
     findAllTxFilters,
+    findTxFilterById,
     updateTxFilter as persistTxFilter,
 } from '../repositories/txFilterRepository';
-import { findRuleForFilter, saveRuleForFilter } from '../repositories/txFilterRuleRepository';
+import {
+    findRuleForFilter,
+    findRulesForFilters,
+    saveRuleForFilter,
+} from '../repositories/txFilterRuleRepository';
 import { getNextFilterStartBlock } from './txFilterActivationService';
 import {
     ActiveTxFilter,
@@ -28,9 +33,10 @@ export function createTxFilterService() {
 
     async function loadTxFilters() {
         const activeFilters = await findActiveTxFilters();
+        const rulesByFilterId = await findRulesForFilters(activeFilters.map((filter) => filter.id));
         const next = new Map<number, ActiveTxFilter>();
         for (const filter of activeFilters) {
-            const rule = (await findRuleForFilter(filter.id)) ?? legacyRule(filter);
+            const rule = rulesByFilterId.get(filter.id) ?? legacyRule(filter);
             if (!rule) continue;
             if (filter.activeFromBlock === null || filter.activeFromBlock === undefined) {
                 const startBlock = await getNextFilterStartBlock();
@@ -69,12 +75,11 @@ export function createTxFilterService() {
 
     async function getAllTxFilters() {
         const filters = await findAllTxFilters();
-        return Promise.all(
-            filters.map(async (filter) => ({
-                ...filter.toJSON(),
-                rule: (await findRuleForFilter(filter.id)) ?? legacyRule(filter),
-            })),
-        );
+        const rulesByFilterId = await findRulesForFilters(filters.map((filter) => filter.id));
+        return filters.map((filter) => ({
+            ...filter.toJSON(),
+            rule: rulesByFilterId.get(filter.id) ?? legacyRule(filter),
+        }));
     }
 
     async function createTxFilter(data: {
@@ -116,8 +121,7 @@ export function createTxFilterService() {
         },
     ) {
         if (updates.rule) validateTxFilterGroup(updates.rule);
-        const existing = await findAllTxFilters();
-        const current = existing.find((item) => item.id === id);
+        const current = await findTxFilterById(id);
         if (!current) return null;
         if (
             updates.rule === null &&

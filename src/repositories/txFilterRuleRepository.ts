@@ -4,41 +4,79 @@ import TxFilterGroup from '../models/txFilterGroup';
 import TxFilterCondition from '../models/txFilterCondition';
 import { TxFilterGroupRule } from '../services/txFilterEvaluatorService';
 
-export async function findRuleForFilter(txFilterId: number): Promise<TxFilterGroupRule | null> {
-    const groups = await TxFilterGroup.findAll({ where: { txFilterId }, order: [['id', 'ASC']] });
-    if (groups.length === 0) return null;
+export async function findRulesForFilters(
+    txFilterIds: number[],
+): Promise<Map<number, TxFilterGroupRule | null>> {
+    const rules = new Map<number, TxFilterGroupRule | null>();
+    for (const id of txFilterIds) rules.set(id, null);
+    if (txFilterIds.length === 0) return rules;
+
+    const groups = await TxFilterGroup.findAll({
+        where: { txFilterId: { [Op.in]: txFilterIds } },
+        order: [['id', 'ASC']],
+    });
+    if (groups.length === 0) return rules;
 
     const groupIds = groups.map((group) => group.id);
     const conditions = await TxFilterCondition.findAll({
         where: { groupId: { [Op.in]: groupIds } },
         order: [['id', 'ASC']],
     });
-    const groupById = new Map<number, TxFilterGroupRule>();
-    const rootIds: number[] = [];
-
-    for (const group of groups) {
-        groupById.set(group.id, { logic: group.logic, conditions: [], groups: [] });
-    }
-    for (const group of groups) {
-        if (group.parentGroupId === null) rootIds.push(group.id);
-        else {
-            const parent = groupById.get(group.parentGroupId);
-            const child = groupById.get(group.id);
-            if (parent && child) parent.groups.push(child);
-        }
-    }
+    const conditionsByGroupId = new Map<number, typeof conditions>();
     for (const condition of conditions) {
-        groupById.get(condition.groupId)?.conditions.push({
-            field: condition.field,
-            operator: condition.operator,
-            value: condition.value,
-        });
+        const current = conditionsByGroupId.get(condition.groupId) ?? [];
+        current.push(condition);
+        conditionsByGroupId.set(condition.groupId, current);
     }
 
-    if (rootIds.length !== 1) {
-        throw new Error(`Filter ${txFilterId} must have exactly one root rule group`);
+    const groupsByFilterId = new Map<number, typeof groups>();
+    for (const group of groups) {
+        const current = groupsByFilterId.get(group.txFilterId) ?? [];
+        current.push(group);
+        groupsByFilterId.set(group.txFilterId, current);
     }
-    return groupById.get(rootIds[0]) ?? null;
+
+    for (const txFilterId of txFilterIds) {
+        const filterGroups = groupsByFilterId.get(txFilterId);
+        if (!filterGroups?.length) continue;
+
+        const groupById = new Map<number, TxFilterGroupRule>();
+        const rootIds: number[] = [];
+        for (const group of filterGroups) {
+            groupById.set(group.id, { logic: group.logic, conditions: [], groups: [] });
+        }
+        for (const group of filterGroups) {
+            if (group.parentGroupId === null) {
+                rootIds.push(group.id);
+            } else {
+                const parent = groupById.get(group.parentGroupId);
+                const child = groupById.get(group.id);
+                if (parent && child) parent.groups.push(child);
+            }
+
+            const ruleGroup = groupById.get(group.id);
+            if (!ruleGroup) continue;
+            for (const condition of conditionsByGroupId.get(group.id) ?? []) {
+                ruleGroup.conditions.push({
+                    field: condition.field,
+                    operator: condition.operator,
+                    value: condition.value,
+                });
+            }
+        }
+
+        if (rootIds.length !== 1) {
+            throw new Error(`Filter ${txFilterId} must have exactly one root rule group`);
+        }
+        rules.set(txFilterId, groupById.get(rootIds[0]) ?? null);
+    }
+
+    return rules;
+}
+
+export async function findRuleForFilter(txFilterId: number): Promise<TxFilterGroupRule | null> {
+    const rules = await findRulesForFilters([txFilterId]);
+    return rules.get(txFilterId) ?? null;
 }
 
 async function deleteRuleForFilter(txFilterId: number, transaction: Transaction): Promise<void> {
