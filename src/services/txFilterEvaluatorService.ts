@@ -12,6 +12,13 @@ export interface TxFilterGroupRule {
     groups: TxFilterGroupRule[];
 }
 
+export interface ActiveTxFilter {
+    id: number;
+    isActive: boolean;
+    activeFromBlock: number | null;
+    rule: TxFilterGroupRule;
+}
+
 export interface TransactionFilterContext {
     [field: string]: unknown;
 }
