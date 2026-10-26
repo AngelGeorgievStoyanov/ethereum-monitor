@@ -30,7 +30,9 @@ function normalize(value: unknown, type: string, caseInsensitive: boolean): unkn
             throw new Error('Numeric filter values must be numbers');
         }
         const numberValue = Number(value);
-        if (!Number.isFinite(numberValue)) throw new Error('Invalid numeric filter value');
+        if (!Number.isSafeInteger(numberValue)) {
+            throw new Error('Numeric filter values must be safe integers');
+        }
         return numberValue;
     }
     if (type === 'date') {
