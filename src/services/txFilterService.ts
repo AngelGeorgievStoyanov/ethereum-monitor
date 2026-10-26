@@ -20,6 +20,15 @@ import {
 } from './txFilterEvaluatorService';
 import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
+import { sleep } from '../utils/sleep';
+import { formatError } from '../utils/formatError';
+
+export class TxFilterSyncError extends Error {
+    constructor(public readonly result: unknown) {
+        super('The filter change was saved to the database, but the scanner filters were not refreshed.');
+        this.name = 'TxFilterSyncError';
+    }
+}
 
 function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
     const conditions = [];
@@ -29,7 +38,8 @@ function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
 }
 
 export function createTxFilterService() {
-    const txFilters = new Map<number, ActiveTxFilter>();
+    let txFilters = new Map<number, ActiveTxFilter>();
+    let reloadQueue: Promise<void> = Promise.resolve();
 
     async function loadTxFilters() {
         const activeFilters = await findActiveTxFilters();
@@ -53,27 +63,35 @@ export function createTxFilterService() {
                 rule,
             });
         }
-        txFilters.clear();
-        for (const [id, filter] of next) txFilters.set(id, filter);
+        // Publish only after the full collection has loaded successfully.
+        txFilters = next;
         console.log(`[Scanner] Loaded ${txFilters.size} active tx filter(s)`);
     }
 
-    async function refreshFilter(filter: TxFilter | null) {
-        if (!filter || !filter.isActive) {
-            if (filter) txFilters.delete(filter.id);
-            return;
-        }
-        const rule = (await findRuleForFilter(filter.id)) ?? legacyRule(filter);
-        if (!rule) {
-            txFilters.delete(filter.id);
-            return;
-        }
-        txFilters.set(filter.id, {
-            id: filter.id,
-            isActive: filter.isActive,
-            activeFromBlock: filter.activeFromBlock,
-            rule,
+    async function reloadTxFiltersWithRetry(): Promise<boolean> {
+        const task = reloadQueue.catch(() => undefined).then(async () => {
+            const retryDelaysMs = [1000, 2000, 5000];
+            for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+                try {
+                    await loadTxFilters();
+                    return true;
+                } catch (error) {
+                    if (attempt === retryDelaysMs.length) {
+                        console.error(
+                            `[Scanner] Failed to reload tx filters after ${attempt + 1} attempt(s): ${formatError(error)}`,
+                        );
+                        return false;
+                    }
+                    console.error(
+                        `[Scanner] Failed to reload tx filters (attempt ${attempt + 1}/${retryDelaysMs.length + 1}); retrying: ${formatError(error)}`,
+                    );
+                    await sleep(retryDelaysMs[attempt]);
+                }
+            }
+            return false;
         });
+        reloadQueue = task.then(() => undefined, () => undefined);
+        return task;
     }
 
     async function getAllTxFilters() {
@@ -109,8 +127,9 @@ export function createTxFilterService() {
             return createdFilter;
         });
 
-        await refreshFilter(filter);
-        return { ...filter.toJSON(), rule: data.rule ?? legacyRule(filter) };
+        const result = { ...filter.toJSON(), rule: data.rule ?? legacyRule(filter) };
+        if (!(await reloadTxFiltersWithRetry())) throw new TxFilterSyncError(result);
+        return result;
     }
 
     async function updateTxFilter(
@@ -162,20 +181,23 @@ export function createTxFilterService() {
             return updatedFilter;
         });
 
-        await refreshFilter(filter);
         if (!filter) return null;
         const rule =
             updates.rule !== undefined
                 ? updates.rule ?? legacyRule(filter)
                 : (await findRuleForFilter(filter.id)) ?? legacyRule(filter);
-        return { ...filter.toJSON(), rule };
+        const result = { ...filter.toJSON(), rule };
+        if (!(await reloadTxFiltersWithRetry())) throw new TxFilterSyncError(result);
+        return result;
     }
 
     async function removeTxFilter(id: number) {
         const deleted = await sequelize.transaction(async (transaction) =>
             deleteTxFilterById(id, transaction),
         );
-        if (deleted > 0) txFilters.delete(id);
+        if (deleted > 0 && !(await reloadTxFiltersWithRetry())) {
+            throw new TxFilterSyncError({ message: 'Transaction filter deleted', deleted: true });
+        }
         return deleted;
     }
 
