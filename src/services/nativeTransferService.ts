@@ -4,6 +4,7 @@ import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesTxFilter } from '../utils/matchesTxFilter';
 import { mapTransactionFilterContext } from '../mappers/transactionContextMapper';
+import type { TransferBatchCandidate } from './transactionService';
 
 export async function processNativeTransfers(
     transactions: readonly TransactionResponse[],
@@ -14,11 +15,10 @@ export async function processNativeTransfers(
 ) {
     let transfersSeen = 0;
     let transfersMatched = 0;
-    let databaseWriteDurationMs = 0;
+    const candidates: TransferBatchCandidate[] = [];
 
     for (const tx of transactions) {
         if (!tx.to || tx.value <= 0n) continue;
-        transfersSeen += 1;
 
         const receipt = receiptsByHash.get(tx.hash.toLowerCase());
         if (!receipt) {
@@ -29,6 +29,7 @@ export async function processNativeTransfers(
 
         // A failed transaction does not transfer its requested ETH value to the recipient.
         if (Number(BigInt(receipt.status ?? '0x0')) !== 1) continue;
+        transfersSeen += 1;
 
         const transfer = {
             transferType: 'native' as const,
@@ -50,17 +51,15 @@ export async function processNativeTransfers(
         );
         if (matchingTxFilters.length === 0) continue;
 
-        const startedAt = Date.now();
-        await createTransactionFromEthereumData(
+        candidates.push({
             tx,
             receipt,
             blockTimestamp,
             transfer,
             matchingTxFilters,
-        );
-        databaseWriteDurationMs += Date.now() - startedAt;
+        });
         transfersMatched += 1;
     }
 
-    return { transfersSeen, transfersMatched, databaseWriteDurationMs };
+    return { transfersSeen, transfersMatched, candidates };
 }
