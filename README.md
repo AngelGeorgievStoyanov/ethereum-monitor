@@ -92,7 +92,7 @@ The API listens on port 8000.
 - Failed ERC-20 `transfer` and `transferFrom` attempts are stored with status `failed` when their decoded sender and recipient match an active transaction filter. Reverted attempts are not treated as completed token transfers.
 - Transfer amounts are stored as strings in their smallest units. Formatting into ETH or token units belongs in the API or UI layer.
 - `Transactions` stores each matching transfer once. `TxMatches` records every filter that matched it, so one transfer can be associated with multiple filters.
-- Native transfers are unique by `txHash + transferType`. ERC-20 transfers are unique by `txHash + transferType + logIndex`. Internal transfers do not have a database unique index and have an `internalCount` field for grouping identical trace records.
+- Native transfers are unique by `txHash + transferType`. ERC-20 transfers are unique by `txHash + transferType + logIndex`. Internal transfers do not have a database unique index; identical trace records are grouped in `internalCount`, which is null for native and ERC-20 transfers.
 - Internal transaction tracing is not implemented yet; the schema supports the planned `internal` transfer type.
 - During catch-up, the scanner reads finalized blocks over HTTP and saves a persistent checkpoint after each fully processed block.
 - It checks the finalized block height over HTTP every 4 seconds and processes newly finalized blocks.
