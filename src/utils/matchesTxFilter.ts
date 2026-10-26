@@ -1,16 +1,11 @@
-import TxFilter from '../models/txFilter';
+import { ActiveTxFilter, TransactionFilterContext, evaluateTxFilterGroup } from '../services/txFilterEvaluatorService';
 
 export function matchesTxFilter(
-    from: string | null | undefined,
-    to: string | null | undefined,
-    txFilter: TxFilter,
+    transaction: TransactionFilterContext,
+    txFilter: ActiveTxFilter,
+    blockNumber: number,
 ): boolean {
-    if (!txFilter.from && !txFilter.to) {
-        return false;
-    }
-
-    const senderMatches = !txFilter.from || from?.toLowerCase() === txFilter.from.toLowerCase();
-    const recipientMatches = !txFilter.to || to?.toLowerCase() === txFilter.to.toLowerCase();
-
-    return senderMatches && recipientMatches;
+    if (!txFilter.isActive) return false;
+    if (txFilter.activeFromBlock !== null && blockNumber < txFilter.activeFromBlock) return false;
+    return evaluateTxFilterGroup(txFilter.rule, transaction);
 }
