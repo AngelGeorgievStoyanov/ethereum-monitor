@@ -11,7 +11,7 @@ function parseId(value: string): number | undefined {
 function sendError(res: Response, message: string, error: unknown) {
     const details = error instanceof Error ? error.message : String(error);
     const status =
-        /\/unsupported|requires|invalid|must have|must contain|must be|only supported|every filter group|at least one condition\/i/.test(
+        /unsupported|requires|invalid|must have|must contain|must be|only supported|every filter group|at least one condition/i/.test(
             details,
         )
             ? 400
