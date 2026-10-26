@@ -8,6 +8,7 @@ import { initializeScannerState } from './scannerInitializationService';
 import { processFinalizedBlocks } from './blockProcessor';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
 import { getScannerControlState, isScannerPausePendingOrActive } from './scannerControlService';
+import { tryAcquireScannerLock } from './scannerLockService';
 
 export function createBlockMonitorService() {
     const txFilterService = getTxFilterService();
@@ -20,6 +21,11 @@ export function createBlockMonitorService() {
         let state: ScannerState;
 
         try {
+            while (!(await tryAcquireScannerLock())) {
+                console.warn('[Scanner] Another replica owns the scanner lock; waiting');
+                await sleep(SCANNER_POLL_INTERVAL_MS);
+            }
+            console.log('[Scanner] Acquired PostgreSQL advisory lock');
             state = await initializeScannerState();
         } catch (error) {
             scannerStarted = false;
