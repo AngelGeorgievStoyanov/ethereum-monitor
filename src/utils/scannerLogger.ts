@@ -49,6 +49,10 @@ export function logCatchUpComplete(summary: CatchUpSummary): void {
         summary.durationMs > 0
             ? ((summary.processedBlocks * 1000) / summary.durationMs).toFixed(2)
             : 'n/a';
+    const blocksPerMinute =
+        summary.durationMs > 0
+            ? ((summary.processedBlocks * 60000) / summary.durationMs).toFixed(1)
+            : 'n/a';
     const averageFetchDurationMs = (summary.totalFetchDurationMs / summary.processedBlocks).toFixed(
         1,
     );
@@ -61,7 +65,7 @@ export function logCatchUpComplete(summary: CatchUpSummary): void {
 
     console.log(
         `[Scanner] Catch-up complete: blocks ${summary.startBlock}-${summary.endBlock}, ` +
-            `count=${summary.processedBlocks}, speed=${blocksPerSecond} blocks/s, ` +
+            `count=${summary.processedBlocks}, speed=${blocksPerSecond} blocks/s (${blocksPerMinute} blocks/min), ` +
             `avg fetch=${averageFetchDurationMs}ms, avg block=${averageBlockDurationMs}ms, ` +
             `avg db writes=${averageDatabaseWriteDurationMs}ms, tx=${summary.totalTransactions}, ` +
             `native matches=${summary.totalNativeMatches}, ` +
