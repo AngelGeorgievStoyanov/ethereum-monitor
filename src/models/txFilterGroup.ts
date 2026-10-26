@@ -29,7 +29,11 @@ TxFilterGroup.init(
         parentGroupId: { type: DataTypes.INTEGER, allowNull: true },
         logic: { type: DataTypes.ENUM('AND', 'OR'), allowNull: false, defaultValue: 'AND' },
     },
-    { sequelize, tableName: 'TxFilterGroups', modelName: 'TxFilterGroup', timestamps: true },
+        indexes: [
+            { name: 'tx_filter_groups_filter_id_idx', fields: ['txFilterId'] },
+            { name: 'tx_filter_groups_parent_id_idx', fields: ['parentGroupId'] },
+        ],
+    },
 );
 
 export default TxFilterGroup;
