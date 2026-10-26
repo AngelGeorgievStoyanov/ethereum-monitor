@@ -44,7 +44,10 @@ export function validateTxFilterOperator(field: string, operator: string, value:
         throw new Error(`Unsupported transaction filter operator "${operator}"`);
     }
     const definition = getTxFilterField(field);
-    if (['gt', 'gte', 'lt', 'lte'].includes(operator) && !['number', 'bigint', 'date'].includes(definition.type)) {
+    if (
+        ['gt', 'gte', 'lt', 'lte'].includes(operator) &&
+        !['number', 'bigint', 'date'].includes(definition.type)
+    ) {
         throw new Error(`Operator "${operator}" is not supported for field "${field}"`);
     }
     if (operator === 'contains' && definition.type !== 'string') {
@@ -67,9 +70,11 @@ export function evaluateTxFilterOperator(
     const definition = getTxFilterField(field);
     const actual = normalize(actualValue, definition.type, Boolean(definition.caseInsensitive));
     if (operator === 'in' || operator === 'notIn') {
-        const found = Array.isArray(expectedValue) && expectedValue.some(
-            (item) => actual === normalize(item, definition.type, Boolean(definition.caseInsensitive)),
-        );
+        const found =
+            Array.isArray(expectedValue) &&
+            expectedValue.some(
+                (item) => actual === normalize(item, definition.type, Boolean(definition.caseInsensitive)),
+            );
         return operator === 'in' ? found : !found;
     }
     const expected = normalize(expectedValue, definition.type, Boolean(definition.caseInsensitive));
