@@ -31,6 +31,19 @@ export async function catchUpToFinalizedBlock(
             await updateScannerCheckpoint(state.id, blockNumber);
             state.lastProcessedBlock = blockNumber;
 
+            const databaseWriteDurationMs =
+                metrics.nativeDatabaseWriteDurationMs + metrics.erc20DatabaseWriteDurationMs;
+            console.log(
+                `[Scanner] Block ${blockNumber} processed: tx=${metrics.transactionCount}, ` +
+                    `native seen=${metrics.nativeTransfersSeen}, native matches=${metrics.nativeMatches}, ` +
+                    `ERC-20 logs=${metrics.erc20TransferLogsSeen}, ERC-20 matches=${metrics.erc20Matches}, ` +
+                    `ERC-20 failed attempts=${metrics.erc20FailedAttemptsSeen}, ` +
+                    `failed matches=${metrics.erc20FailedAttemptsMatched}, ` +
+                    `fetch=${metrics.fetchDurationMs}ms, db writes=${databaseWriteDurationMs}ms, ` +
+                    `total=${metrics.blockDurationMs}ms, checkpoint=${state.lastProcessedBlock}` +
+                    (metrics.fetchAttempts > 1 ? `, fetch attempts=${metrics.fetchAttempts}` : ''),
+            );
+
             totalTransactions += metrics.transactionCount;
             totalNativeMatches += metrics.nativeMatches;
             totalErc20TransferLogsSeen += metrics.erc20TransferLogsSeen;
