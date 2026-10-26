@@ -1,28 +1,12 @@
-import { TransactionResponse } from 'ethers';
-import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import ScannerState from '../models/scannerState';
-import {
-    createScannerState,
-    findScannerState,
-    saveScannerState,
-    updateScannerCheckpoint,
-} from '../repositories/scannerStateRepository';
-import { env } from '../config/env';
 import { SCANNER_ID, SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
-import { ethereumProvider, fetchBlockData } from './ethereumRpcService';
-import { processNativeTransfers } from './nativeTransferService';
-import { processErc20Transfers } from './erc20TransferService';
+import { ethereumProvider } from './ethereumRpcService';
 import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
-
-async function advanceCheckpoint(
-    state: ScannerState,
-    blockNumber: number,
-) {
-    await updateScannerCheckpoint(state.id, blockNumber);
-    state.lastProcessedBlock = blockNumber;
-}
+import { initializeScannerState } from './scannerInitializationService';
+import { catchUpToFinalizedBlock } from './blockCatchupService';
+import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
 
 export function createBlockMonitorService() {
     const txFilterService = getTxFilterService();
@@ -32,192 +16,40 @@ export function createBlockMonitorService() {
         if (scannerStarted) return;
         scannerStarted = true;
 
+        let state: ScannerState;
+
         try {
-            let state = await findScannerState(SCANNER_ID);
-            const rescanBlock = env.rescanFromBlock;
-            const validRescanBlock = rescanBlock !== undefined;
-
-            if (state && validRescanBlock && state.lastRescanFromBlock !== rescanBlock) {
-                state.lastProcessedBlock = rescanBlock - 1;
-                state.lastRescanFromBlock = rescanBlock;
-                await saveScannerState(state);
-                console.log(`[Scanner] Rescan scheduled from block ${rescanBlock}`);
-            }
-
-            if (!state) {
-                const startBlock = env.startBlock;
-                let initialBlock: number;
-
-                if (rescanBlock !== undefined) {
-                    initialBlock = rescanBlock;
-                } else if (
-                    startBlock !== undefined &&
-                    Number.isSafeInteger(startBlock) &&
-                    startBlock >= 0
-                ) {
-                    initialBlock = startBlock;
-                } else {
-                    const finalized = await ethereumProvider.getBlock('finalized');
-                    if (!finalized) throw new Error('Unable to resolve the latest finalized block');
-                    initialBlock = finalized.number;
-                }
-
-                state = await createScannerState({
-                    id: SCANNER_ID,
-                    lastProcessedBlock: initialBlock - 1,
-                    lastRescanFromBlock: validRescanBlock ? rescanBlock : null,
-                });
-            }
-
-            console.log(`[Scanner] Started at checkpoint ${state.lastProcessedBlock}`);
-
-            while (true) {
-                let processingBlock: number | undefined;
-
-                try {
-                    const finalized = await ethereumProvider.getBlock('finalized');
-                    if (!finalized) throw new Error('Unable to resolve the latest finalized block');
-
-                    if (txFilterService.getTxFilters().length === 0) {
-                        if (state.lastProcessedBlock < finalized.number) {
-                            await advanceCheckpoint(state, finalized.number);
-                            console.log(
-                                `[Scanner] No active txFilters; checkpoint advanced to ${finalized.number}`,
-                            );
-                        }
-                    } else {
-                        const catchupStartedAt = Date.now();
-                        const catchupStartBlock = state.lastProcessedBlock + 1;
-                        let processedBlocks = 0;
-                        let totalTransactions = 0;
-                        let totalNativeMatches = 0;
-                        let totalErc20TransferLogsSeen = 0;
-                        let totalErc20Matches = 0;
-                        let totalErc20FailedAttemptsSeen = 0;
-                        let totalErc20FailedAttemptsMatched = 0;
-                        let totalFetchDurationMs = 0;
-                        let totalBlockDurationMs = 0;
-                        let totalNativeDatabaseWriteDurationMs = 0;
-                        let totalErc20DatabaseWriteDurationMs = 0;
-
-                        while (state.lastProcessedBlock < finalized.number) {
-                            const blockNumber = state.lastProcessedBlock + 1;
-                            processingBlock = blockNumber;
-                            const blockStartedAt = Date.now();
-                            const {
-                                block,
-                                receipts,
-                                durationMs: fetchDurationMs,
-                                attempt,
-                            } = await fetchBlockData(blockNumber);
-                            const transactions = block.prefetchedTransactions;
-                            const receiptsByHash = new Map<string, RpcTransactionReceipt>();
-
-                            for (const receipt of receipts) {
-                                receiptsByHash.set(
-                                    String(receipt.transactionHash).toLowerCase(),
-                                    receipt,
-                                );
-                            }
-
-                            const transactionsByHash = new Map<string, TransactionResponse>();
-                            for (const tx of transactions) {
-                                transactionsByHash.set(tx.hash.toLowerCase(), tx);
-                            }
-
-                            const activeTxFilters = txFilterService.getTxFilters();
-                            const native = await processNativeTransfers(
-                                transactions,
-                                receiptsByHash,
-                                activeTxFilters,
-                                blockNumber,
-                                block.timestamp,
-                            );
-                            const erc20 = await processErc20Transfers(
-                                receipts,
-                                transactionsByHash,
-                                activeTxFilters,
-                                blockNumber,
-                                block.timestamp,
-                            );
-
-                            await advanceCheckpoint(state, blockNumber);
-
-                            const durationMs = Date.now() - blockStartedAt;
-                            const databaseWriteDurationMs =
-                                native.databaseWriteDurationMs + erc20.databaseWriteDurationMs;
-
-                            totalTransactions += transactions.length;
-                            totalNativeMatches += native.transfersMatched;
-                            totalErc20TransferLogsSeen += erc20.transferLogsSeen;
-                            totalErc20Matches += erc20.transfersMatched;
-                            totalErc20FailedAttemptsSeen += erc20.failedAttemptsSeen;
-                            totalErc20FailedAttemptsMatched += erc20.failedAttemptsMatched;
-                            totalFetchDurationMs += fetchDurationMs;
-                            totalBlockDurationMs += durationMs;
-                            totalNativeDatabaseWriteDurationMs += native.databaseWriteDurationMs;
-                            totalErc20DatabaseWriteDurationMs += erc20.databaseWriteDurationMs;
-
-                            console.log(
-                                `[Scanner] Block ${blockNumber} processed: tx=${transactions.length}, ` +
-                                    `native seen=${native.transfersSeen}, native matches=${native.transfersMatched}, ` +
-                                    `ERC-20 logs=${erc20.transferLogsSeen}, ERC-20 matches=${erc20.transfersMatched}, ` +
-                                    `ERC-20 failed attempts=${erc20.failedAttemptsSeen}, ` +
-                                    `failed matches=${erc20.failedAttemptsMatched}, ` +
-                                    `fetch=${fetchDurationMs}ms, db writes=${databaseWriteDurationMs}ms, ` +
-                                    `total=${durationMs}ms, checkpoint=${state.lastProcessedBlock}` +
-                                    (attempt > 1 ? `, fetch attempts=${attempt}` : ''),
-                            );
-
-                            processingBlock = undefined;
-                            processedBlocks += 1;
-                        }
-
-                        if (processedBlocks > 0) {
-                            const durationMs = Date.now() - catchupStartedAt;
-                            const blocksPerSecond =
-                                durationMs > 0
-                                    ? ((processedBlocks * 1000) / durationMs).toFixed(2)
-                                    : 'n/a';
-                            const averageFetchDurationMs = (
-                                totalFetchDurationMs / processedBlocks
-                            ).toFixed(1);
-                            const averageBlockDurationMs = (
-                                totalBlockDurationMs / processedBlocks
-                            ).toFixed(1);
-                            const averageDatabaseWriteDurationMs = (
-                                (totalNativeDatabaseWriteDurationMs +
-                                    totalErc20DatabaseWriteDurationMs) /
-                                processedBlocks
-                            ).toFixed(1);
-
-                            console.log(
-                                `[Scanner] Catch-up complete: blocks ${catchupStartBlock}-${state.lastProcessedBlock}, ` +
-                                    `count=${processedBlocks}, speed=${blocksPerSecond} blocks/s, ` +
-                                    `avg fetch=${averageFetchDurationMs}ms, avg block=${averageBlockDurationMs}ms, ` +
-                                    `avg db writes=${averageDatabaseWriteDurationMs}ms, tx=${totalTransactions}, ` +
-                                    `native matches=${totalNativeMatches}, ERC-20 logs=${totalErc20TransferLogsSeen}, ` +
-                                    `ERC-20 matches=${totalErc20Matches}, ` +
-                                    `ERC-20 failed attempts=${totalErc20FailedAttemptsSeen}, ` +
-                                    `failed attempt matches=${totalErc20FailedAttemptsMatched}, ` +
-                                    `total db writes=${totalNativeDatabaseWriteDurationMs + totalErc20DatabaseWriteDurationMs}ms`,
-                            );
-                        }
-                    }
-                } catch (error) {
-                    const location =
-                        processingBlock === undefined ? '' : ` at block ${processingBlock}`;
-                    const message = formatError(error);
-                    console.error(
-                        `[Scanner] Processing failed${location}; checkpoint=${state.lastProcessedBlock}: ${message}`,
-                    );
-                }
-
-                await sleep(SCANNER_POLL_INTERVAL_MS);
-            }
+            state = await initializeScannerState();
         } catch (error) {
             scannerStarted = false;
             throw error;
+        }
+
+        while (true) {
+            try {
+                const finalized = await ethereumProvider.getBlock('finalized');
+                if (!finalized) throw new Error('Unable to resolve the latest finalized block');
+
+                const activeTxFilters = txFilterService.getTxFilters();
+
+                if (activeTxFilters.length === 0) {
+                    if (state.lastProcessedBlock < finalized.number) {
+                        await updateScannerCheckpoint(state.id, finalized.number);
+                        state.lastProcessedBlock = finalized.number;
+                        console.log(
+                            `[Scanner] No active tx filters; checkpoint advanced to ${finalized.number}`,
+                        );
+                    }
+                } else {
+                    await catchUpToFinalizedBlock(state, finalized.number, activeTxFilters);
+                }
+            } catch (error) {
+                console.error(
+                    `[Scanner] Processing failed; checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
+                );
+            }
+
+            await sleep(SCANNER_POLL_INTERVAL_MS);
         }
     }
 
