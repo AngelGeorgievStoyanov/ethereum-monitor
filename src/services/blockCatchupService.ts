@@ -79,9 +79,7 @@ export async function catchUpToFinalizedBlock(
     const averageBlockDurationMs = (totalBlockDurationMs / processedBlocks).toFixed(1);
     const totalDatabaseWriteDurationMs =
         totalNativeDatabaseWriteDurationMs + totalErc20DatabaseWriteDurationMs;
-    const averageDatabaseWriteDurationMs = (
-        totalDatabaseWriteDurationMs / processedBlocks
-    ).toFixed(1);
+    const averageDatabaseWriteDurationMs = (totalDatabaseWriteDurationMs / processedBlocks).toFixed(1);
 
     console.log(
         `[Scanner] Catch-up complete: blocks ${catchupStartBlock}-${state.lastProcessedBlock}, ` +
