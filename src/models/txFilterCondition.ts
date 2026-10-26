@@ -30,6 +30,11 @@ TxFilterCondition.init(
         operator: { type: DataTypes.STRING(20), allowNull: false },
         value: { type: DataTypes.JSONB, allowNull: true },
     },
+    {
+        sequelize,
+        tableName: 'TxFilterConditions',
+        modelName: 'TxFilterCondition',
+        timestamps: true,
         indexes: [{ name: 'tx_filter_conditions_group_id_idx', fields: ['groupId'] }],
     },
 );
