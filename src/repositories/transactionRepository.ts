@@ -36,7 +36,7 @@ export async function ensureTransferUniqueness() {
     }
 
     const queryInterface = sequelize.getQueryInterface();
-    const indexes = await queryInterface.showIndex('Transactions');
+    const indexes = (await queryInterface.showIndex('Transactions')) as Array<{ name?: string }>;
     if (indexes.some((index) => index.name === TRANSFER_UNIQUE_INDEX)) return;
 
     await queryInterface.addIndex(
