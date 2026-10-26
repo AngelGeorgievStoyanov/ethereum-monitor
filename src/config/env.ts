@@ -29,5 +29,4 @@ export const env = {
     databaseUrl,
     rpcUrls,
     startBlock: parseOptionalBlock('START_BLOCK'),
-    rescanFromBlock: parseOptionalBlock('RESCAN_FROM_BLOCK'),
 };
