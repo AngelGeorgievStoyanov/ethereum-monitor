@@ -4,6 +4,7 @@ import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { fetchBlockData } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
+import { createTransactionsFromEthereumDataBatch } from './transactionService';
 
 export interface ProcessedBlockMetrics {
     transactionCount: number;
@@ -16,8 +17,7 @@ export interface ProcessedBlockMetrics {
     fetchDurationMs: number;
     fetchAttempts: number;
     blockDurationMs: number;
-    nativeDatabaseWriteDurationMs: number;
-    erc20DatabaseWriteDurationMs: number;
+    databaseWriteDurationMs: number;
 }
 
 export async function processBlock(
@@ -59,6 +59,13 @@ export async function processBlock(
         block.timestamp,
     );
 
+    const databaseWriteStartedAt = Date.now();
+    await createTransactionsFromEthereumDataBatch([
+        ...native.candidates,
+        ...erc20.candidates,
+    ]);
+    const databaseWriteDurationMs = Date.now() - databaseWriteStartedAt;
+
     return {
         transactionCount: transactions.length,
         nativeTransfersSeen: native.transfersSeen,
@@ -70,7 +77,6 @@ export async function processBlock(
         fetchDurationMs,
         fetchAttempts: attempt,
         blockDurationMs: Date.now() - blockStartedAt,
-        nativeDatabaseWriteDurationMs: native.databaseWriteDurationMs,
-        erc20DatabaseWriteDurationMs: erc20.databaseWriteDurationMs,
+        databaseWriteDurationMs,
     };
 }
