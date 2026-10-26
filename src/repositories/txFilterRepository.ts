@@ -1,11 +1,11 @@
 import TxFilter from '../models/txFilter';
 
 export function findAllTxFilters() {
-    return TxFilter.findAll();
+    return TxFilter.findAll({ order: [['id', 'ASC']] });
 }
 
 export function findActiveTxFilters() {
-    return TxFilter.findAll({ where: { isActive: true } });
+    return TxFilter.findAll({ where: { isActive: true }, order: [['id', 'ASC']] });
 }
 
 export function findTxFilterById(id: number) {
@@ -17,6 +17,7 @@ export function createTxFilter(data: {
     from: string | null;
     to: string | null;
     isActive: boolean;
+    activeFromBlock?: number | null;
 }) {
     return TxFilter.create(data);
 }
@@ -28,6 +29,7 @@ export async function updateTxFilter(
         from?: string | null;
         to?: string | null;
         isActive?: boolean;
+        activeFromBlock?: number | null;
     },
 ) {
     const txFilter = await TxFilter.findByPk(id);
@@ -37,6 +39,7 @@ export async function updateTxFilter(
     if (updates.from !== undefined) txFilter.from = updates.from;
     if (updates.to !== undefined) txFilter.to = updates.to;
     if (updates.isActive !== undefined) txFilter.isActive = updates.isActive;
+    if (updates.activeFromBlock !== undefined) txFilter.activeFromBlock = updates.activeFromBlock;
 
     await txFilter.save();
     return txFilter;
