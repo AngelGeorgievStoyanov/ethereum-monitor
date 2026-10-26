@@ -12,6 +12,7 @@ export async function catchUpToFinalizedBlock(
 ): Promise<void> {
     const catchupStartedAt = Date.now();
     const catchupStartBlock = state.lastProcessedBlock + 1;
+    if (shouldPauseBeforeBlock(catchupStartBlock, state.lastProcessedBlock)) return;
     let processedBlocks = 0;
     let totalTransactions = 0;
     let totalNativeMatches = 0;
