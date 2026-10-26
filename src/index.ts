@@ -11,7 +11,6 @@ import { getTxFilterService } from './services/txFilterService';
 import { formatError } from './utils/formatError';
 import { sleep } from './utils/sleep';
 import { ensureTransferUniqueness } from './repositories/transactionRepository';
-import { renameTxFilterSchema } from './migrations/renameTxFilterSchema';
 
 const app = express();
 
@@ -44,7 +43,6 @@ async function startScannerWithRetry() {
 }
 
 async function startServer() {
-    await renameTxFilterSchema();
     await sequelize.sync();
     console.log('Database connected');
 
