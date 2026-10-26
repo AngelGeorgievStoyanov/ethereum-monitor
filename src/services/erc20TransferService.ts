@@ -4,6 +4,7 @@ import { ERC20_TRANSFER_TOPIC } from '../constants/erc20-transfer.constants';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesTxFilter } from '../utils/matchesTxFilter';
+import { mapTransactionFilterContext } from '../mappers/transactionContextMapper';
 
 const ERC20_INTERFACE = new ethers.Interface([
     'function transfer(address to, uint256 value)',
@@ -79,23 +80,21 @@ export async function processErc20Transfers(
 
             failedAttemptsSeen += 1;
             const tokenAddress = ethers.getAddress(tx.to!);
-            const context = {
-                txHash: tx.hash,
-                transferType: 'erc20',
+            const transfer = {
+                transferType: 'erc20' as const,
                 tokenAddress,
                 logIndex: -1,
-                nonce: tx.nonce,
-                blockHash: receipt.blockHash,
-                blockNumber,
-                transactionIndex: Number(BigInt(receipt.transactionIndex)),
                 from: attempt.from,
                 to: attempt.to,
                 value: attempt.value,
-                internalCount: null,
-                status,
-                transactionType: tx.type?.toString() ?? null,
-                timestamp: new Date(blockTimestamp * 1000),
             };
+            const context = mapTransactionFilterContext(
+                tx,
+                receipt,
+                blockNumber,
+                blockTimestamp,
+                transfer,
+            );
             const matchingTxFilters = txFilters.filter((filter) =>
                 matchesTxFilter(context, filter, blockNumber),
             );
@@ -106,14 +105,7 @@ export async function processErc20Transfers(
                 tx,
                 receipt,
                 blockTimestamp,
-                {
-                    transferType: 'erc20',
-                    tokenAddress,
-                    logIndex: -1,
-                    from: attempt.from,
-                    to: attempt.to,
-                    value: attempt.value,
-                },
+                transfer,
                 matchingTxFilters,
             );
             databaseWriteDurationMs += Date.now() - startedAt;
@@ -137,23 +129,21 @@ export async function processErc20Transfers(
             const value = BigInt(log.data).toString();
             const logIndex = Number(BigInt(log.logIndex));
             const tokenAddress = ethers.getAddress(log.address);
-            const context = {
-                txHash: tx.hash,
-                transferType: 'erc20',
+            const transfer = {
+                transferType: 'erc20' as const,
                 tokenAddress,
                 logIndex,
-                nonce: tx.nonce,
-                blockHash: receipt.blockHash,
-                blockNumber,
-                transactionIndex: Number(BigInt(receipt.transactionIndex)),
                 from,
                 to,
                 value,
-                internalCount: null,
-                status,
-                transactionType: tx.type?.toString() ?? null,
-                timestamp: new Date(blockTimestamp * 1000),
             };
+            const context = mapTransactionFilterContext(
+                tx,
+                receipt,
+                blockNumber,
+                blockTimestamp,
+                transfer,
+            );
             const matchingTxFilters = txFilters.filter((filter) =>
                 matchesTxFilter(context, filter, blockNumber),
             );
@@ -164,14 +154,7 @@ export async function processErc20Transfers(
                 tx,
                 receipt,
                 blockTimestamp,
-                {
-                    transferType: 'erc20',
-                    tokenAddress,
-                    logIndex,
-                    from,
-                    to,
-                    value,
-                },
+                transfer,
                 matchingTxFilters,
             );
             databaseWriteDurationMs += Date.now() - startedAt;
