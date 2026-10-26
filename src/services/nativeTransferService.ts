@@ -1,5 +1,5 @@
 import { TransactionResponse } from 'ethers';
-import TxFilter from '../models/txFilter';
+import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { createTransactionFromEthereumData } from './transactionService';
 import { matchesTxFilter } from '../utils/matchesTxFilter';
@@ -7,7 +7,7 @@ import { matchesTxFilter } from '../utils/matchesTxFilter';
 export async function processNativeTransfers(
     transactions: readonly TransactionResponse[],
     receiptsByHash: Map<string, RpcTransactionReceipt>,
-    txFilters: TxFilter[],
+    txFilters: ActiveTxFilter[],
     blockNumber: number,
     blockTimestamp: number,
 ) {
@@ -19,17 +19,35 @@ export async function processNativeTransfers(
         if (!tx.to || tx.value <= 0n) continue;
         transfersSeen += 1;
 
-        const matchingTxFilters = txFilters.filter(
-            (txFilter) => txFilter.isActive && matchesTxFilter(tx.from, tx.to, txFilter),
-        );
-        if (matchingTxFilters.length === 0) continue;
-
         const receipt = receiptsByHash.get(tx.hash.toLowerCase());
         if (!receipt) {
             throw new Error(
                 `Block receipts did not contain native transaction ${tx.hash} in block ${blockNumber}`,
             );
         }
+
+        const context = {
+            txHash: tx.hash,
+            transferType: 'native',
+            tokenAddress: null,
+            logIndex: -1,
+            nonce: tx.nonce,
+            blockHash: receipt.blockHash,
+            blockNumber,
+            transactionIndex: Number(BigInt(receipt.transactionIndex)),
+            from: tx.from,
+            to: tx.to,
+            value: tx.value.toString(),
+            internalCount: null,
+            status: Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed',
+            transactionType: tx.type?.toString() ?? null,
+            timestamp: new Date(blockTimestamp * 1000),
+        };
+
+        const matchingTxFilters = txFilters.filter((filter) =>
+            matchesTxFilter(context, filter, blockNumber),
+        );
+        if (matchingTxFilters.length === 0) continue;
 
         const startedAt = Date.now();
         await createTransactionFromEthereumData(
