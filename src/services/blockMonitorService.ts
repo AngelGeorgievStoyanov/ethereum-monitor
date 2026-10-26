@@ -26,30 +26,29 @@ export function createBlockMonitorService() {
             throw error;
         }
 
-        // If the process starts with active filters, preserve the checkpoint and catch up.
-        // If it starts without filters, the first later activation begins at the latest
-        // finalized block instead of replaying a period during which nothing was monitored.
         let waitingForFilters = txFilterService.getTxFilters().length === 0;
-
         if (waitingForFilters) {
             console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
         }
 
         while (true) {
             try {
-                const finalized = await ethereumProvider.getBlock('finalized');
-                if (!finalized) throw new Error('Unable to resolve the latest finalized block');
-
                 const activeTxFilters = txFilterService.getTxFilters();
 
                 if (activeTxFilters.length === 0) {
                     if (!waitingForFilters) {
-                        console.log('[Scanner] No active tx filters; scanning paused until a filter is activated');
+                        console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
                     }
                     waitingForFilters = true;
                 } else {
+                    const finalized = await ethereumProvider.getBlock('finalized');
+                    if (!finalized) throw new Error('Unable to resolve the latest finalized block');
+
                     if (waitingForFilters) {
-                        if (!isScannerPausePendingOrActive() && state.lastProcessedBlock < finalized.number) {
+                        if (
+                            !isScannerPausePendingOrActive() &&
+                            state.lastProcessedBlock < finalized.number
+                        ) {
                             await updateScannerCheckpoint(state.id, finalized.number);
                             state.lastProcessedBlock = finalized.number;
                         }
@@ -61,7 +60,11 @@ export function createBlockMonitorService() {
                         waitingForFilters = false;
                     }
 
-                    await catchUpToFinalizedBlock(state, finalized.number, () => txFilterService.getTxFilters());
+                    await catchUpToFinalizedBlock(
+                        state,
+                        finalized.number,
+                        () => txFilterService.getTxFilters(),
+                    );
                 }
             } catch (error) {
                 console.error(
