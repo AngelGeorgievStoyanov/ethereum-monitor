@@ -55,6 +55,7 @@ String/address comparisons are case-insensitive. `value` is compared as an exact
 - `gt`, `gte`, `lt`, `lte`: numeric, integer, or date comparisons.
 - `in`, `notIn`: membership in an array.
 - `contains`: substring match for string fields.
+- Null-valued fields do not match `ne` or `notIn`; use `eq` with a null value to explicitly match null fields.
 
 ## Activation boundaries
 
