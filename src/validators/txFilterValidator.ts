@@ -78,6 +78,6 @@ export function validateUpdateTxFilterInput(body: unknown): UpdateTxFilterInput 
             ? { to: typeof to === 'string' && to.length > 0 ? to : null }
             : {}),
         ...(isActive !== undefined ? { isActive: isActive as boolean } : {}),
-        ...(rule !== undefined ? { rule: rule as TxFilterGroupRule } : {}),
+        ...(rule !== undefined ? { rule: rule === null ? null : (rule as TxFilterGroupRule) } : {}),
     };
 }
