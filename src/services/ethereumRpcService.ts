@@ -11,6 +11,57 @@ import { getRpcClient } from '../clients/rpcClient';
 
 export const ethereumProvider = getRpcClient();
 
+function validateBlockReceipts(
+    blockNumber: number,
+    block: ethers.Block,
+    receipts: RpcTransactionReceipt[],
+): void {
+    const transactions = block.prefetchedTransactions;
+    if (transactions.length !== receipts.length) {
+        throw new Error(
+            `Block ${blockNumber} has ${transactions.length} transactions but ${receipts.length} receipts`,
+        );
+    }
+
+    const transactionHashes = new Set<string>();
+    for (const tx of transactions) {
+        const hash = tx.hash.toLowerCase();
+        if (transactionHashes.has(hash)) {
+            throw new Error(`Block ${blockNumber} contains duplicate transaction ${tx.hash}`);
+        }
+        transactionHashes.add(hash);
+    }
+
+    const receiptHashes = new Set<string>();
+    for (const receipt of receipts) {
+        const hash = String(receipt.transactionHash).toLowerCase();
+        if (receiptHashes.has(hash)) {
+            throw new Error(`Block ${blockNumber} contains duplicate receipt for ${hash}`);
+        }
+        receiptHashes.add(hash);
+
+        if (!transactionHashes.has(hash)) {
+            throw new Error(
+                `Receipt ${hash} does not correspond to a transaction in block ${blockNumber}`,
+            );
+        }
+        if (String(receipt.blockHash).toLowerCase() !== block.hash.toLowerCase()) {
+            throw new Error(
+                `Receipt ${hash} has blockHash ${receipt.blockHash}, expected ${block.hash}`,
+            );
+        }
+        if (Number(BigInt(receipt.blockNumber)) !== block.number) {
+            throw new Error(
+                `Receipt ${hash} has blockNumber ${receipt.blockNumber}, expected ${block.number}`,
+            );
+        }
+    }
+
+    if (receiptHashes.size !== transactionHashes.size) {
+        throw new Error(`Block ${blockNumber} transaction and receipt sets do not match`);
+    }
+}
+
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
         const startedAt = Date.now();
@@ -39,9 +90,12 @@ export async function fetchBlockData(blockNumber: number) {
                         throw new Error('eth_getBlockReceipts returned a non-array response');
                     }
 
+                    const receipts = response as RpcTransactionReceipt[];
+                    validateBlockReceipts(blockNumber, block, receipts);
+
                     return {
                         block,
-                        receipts: response as RpcTransactionReceipt[],
+                        receipts,
                     };
                 },
             );
