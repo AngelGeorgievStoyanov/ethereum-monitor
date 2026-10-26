@@ -9,6 +9,7 @@ import {
     deleteTransactionById,
     getAllStoredTransactions,
 } from './controllers/transactionController';
+import { getLiveness, getReadiness } from './controllers/healthController';
 import {
     getScannerStatus,
     pauseScanner,
@@ -16,6 +17,9 @@ import {
 } from './controllers/scannerController';
 
 const router = Router();
+
+router.get('/health/live', getLiveness);
+router.get('/health/ready', getReadiness);
 
 router.get('/tx-filters', getTxFilters);
 router.post('/tx-filters', createTxFilter);
