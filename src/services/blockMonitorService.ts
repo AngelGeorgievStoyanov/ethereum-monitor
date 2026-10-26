@@ -8,7 +8,7 @@ import { initializeScannerState } from './scannerInitializationService';
 import { processFinalizedBlocks } from './blockProcessor';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
 import { getScannerControlState, isScannerPausePendingOrActive } from './scannerControlService';
-import { tryAcquireScannerLock } from './scannerLockService';
+import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 
 export function createBlockMonitorService() {
     const txFilterService = getTxFilterService();
@@ -32,6 +32,7 @@ export function createBlockMonitorService() {
             throw error;
         }
 
+        let needsStateReload = false;
         let waitingForFilters = txFilterService.getTxFilters().length === 0;
         let waitingForPause = false;
         if (waitingForFilters) {
@@ -40,6 +41,24 @@ export function createBlockMonitorService() {
 
         while (true) {
             try {
+                if (!(await isScannerLockHeld())) {
+                    needsStateReload = true;
+                    while (!(await tryAcquireScannerLock())) {
+                        console.warn(
+                            '[Scanner] Advisory lock unavailable after connection loss; waiting',
+                        );
+                        await sleep(SCANNER_POLL_INTERVAL_MS);
+                    }
+                    console.log('[Scanner] Reacquired PostgreSQL advisory lock');
+                }
+
+                if (needsStateReload) {
+                    state = await initializeScannerState();
+                    waitingForFilters = txFilterService.getTxFilters().length === 0;
+                    waitingForPause = false;
+                    needsStateReload = false;
+                }
+
                 const activeTxFilters = txFilterService.getTxFilters();
 
                 if (activeTxFilters.length === 0) {
