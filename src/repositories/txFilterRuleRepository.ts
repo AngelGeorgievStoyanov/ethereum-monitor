@@ -32,7 +32,7 @@ export async function findRuleForFilter(txFilterId: number): Promise<TxFilterGro
             field: condition.field,
             operator: condition.operator,
             value: condition.value,
-        }, { transaction });
+        });
     }
 
     if (rootIds.length !== 1) {
@@ -42,7 +42,11 @@ export async function findRuleForFilter(txFilterId: number): Promise<TxFilterGro
 }
 
 async function deleteRuleForFilter(txFilterId: number, transaction: Transaction): Promise<void> {
-    const groups = await TxFilterGroup.findAll({ where: { txFilterId }, attributes: ['id'], transaction });
+    const groups = await TxFilterGroup.findAll({
+        where: { txFilterId },
+        attributes: ['id'],
+        transaction,
+    });
     const ids = groups.map((group) => group.id);
     if (ids.length > 0) {
         await TxFilterCondition.destroy({ where: { groupId: { [Op.in]: ids } }, transaction });
@@ -61,12 +65,15 @@ async function persistGroup(
         { transaction },
     );
     for (const condition of group.conditions) {
-        await TxFilterCondition.create({
-            groupId: savedGroup.id,
-            field: condition.field,
-            operator: condition.operator,
-            value: condition.value,
-        });
+        await TxFilterCondition.create(
+            {
+                groupId: savedGroup.id,
+                field: condition.field,
+                operator: condition.operator,
+                value: condition.value,
+            },
+            { transaction },
+        );
     }
     for (const child of group.groups) {
         await persistGroup(txFilterId, child, savedGroup.id, transaction);
