@@ -27,6 +27,9 @@ export async function processNativeTransfers(
             );
         }
 
+        // A failed transaction does not transfer its requested ETH value to the recipient.
+        if (Number(BigInt(receipt.status ?? '0x0')) !== 1) continue;
+
         const transfer = {
             transferType: 'native' as const,
             logIndex: -1,
