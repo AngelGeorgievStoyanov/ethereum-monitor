@@ -18,7 +18,7 @@ const OPERATORS = new Set<TxFilterOperator>([
 function normalize(value: unknown, type: string, caseInsensitive: boolean): unknown {
     if (value === null || value === undefined) return value;
     if (type === 'bigint') {
-        if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'bigint') {
+        if (typeof value !== 'string' && typeof value !== 'bigint') {
             throw new Error('Big integer filter values must be strings or integers');
         }
         const stringValue = String(value);
