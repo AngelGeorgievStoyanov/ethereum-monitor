@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getTxFilterService } from '../services/txFilterService';
+import { getTxFilterService, TxFilterSyncError } from '../services/txFilterService';
 import { sendHttpError } from '../utils/httpError';
 import { parsePositiveId } from '../utils/parsePositiveId';
 import {
@@ -23,6 +23,14 @@ export const createTxFilter = async (req: Request, res: Response): Promise<void>
         const txFilter = await txFilterService.createTxFilter(input);
         res.status(201).json(txFilter);
     } catch (error) {
+        if (error instanceof TxFilterSyncError) {
+            res.status(202).json({
+                message: 'Filter saved to the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                scannerSync: 'out_of_sync',
+                data: error.result,
+            });
+            return;
+        }
         sendHttpError(res, 'Error creating transaction filter', error);
     }
 };
@@ -44,6 +52,14 @@ export const updateTxFilter = async (req: Request<{ id: string }>, res: Response
         }
         res.json(txFilter);
     } catch (error) {
+        if (error instanceof TxFilterSyncError) {
+            res.status(202).json({
+                message: 'Filter changes were saved to the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                scannerSync: 'out_of_sync',
+                data: error.result,
+            });
+            return;
+        }
         sendHttpError(res, 'Error updating transaction filter', error);
     }
 };
@@ -63,6 +79,14 @@ export const deleteTxFilter = async (req: Request<{ id: string }>, res: Response
         }
         res.json({ message: 'Transaction filter deleted' });
     } catch (error) {
+        if (error instanceof TxFilterSyncError) {
+            res.status(202).json({
+                message: 'Filter was deleted from the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                scannerSync: 'out_of_sync',
+                data: error.result,
+            });
+            return;
+        }
         sendHttpError(res, 'Error deleting transaction filter', error);
     }
 };
