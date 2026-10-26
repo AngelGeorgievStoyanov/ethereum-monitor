@@ -1,4 +1,7 @@
+import { Transaction as SequelizeTransaction } from 'sequelize';
+import sequelize from '../database';
 import TxFilter from '../models/txFilter';
+import TxMatch from '../models/txMatch';
 
 export function findAllTxFilters() {
     return TxFilter.findAll({ order: [['id', 'ASC']] });
@@ -45,6 +48,9 @@ export async function updateTxFilter(
     return txFilter;
 }
 
-export function deleteTxFilterById(id: number) {
-    return TxFilter.destroy({ where: { id } });
+export async function deleteTxFilterById(id: number) {
+    return sequelize.transaction(async (transaction: SequelizeTransaction) => {
+        await TxMatch.destroy({ where: { txFilterId: id }, transaction });
+        return TxFilter.destroy({ where: { id }, transaction });
+    });
 }
