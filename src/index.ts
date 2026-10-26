@@ -1,4 +1,5 @@
 import express from 'express';
+import './models/associations';
 import sequelize from './database';
 import httpRouter from './httpRouter';
 import { HTTP_HOST, HTTP_PORT } from './constants/http.constants';
@@ -47,7 +48,7 @@ async function startServer() {
     console.log('Database connected');
 
     await ensureTransferUniqueness();
-    console.log('Transfer uniqueness constraint verified');
+    console.log('Transfer uniqueness constraints verified');
 
     await txFilterService.loadTxFilters();
 

@@ -1,6 +1,7 @@
 import { QueryTypes } from 'sequelize';
 import sequelize from '../database';
 import Transaction, { TransactionCreationAttributes } from '../models/transaction';
+import TxFilter from '../models/txFilter';
 import TxMatch from '../models/txMatch';
 
 const NATIVE_UNIQUE_INDEX = 'transactions_native_identity_unique';
@@ -72,14 +73,16 @@ export async function ensureTransferUniqueness() {
 }
 
 export async function findOrCreateTransfer(data: TransactionCreationAttributes) {
-    return Transaction.findOrCreate({
+    const [transaction] = await Transaction.findOrCreate({
         where: {
             txHash: data.txHash,
             transferType: data.transferType,
             ...(data.transferType === 'erc20' ? { logIndex: data.logIndex } : {}),
         },
         defaults: data,
-    }).then(([transaction]) => transaction);
+    });
+
+    return transaction;
 }
 
 export async function findOrCreateInternalTransfer(data: TransactionCreationAttributes) {
@@ -116,7 +119,15 @@ export async function createTxMatches(txId: number, txFilterIds: number[]) {
 }
 
 export function findAllTransactions() {
-    return Transaction.findAll();
+    return Transaction.findAll({
+        include: [
+            {
+                model: TxMatch,
+                as: 'matches',
+                include: [{ model: TxFilter, as: 'txFilter' }],
+            },
+        ],
+    });
 }
 
 export function deleteTransactionById(id: number) {
