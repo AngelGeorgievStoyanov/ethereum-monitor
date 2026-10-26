@@ -9,6 +9,11 @@ import {
     deleteTransactionById,
     getAllStoredTransactions,
 } from './controllers/transactionController';
+import {
+    getScannerStatus,
+    pauseScanner,
+    resumeScannerController,
+} from './controllers/scannerController';
 
 const router = Router();
 
@@ -16,6 +21,10 @@ router.get('/tx-filters', getTxFilters);
 router.post('/tx-filters', createTxFilter);
 router.put('/tx-filters/:id', updateTxFilter);
 router.delete('/tx-filters/:id', deleteTxFilter);
+
+router.get('/scanner/status', getScannerStatus);
+router.post('/scanner/pause', pauseScanner);
+router.post('/scanner/resume', resumeScannerController);
 
 router.get('/transactions', getAllStoredTransactions);
 router.delete('/transactions/:id', deleteTransactionById);
