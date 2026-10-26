@@ -10,8 +10,7 @@ export interface BlockProcessingTotals {
     totalErc20FailedAttemptsMatched: number;
     totalFetchDurationMs: number;
     totalBlockDurationMs: number;
-    totalNativeDatabaseWriteDurationMs: number;
-    totalErc20DatabaseWriteDurationMs: number;
+    totalDatabaseWriteDurationMs: number;
 }
 
 export function createBlockProcessingTotals(): BlockProcessingTotals {
@@ -25,8 +24,7 @@ export function createBlockProcessingTotals(): BlockProcessingTotals {
         totalErc20FailedAttemptsMatched: 0,
         totalFetchDurationMs: 0,
         totalBlockDurationMs: 0,
-        totalNativeDatabaseWriteDurationMs: 0,
-        totalErc20DatabaseWriteDurationMs: 0,
+        totalDatabaseWriteDurationMs: 0,
     };
 }
 
@@ -43,7 +41,6 @@ export function accumulateBlockMetrics(
     totals.totalErc20FailedAttemptsMatched += metrics.erc20FailedAttemptsMatched;
     totals.totalFetchDurationMs += metrics.fetchDurationMs;
     totals.totalBlockDurationMs += blockDurationMs;
-    totals.totalNativeDatabaseWriteDurationMs += metrics.nativeDatabaseWriteDurationMs;
-    totals.totalErc20DatabaseWriteDurationMs += metrics.erc20DatabaseWriteDurationMs;
+    totals.totalDatabaseWriteDurationMs += metrics.databaseWriteDurationMs;
     totals.processedBlocks += 1;
 }
