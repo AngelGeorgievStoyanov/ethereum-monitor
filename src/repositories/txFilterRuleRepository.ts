@@ -83,9 +83,16 @@ async function persistGroup(
 export async function saveRuleForFilter(
     txFilterId: number,
     rule: TxFilterGroupRule | null,
+    transaction?: Transaction,
 ): Promise<void> {
-    await sequelize.transaction(async (transaction) => {
-        await deleteRuleForFilter(txFilterId, transaction);
-        if (rule) await persistGroup(txFilterId, rule, null, transaction);
-    });
+    const save = async (activeTransaction: Transaction) => {
+        await deleteRuleForFilter(txFilterId, activeTransaction);
+        if (rule) await persistGroup(txFilterId, rule, null, activeTransaction);
+    };
+
+    if (transaction) {
+        await save(transaction);
+        return;
+    }
+    await sequelize.transaction(save);
 }
