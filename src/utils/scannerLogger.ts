@@ -13,8 +13,7 @@ export interface CatchUpSummary {
     totalErc20FailedAttemptsMatched: number;
     totalFetchDurationMs: number;
     totalBlockDurationMs: number;
-    totalNativeDatabaseWriteDurationMs: number;
-    totalErc20DatabaseWriteDurationMs: number;
+    totalDatabaseWriteDurationMs: number;
 }
 
 export function logBlockProcessed(
@@ -23,8 +22,7 @@ export function logBlockProcessed(
     blockDurationMs: number,
     checkpoint: number,
 ): void {
-    const databaseWriteDurationMs =
-        metrics.nativeDatabaseWriteDurationMs + metrics.erc20DatabaseWriteDurationMs;
+    const databaseWriteDurationMs = metrics.databaseWriteDurationMs;
 
     console.log(
         `[Scanner] Block ${blockNumber} processed: tx=${metrics.transactionCount}, ` +
@@ -51,10 +49,8 @@ export function logCatchUpComplete(summary: CatchUpSummary): void {
     const averageBlockDurationMs = (summary.totalBlockDurationMs / summary.processedBlocks).toFixed(
         1,
     );
-    const totalDatabaseWriteDurationMs =
-        summary.totalNativeDatabaseWriteDurationMs + summary.totalErc20DatabaseWriteDurationMs;
     const averageDatabaseWriteDurationMs = (
-        totalDatabaseWriteDurationMs / summary.processedBlocks
+        summary.totalDatabaseWriteDurationMs / summary.processedBlocks
     ).toFixed(1);
 
     console.log(
@@ -67,6 +63,6 @@ export function logCatchUpComplete(summary: CatchUpSummary): void {
             `ERC-20 matches=${summary.totalErc20Matches}, ` +
             `ERC-20 failed attempts=${summary.totalErc20FailedAttemptsSeen}, ` +
             `failed attempt matches=${summary.totalErc20FailedAttemptsMatched}, ` +
-            `total db writes=${totalDatabaseWriteDurationMs}ms`,
+            `total db writes=${summary.totalDatabaseWriteDurationMs}ms`,
     );
 }
