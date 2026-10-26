@@ -1,6 +1,5 @@
 import { TransactionResponse } from 'ethers';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
-import { TransactionCreationAttributes } from '../models/transaction';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import {
     createTxMatches,
@@ -8,15 +7,12 @@ import {
     findAllTransactions,
     findOrCreateTransfer,
 } from '../repositories/transactionRepository';
+import {
+    mapTransactionCreationData,
+    TransferContextMetadata,
+} from '../mappers/transactionContextMapper';
 
-export interface TransferMetadata {
-    transferType: 'native' | 'erc20';
-    logIndex: number;
-    from: string;
-    to: string;
-    value: string;
-    tokenAddress?: string;
-}
+export type TransferMetadata = TransferContextMetadata;
 
 export async function createTransactionFromEthereumData(
     tx: TransactionResponse,
@@ -25,23 +21,7 @@ export async function createTransactionFromEthereumData(
     transfer: TransferMetadata,
     matchingTxFilters: ActiveTxFilter[],
 ) {
-    const data: TransactionCreationAttributes = {
-        txHash: tx.hash,
-        nonce: tx.nonce,
-        blockHash: receipt.blockHash,
-        blockNumber: Number(BigInt(receipt.blockNumber)),
-        transactionIndex: Number(BigInt(receipt.transactionIndex)),
-        from: transfer.from,
-        to: transfer.to,
-        value: transfer.value,
-        transferType: transfer.transferType,
-        tokenAddress: transfer.tokenAddress ?? null,
-        logIndex: transfer.logIndex,
-        status: Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed',
-        transactionType: tx.type?.toString(),
-        timestamp: new Date(blockTimestamp * 1000),
-    };
-
+    const data = mapTransactionCreationData(tx, receipt, blockTimestamp, transfer);
     const transaction = await findOrCreateTransfer(data);
     await createTxMatches(
         transaction.id,
