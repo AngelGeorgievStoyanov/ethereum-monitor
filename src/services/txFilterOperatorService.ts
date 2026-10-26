@@ -22,7 +22,7 @@ function normalize(value: unknown, type: string, caseInsensitive: boolean): unkn
             throw new Error('Big integer filter values must be strings or integers');
         }
         const stringValue = String(value);
-        if (!/^-?\\d+$/.test(stringValue)) throw new Error('Invalid integer filter value');
+        if (!/^-?\d+$/.test(stringValue)) throw new Error('Invalid integer filter value');
         return BigInt(stringValue);
     }
     if (type === 'number') {
