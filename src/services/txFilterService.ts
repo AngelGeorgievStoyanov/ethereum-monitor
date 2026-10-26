@@ -135,6 +135,7 @@ export function createTxFilterService() {
 
     async function removeTxFilter(id: number) {
         txFilters.delete(id);
+        await saveRuleForFilter(id, null);
         return deleteTxFilterById(id);
     }
 
