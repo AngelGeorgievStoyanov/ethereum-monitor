@@ -14,6 +14,7 @@ import {
     TxFilterGroupRule,
 } from './txFilterEvaluatorService';
 import { validateTxFilterGroup } from './txFilterValidationService';
+import { ValidationError } from '../utils/validationError';
 
 function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
     const conditions = [];
@@ -84,7 +85,7 @@ export function createTxFilterService() {
         rule?: TxFilterGroupRule;
     }) {
         if (!data.rule && !data.from && !data.to) {
-            throw new Error('A filter requires at least one condition');
+            throw new ValidationError('A filter requires at least one condition');
         }
         if (data.rule) validateTxFilterGroup(data.rule);
         const activeFromBlock = data.isActive ? await getNextFilterStartBlock() : null;
@@ -125,7 +126,7 @@ export function createTxFilterService() {
             !updates.from &&
             !updates.to
         ) {
-            throw new Error('A filter requires at least one condition');
+            throw new ValidationError('A filter requires at least one condition');
         }
 
         const activatingOrChangingRule =
