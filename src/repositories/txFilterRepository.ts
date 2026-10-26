@@ -54,7 +54,23 @@ export async function updateTxFilter(
 
 export async function deleteTxFilterById(id: number, transaction?: SequelizeTransaction) {
     const remove = async (activeTransaction: SequelizeTransaction) => {
-        await TxMatch.destroy({ where: { txFilterId: id }, transaction: activeTransaction });
+        const txFilter = await TxFilter.findByPk(id, { transaction: activeTransaction });
+        if (!txFilter) return 0;
+
+        // Keep historical matches and snapshot the description before unlinking the filter.
+        await TxMatch.update(
+            { txFilterDescription: txFilter.description },
+            {
+                where: { txFilterId: id, txFilterDescription: null },
+                transaction: activeTransaction,
+            },
+        );
+        await TxMatch.update(
+            { txFilterId: null },
+            { where: { txFilterId: id }, transaction: activeTransaction },
+        );
+
+        // Database foreign keys cascade-delete groups, nested groups, and conditions.
         return TxFilter.destroy({ where: { id }, transaction: activeTransaction });
     };
 
