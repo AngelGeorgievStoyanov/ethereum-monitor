@@ -9,7 +9,10 @@ interface TxMatchAttributes {
 
 type TxMatchCreationAttributes = Optional<TxMatchAttributes, 'id'>;
 
-class TxMatch extends Model<TxMatchAttributes, TxMatchCreationAttributes> implements TxMatchAttributes {
+class TxMatch
+    extends Model<TxMatchAttributes, TxMatchCreationAttributes>
+    implements TxMatchAttributes
+{
     public id!: number;
     public txId!: number;
     public txFilterId!: number;
