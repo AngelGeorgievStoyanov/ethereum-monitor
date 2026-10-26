@@ -58,7 +58,7 @@ export function createBlockMonitorService() {
                         waitingForFilters = false;
                     }
 
-                    await catchUpToFinalizedBlock(state, finalized.number, activeTxFilters);
+                    await catchUpToFinalizedBlock(state, finalized.number, () => txFilterService.getTxFilters());
                 }
             } catch (error) {
                 console.error(
