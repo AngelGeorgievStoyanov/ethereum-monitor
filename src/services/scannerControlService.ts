@@ -15,6 +15,7 @@ const state: ScannerControlState = {
 };
 
 let targetBlock: number | null = null;
+let pauseDurationMinutes = 5;
 
 export function isScannerPausePendingOrActive(): boolean {
     refreshTimeout();
@@ -38,12 +39,20 @@ function refreshTimeout(): void {
     }
 }
 
-export function requestScannerPause(mode: ScannerPauseMode, atBlock: number | null): void {
+export function requestScannerPause(
+    mode: ScannerPauseMode,
+    atBlock: number | null,
+    durationMinutes = 5,
+): void {
     targetBlock = atBlock;
     state.paused = atBlock === null;
     state.mode = mode;
     state.pauseRequestedAtBlock = atBlock;
-    state.pauseUntil = state.paused && mode === 'temporary' ? Date.now() + 5 * 60 * 1000 : null;
+    pauseDurationMinutes = durationMinutes;
+    state.pauseUntil =
+        state.paused && mode === 'temporary'
+            ? Date.now() + pauseDurationMinutes * 60 * 1000
+            : null;
     console.log(
         state.paused
             ? `[Scanner] Paused (${mode}); checkpoint will be preserved`
@@ -57,9 +66,12 @@ export function shouldPauseBeforeBlock(nextBlock: number, lastProcessedBlock: nu
     if (targetBlock !== null && nextBlock > targetBlock && lastProcessedBlock >= targetBlock) {
         state.paused = true;
         targetBlock = null;
-        state.pauseUntil = state.mode === 'temporary' ? Date.now() + 5 * 60 * 1000 : null;
+        state.pauseUntil =
+            state.mode === 'temporary'
+                ? Date.now() + pauseDurationMinutes * 60 * 1000
+                : null;
         const resumeMessage = state.pauseUntil
-            ? '; auto-resume in 5 minutes'
+            ? `; auto-resume in ${pauseDurationMinutes} minute(s)`
             : '; manual resume required';
         console.log(`[Scanner] Paused at checkpoint ${lastProcessedBlock}${resumeMessage}`);
         return true;
@@ -74,5 +86,6 @@ export function resumeScanner(): void {
     state.pauseRequestedAtBlock = null;
     state.pauseUntil = null;
     targetBlock = null;
+    pauseDurationMinutes = 5;
     if (wasPaused) console.log('[Scanner] Resumed; catch-up will continue from the saved checkpoint');
 }
