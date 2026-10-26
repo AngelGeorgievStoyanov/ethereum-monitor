@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { Op, Transaction as SequelizeTransaction } from 'sequelize';
 import sequelize from '../database';
 import Transaction, { TransactionCreationAttributes } from '../models/transaction';
 import TxFilter from '../models/txFilter';
@@ -19,10 +19,13 @@ function getTransferIdentity(data: {
         : `${data.txHash.toLowerCase()}:${data.transferType}`;
 }
 
-export async function createTransfersBatch(items: readonly TransferBatchItem[]): Promise<void> {
+export async function createTransfersBatch(
+    items: readonly TransferBatchItem[],
+    transaction?: SequelizeTransaction,
+): Promise<void> {
     if (items.length === 0) return;
 
-    await sequelize.transaction(async (dbTransaction) => {
+    const persist = async (dbTransaction: SequelizeTransaction) => {
         const data = items.map((item) => item.data);
         await Transaction.bulkCreate(data, {
             ignoreDuplicates: true,
@@ -39,8 +42,8 @@ export async function createTransfersBatch(items: readonly TransferBatchItem[]):
             transaction: dbTransaction,
         });
         const transactionsByIdentity = new Map<string, Transaction>();
-        for (const transaction of storedTransactions) {
-            transactionsByIdentity.set(getTransferIdentity(transaction), transaction);
+        for (const storedTransaction of storedTransactions) {
+            transactionsByIdentity.set(getTransferIdentity(storedTransaction), storedTransaction);
         }
 
         const filterIds = [
@@ -64,8 +67,8 @@ export async function createTransfersBatch(items: readonly TransferBatchItem[]):
         }> = [];
 
         for (const item of items) {
-            const transaction = transactionsByIdentity.get(getTransferIdentity(item.data));
-            if (!transaction) {
+            const storedTransaction = transactionsByIdentity.get(getTransferIdentity(item.data));
+            if (!storedTransaction) {
                 throw new Error(
                     `Unable to resolve stored transfer ${item.data.txHash} (${item.data.transferType}) after batch insert`,
                 );
@@ -75,7 +78,7 @@ export async function createTransfersBatch(items: readonly TransferBatchItem[]):
                 const description = descriptionsById.get(filterId);
                 if (description === undefined) continue;
                 matches.push({
-                    txId: transaction.id,
+                    txId: storedTransaction.id,
                     txFilterId: filterId,
                     txFilterDescription: description,
                 });
@@ -88,7 +91,14 @@ export async function createTransfersBatch(items: readonly TransferBatchItem[]):
                 transaction: dbTransaction,
             });
         }
-    });
+    };
+
+    if (transaction) {
+        await persist(transaction);
+        return;
+    }
+
+    await sequelize.transaction(persist);
 }
 
 export async function findOrCreateTransfer(data: TransactionCreationAttributes) {
