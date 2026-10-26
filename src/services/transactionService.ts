@@ -1,5 +1,5 @@
 import { TransactionResponse } from 'ethers';
-import TxFilter from '../models/txFilter';
+import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { TransactionCreationAttributes } from '../models/transaction';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import {
@@ -23,7 +23,7 @@ export async function createTransactionFromEthereumData(
     receipt: RpcTransactionReceipt,
     blockTimestamp: number,
     transfer: TransferMetadata,
-    matchingTxFilters: TxFilter[],
+    matchingTxFilters: ActiveTxFilter[],
 ) {
     const data: TransactionCreationAttributes = {
         txHash: tx.hash,
