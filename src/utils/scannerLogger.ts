@@ -21,8 +21,10 @@ export function logBlockProcessed(
     metrics: ProcessedBlockMetrics,
     blockDurationMs: number,
     checkpoint: number,
+    finalizedBlockNumber: number,
 ): void {
     const databaseWriteDurationMs = metrics.databaseWriteDurationMs;
+    const finalizedLag = Math.max(0, finalizedBlockNumber - checkpoint);
 
     console.log(
         `[Scanner] Block ${blockNumber} processed: tx=${metrics.transactionCount}, ` +
@@ -30,8 +32,12 @@ export function logBlockProcessed(
             `ERC-20 logs=${metrics.erc20TransferLogsSeen}, ERC-20 matches=${metrics.erc20Matches}, ` +
             `ERC-20 failed attempts=${metrics.erc20FailedAttemptsSeen}, ` +
             `failed matches=${metrics.erc20FailedAttemptsMatched}, ` +
-            `fetch=${metrics.fetchDurationMs}ms, db writes=${databaseWriteDurationMs}ms, ` +
-            `total=${blockDurationMs}ms, checkpoint=${checkpoint}` +
+            `getBlock=${metrics.getBlockDurationMs}ms, ` +
+            `getBlockReceipts=${metrics.getBlockReceiptsDurationMs}ms, ` +
+            `fetch total=${metrics.fetchDurationMs}ms, ` +
+            `filter matching=${metrics.filterMatchingDurationMs}ms, ` +
+            `db writes=${databaseWriteDurationMs}ms, total=${blockDurationMs}ms, ` +
+            `checkpoint=${checkpoint}, finalized lag=${finalizedLag} blocks` +
             (metrics.fetchAttempts > 1 ? `, fetch attempts=${metrics.fetchAttempts}` : ''),
     );
 }
