@@ -15,6 +15,9 @@ export interface ProcessedBlockMetrics {
     erc20FailedAttemptsSeen: number;
     erc20FailedAttemptsMatched: number;
     fetchDurationMs: number;
+    getBlockDurationMs: number;
+    getBlockReceiptsDurationMs: number;
+    filterMatchingDurationMs: number;
     fetchAttempts: number;
     blockDurationMs: number;
     databaseWriteDurationMs: number;
@@ -33,6 +36,8 @@ export async function processBlock(
         block,
         receipts,
         durationMs: fetchDurationMs,
+        getBlockDurationMs,
+        getBlockReceiptsDurationMs,
         attempt,
     } = await fetchBlockData(blockNumber);
     const transactions = block.prefetchedTransactions;
@@ -48,6 +53,7 @@ export async function processBlock(
         transactionsByHash.set(tx.hash.toLowerCase(), tx);
     }
 
+    const filterMatchingStartedAt = Date.now();
     const native = await processNativeTransfers(
         transactions,
         receiptsByHash,
@@ -62,6 +68,7 @@ export async function processBlock(
         blockNumber,
         block.timestamp,
     );
+    const filterMatchingDurationMs = Date.now() - filterMatchingStartedAt;
 
     return {
         transactionCount: transactions.length,
@@ -72,6 +79,9 @@ export async function processBlock(
         erc20FailedAttemptsSeen: erc20.failedAttemptsSeen,
         erc20FailedAttemptsMatched: erc20.failedAttemptsMatched,
         fetchDurationMs,
+        getBlockDurationMs,
+        getBlockReceiptsDurationMs,
+        filterMatchingDurationMs,
         fetchAttempts: attempt,
         blockDurationMs: Date.now() - blockStartedAt,
         databaseWriteDurationMs: 0,
