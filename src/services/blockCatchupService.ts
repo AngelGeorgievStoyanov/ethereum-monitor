@@ -37,8 +37,10 @@ export async function catchUpToFinalizedBlock(
                 metrics.nativeDatabaseWriteDurationMs + metrics.erc20DatabaseWriteDurationMs;
             console.log(
                 `[Scanner] Block ${blockNumber} processed: tx=${metrics.transactionCount}, ` +
-                    `native seen=${metrics.nativeTransfersSeen}, native matches=${metrics.nativeMatches}, ` +
-                    `ERC-20 logs=${metrics.erc20TransferLogsSeen}, ERC-20 matches=${metrics.erc20Matches}, ` +
+                    `native seen=${metrics.nativeTransfersSeen}, ` +
+                    `native matches=${metrics.nativeMatches}, ` +
+                    `ERC-20 logs=${metrics.erc20TransferLogsSeen}, ` +
+                    `ERC-20 matches=${metrics.erc20Matches}, ` +
                     `ERC-20 failed attempts=${metrics.erc20FailedAttemptsSeen}, ` +
                     `failed matches=${metrics.erc20FailedAttemptsMatched}, ` +
                     `fetch=${metrics.fetchDurationMs}ms, db writes=${databaseWriteDurationMs}ms, ` +
@@ -59,7 +61,8 @@ export async function catchUpToFinalizedBlock(
             processedBlocks += 1;
         } catch (error) {
             console.error(
-                `[Scanner] Processing failed at block ${blockNumber}; checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
+                `[Scanner] Processing failed at block ${blockNumber}; ` +
+                    `checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
             );
             return;
         }
