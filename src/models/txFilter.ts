@@ -7,6 +7,7 @@ interface TxFilterAttributes {
     from?: string | null;
     to?: string | null;
     isActive: boolean;
+    activeFromBlock: number | null;
 }
 
 export type TxFilterCreationAttributes = Optional<TxFilterAttributes, 'id' | 'isActive'>;
@@ -20,6 +21,7 @@ class TxFilter
     public from?: string | null;
     public to?: string | null;
     public isActive!: boolean;
+    public activeFromBlock!: number | null;
 }
 
 TxFilter.init(
@@ -45,6 +47,11 @@ TxFilter.init(
             type: DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: true,
+        },
+        activeFromBlock: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            defaultValue: null,
         },
     },
     {
