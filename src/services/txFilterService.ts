@@ -6,20 +6,63 @@ import {
     findAllTxFilters,
     updateTxFilter as persistTxFilter,
 } from '../repositories/txFilterRepository';
+import { findRuleForFilter, saveRuleForFilter } from '../repositories/txFilterRuleRepository';
+import { getNextFilterStartBlock } from './txFilterActivationService';
+import {
+    ActiveTxFilter,
+    TxFilterGroupRule,
+    validateTxFilterGroup,
+} from './txFilterEvaluatorService';
+
+function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
+    const conditions = [];
+    if (txFilter.from) conditions.push({ field: 'from', operator: 'eq', value: txFilter.from });
+    if (txFilter.to) conditions.push({ field: 'to', operator: 'eq', value: txFilter.to });
+    return conditions.length ? { logic: 'AND', conditions, groups: [] } : null;
+}
 
 export function createTxFilterService() {
-    const txFilters = new Map<number, TxFilter>();
+    const txFilters = new Map<number, ActiveTxFilter>();
 
     async function loadTxFilters() {
-        const activeTxFilters = await findActiveTxFilters();
+        const activeFilters = await findActiveTxFilters();
+        const next = new Map<number, ActiveTxFilter>();
+        for (const filter of activeFilters) {
+            const rule = (await findRuleForFilter(filter.id)) ?? legacyRule(filter);
+            if (!rule) continue;
+            if (filter.activeFromBlock === null || filter.activeFromBlock === undefined) {
+                const startBlock = await getNextFilterStartBlock();
+                filter.activeFromBlock = startBlock;
+                await filter.save();
+            }
+            next.set(filter.id, {
+                id: filter.id,
+                isActive: filter.isActive,
+                activeFromBlock: filter.activeFromBlock,
+                rule,
+            });
+        }
         txFilters.clear();
-        activeTxFilters.forEach((txFilter) => txFilters.set(txFilter.id, txFilter));
+        for (const [id, filter] of next) txFilters.set(id, filter);
         console.log(`[Scanner] Loaded ${txFilters.size} active tx filter(s)`);
     }
 
-    function syncTxFilter(txFilter: TxFilter) {
-        if (txFilter.isActive) txFilters.set(txFilter.id, txFilter);
-        else txFilters.delete(txFilter.id);
+    async function refreshFilter(filter: TxFilter | null) {
+        if (!filter || !filter.isActive) {
+            if (filter) txFilters.delete(filter.id);
+            return;
+        }
+        const rule = (await findRuleForFilter(filter.id)) ?? legacyRule(filter);
+        if (!rule) {
+            txFilters.delete(filter.id);
+            return;
+        }
+        txFilters.set(filter.id, {
+            id: filter.id,
+            isActive: filter.isActive,
+            activeFromBlock: filter.activeFromBlock,
+            rule,
+        });
     }
 
     async function getAllTxFilters() {
@@ -28,13 +71,23 @@ export function createTxFilterService() {
 
     async function createTxFilter(data: {
         description: string;
-        from: string | null;
-        to: string | null;
+        from?: string | null;
+        to?: string | null;
         isActive: boolean;
+        rule?: TxFilterGroupRule;
     }) {
-        const txFilter = await insertTxFilter(data);
-        syncTxFilter(txFilter);
-        return txFilter;
+        if (data.rule) validateTxFilterGroup(data.rule);
+        const activeFromBlock = data.isActive ? await getNextFilterStartBlock() : null;
+        const filter = await insertTxFilter({
+            description: data.description,
+            from: data.from ?? null,
+            to: data.to ?? null,
+            isActive: data.isActive,
+            activeFromBlock,
+        });
+        if (data.rule) await saveRuleForFilter(filter.id, data.rule);
+        await refreshFilter(filter);
+        return filter;
     }
 
     async function updateTxFilter(
@@ -44,17 +97,41 @@ export function createTxFilterService() {
             from?: string | null;
             to?: string | null;
             isActive?: boolean;
+            rule?: TxFilterGroupRule;
         },
     ) {
-        const txFilter = await persistTxFilter(id, updates);
-        if (txFilter) syncTxFilter(txFilter);
-        return txFilter;
+        if (updates.rule) validateTxFilterGroup(updates.rule);
+        const existing = await findAllTxFilters();
+        const current = existing.find((item) => item.id === id);
+        if (!current) return null;
+
+        const activatingOrChangingRule =
+            updates.isActive === true ||
+            updates.rule !== undefined ||
+            updates.from !== undefined ||
+            updates.to !== undefined;
+        const activeFromBlock =
+            updates.isActive === false
+                ? null
+                : activatingOrChangingRule && (updates.isActive ?? current.isActive)
+                  ? await getNextFilterStartBlock()
+                  : current.activeFromBlock;
+
+        const filter = await persistTxFilter(id, {
+            ...(updates.description !== undefined ? { description: updates.description } : {}),
+            ...(updates.from !== undefined ? { from: updates.from } : {}),
+            ...(updates.to !== undefined ? { to: updates.to } : {}),
+            ...(updates.isActive !== undefined ? { isActive: updates.isActive } : {}),
+            ...(activeFromBlock !== undefined ? { activeFromBlock } : {}),
+        });
+        if (updates.rule !== undefined) await saveRuleForFilter(id, updates.rule);
+        await refreshFilter(filter);
+        return filter;
     }
 
     async function removeTxFilter(id: number) {
-        const deleted = await deleteTxFilterById(id);
-        if (deleted > 0) txFilters.delete(id);
-        return deleted;
+        txFilters.delete(id);
+        return deleteTxFilterById(id);
     }
 
     return {
@@ -70,8 +147,6 @@ export function createTxFilterService() {
 let txFilterServiceInstance: ReturnType<typeof createTxFilterService> | undefined;
 
 export function getTxFilterService() {
-    if (!txFilterServiceInstance) {
-        txFilterServiceInstance = createTxFilterService();
-    }
+    if (!txFilterServiceInstance) txFilterServiceInstance = createTxFilterService();
     return txFilterServiceInstance;
 }
