@@ -66,7 +66,11 @@ export function createTxFilterService() {
     }
 
     async function getAllTxFilters() {
-        return findAllTxFilters();
+        const filters = await findAllTxFilters();
+        return Promise.all(filters.map(async (filter) => ({
+            ...filter.toJSON(),
+            rule: (await findRuleForFilter(filter.id)) ?? legacyRule(filter),
+        })));
     }
 
     async function createTxFilter(data: {
@@ -87,7 +91,7 @@ export function createTxFilterService() {
         });
         if (data.rule) await saveRuleForFilter(filter.id, data.rule);
         await refreshFilter(filter);
-        return filter;
+        return { ...filter.toJSON(), rule: data.rule ?? legacyRule(filter) };
     }
 
     async function updateTxFilter(
@@ -97,7 +101,7 @@ export function createTxFilterService() {
             from?: string | null;
             to?: string | null;
             isActive?: boolean;
-            rule?: TxFilterGroupRule;
+            rule?: TxFilterGroupRule | null;
         },
     ) {
         if (updates.rule) validateTxFilterGroup(updates.rule);
@@ -126,7 +130,7 @@ export function createTxFilterService() {
         });
         if (updates.rule !== undefined) await saveRuleForFilter(id, updates.rule);
         await refreshFilter(filter);
-        return filter;
+        return filter ? { ...filter.toJSON(), rule: updates.rule !== undefined ? updates.rule : (await findRuleForFilter(filter.id)) ?? legacyRule(filter) } : null;
     }
 
     async function removeTxFilter(id: number) {
