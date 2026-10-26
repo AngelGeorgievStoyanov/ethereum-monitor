@@ -14,6 +14,7 @@ export interface ProcessedBlockMetrics {
     erc20FailedAttemptsSeen: number;
     erc20FailedAttemptsMatched: number;
     fetchDurationMs: number;
+    fetchAttempts: number;
     blockDurationMs: number;
     nativeDatabaseWriteDurationMs: number;
     erc20DatabaseWriteDurationMs: number;
@@ -53,21 +54,6 @@ export async function processBlock(
         block.timestamp,
     );
 
-    const blockDurationMs = Date.now() - blockStartedAt;
-    const databaseWriteDurationMs =
-        native.databaseWriteDurationMs + erc20.databaseWriteDurationMs;
-
-    console.log(
-        `[Scanner] Block ${blockNumber} processed: tx=${transactions.length}, ` +
-            `native seen=${native.transfersSeen}, native matches=${native.transfersMatched}, ` +
-            `ERC-20 logs=${erc20.transferLogsSeen}, ERC-20 matches=${erc20.transfersMatched}, ` +
-            `ERC-20 failed attempts=${erc20.failedAttemptsSeen}, ` +
-            `failed matches=${erc20.failedAttemptsMatched}, ` +
-            `fetch=${fetchDurationMs}ms, db writes=${databaseWriteDurationMs}ms, ` +
-            `total=${blockDurationMs}ms` +
-            (attempt > 1 ? `, fetch attempts=${attempt}` : ''),
-    );
-
     return {
         transactionCount: transactions.length,
         nativeTransfersSeen: native.transfersSeen,
@@ -77,7 +63,8 @@ export async function processBlock(
         erc20FailedAttemptsSeen: erc20.failedAttemptsSeen,
         erc20FailedAttemptsMatched: erc20.failedAttemptsMatched,
         fetchDurationMs,
-        blockDurationMs,
+        fetchAttempts: attempt,
+        blockDurationMs: Date.now() - blockStartedAt,
         nativeDatabaseWriteDurationMs: native.databaseWriteDurationMs,
         erc20DatabaseWriteDurationMs: erc20.databaseWriteDurationMs,
     };
