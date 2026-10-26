@@ -83,13 +83,23 @@ export function evaluateTxFilterOperator(
         return false;
     }
 
-    const left = actual as number | bigint;
-    const right = expected as number | bigint;
-    switch (operator) {
-        case 'gt': return left > right;
-        case 'gte': return left >= right;
-        case 'lt': return left < right;
-        case 'lte': return left <= right;
-        default: return false;
+    if (typeof actual === 'bigint' && typeof expected === 'bigint') {
+        switch (operator) {
+            case 'gt': return actual > expected;
+            case 'gte': return actual >= expected;
+            case 'lt': return actual < expected;
+            case 'lte': return actual <= expected;
+            default: return false;
+        }
     }
+    if (typeof actual === 'number' && typeof expected === 'number') {
+        switch (operator) {
+            case 'gt': return actual > expected;
+            case 'gte': return actual >= expected;
+            case 'lt': return actual < expected;
+            case 'lte': return actual <= expected;
+            default: return false;
+        }
+    }
+    return false;
 }
