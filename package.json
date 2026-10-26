@@ -7,7 +7,7 @@
         "build": "npm run clean && tsc",
         "typecheck": "tsc --noEmit",
         "start": "node build/index.js",
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "test": "npm run build && node --test",
         "dev": "nodemon",
         "clean": "node -e \"require('node:fs').rmSync('build', { recursive: true, force: true })\"",
         "lint": "eslint .",
