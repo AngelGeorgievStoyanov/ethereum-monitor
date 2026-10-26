@@ -33,6 +33,33 @@ export function createBlockMonitorService() {
         }
 
         let needsStateReload = false;
+        let processingFinalizedBlocks = false;
+        let lastObservedCheckpoint = state.lastProcessedBlock;
+        let lastProgressAt = Date.now();
+        let lastStallWarningAt = 0;
+
+        const stallWatchdog = setInterval(() => {
+            if (!processingFinalizedBlocks) return;
+
+            if (state.lastProcessedBlock !== lastObservedCheckpoint) {
+                lastObservedCheckpoint = state.lastProcessedBlock;
+                lastProgressAt = Date.now();
+                lastStallWarningAt = 0;
+                return;
+            }
+
+            const now = Date.now();
+            const noProgressMs = now - lastProgressAt;
+            const warningIntervalMs = 60_000;
+            if (noProgressMs >= warningIntervalMs &&
+                (lastStallWarningAt === 0 || now - lastStallWarningAt >= warningIntervalMs)) {
+                console.warn(
+                    `[Scanner] No checkpoint progress for ${Math.round(noProgressMs / 1000)}s; ` +
+                        `checkpoint=${state.lastProcessedBlock}. Block processing may be stalled.`,
+                );
+                lastStallWarningAt = now;
+            }
+        }, 15_000);
         let waitingForFilters = txFilterService.getTxFilters().length === 0;
         let waitingForPause = false;
         if (waitingForFilters) {
@@ -100,9 +127,19 @@ export function createBlockMonitorService() {
                         waitingForFilters = false;
                     }
 
-                    await processFinalizedBlocks(state, finalized.number, () =>
-                        txFilterService.getTxFilters(),
-                    );
+                    processingFinalizedBlocks = state.lastProcessedBlock < finalized.number;
+                    if (processingFinalizedBlocks) {
+                        lastObservedCheckpoint = state.lastProcessedBlock;
+                        lastProgressAt = Date.now();
+                        lastStallWarningAt = 0;
+                    }
+                    try {
+                        await processFinalizedBlocks(state, finalized.number, () =>
+                            txFilterService.getTxFilters(),
+                        );
+                    } finally {
+                        processingFinalizedBlocks = false;
+                    }
                 }
             } catch (error) {
                 console.error(
