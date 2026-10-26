@@ -35,6 +35,7 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
                     ? latestFinalizedBlock - lastProcessedBlock
                     : null,
             rpcAvailable,
+            rpcMetrics: ethereumProvider.getMetrics(),
             checkedAt: new Date().toISOString(),
         });
     } catch (error) {
