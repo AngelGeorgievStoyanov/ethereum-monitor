@@ -28,7 +28,7 @@ TxFilterCondition.init(
         groupId: { type: DataTypes.INTEGER, allowNull: false },
         field: { type: DataTypes.STRING(80), allowNull: false },
         operator: { type: DataTypes.STRING(20), allowNull: false },
-        value: { type: DataTypes.JSONB, allowNull: false },
+        value: { type: DataTypes.JSONB, allowNull: true },
     },
     { sequelize, tableName: 'TxFilterConditions', modelName: 'TxFilterCondition', timestamps: true },
 );
