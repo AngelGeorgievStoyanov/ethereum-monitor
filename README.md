@@ -44,8 +44,10 @@ The API listens on port `8000`.
 
 - Processes finalized blocks in order and stores a checkpoint in the database to resume after a restart.
 - Monitors native ETH transfers and ERC-20 `Transfer` events, including recognized failed attempts.
-- Stores each transfer once in `Transactions` and records filter matches in `TxMatches`.
-- Does not advance the checkpoint when block processing fails.
+- Collects matching transfers for a block and persists them with bulk database writes inside one database transaction.
+- Uses database uniqueness constraints and duplicate-safe inserts so a block can be replayed after a checkpoint update failure.
+- Advances the checkpoint only after the block's transfer and filter-match writes complete successfully.
+- Reports block processing speed, fetch and database-write durations, finalized-block lag, and per-RPC-endpoint attempt and failure metrics.
 
 ## Transfer uniqueness
 
@@ -61,7 +63,9 @@ The API listens on port `8000`.
 - `DELETE /api/tx-filters/:id` — delete a filter.
 - `GET /api/transactions?page=1&limit=20` — list transfers with pagination.
 - `DELETE /api/transactions/:id` — delete a transfer.
-- `GET /api/scanner/status` — get scanner status.
+- `GET /api/scanner/status` — get the last processed block, latest finalized block, block lag, RPC availability, and per-endpoint RPC metrics.
+- `GET /api/health/live` — process liveness check.
+- `GET /api/health/ready` — readiness check; returns HTTP 503 when PostgreSQL or the Ethereum RPC is unavailable.
 - `POST /api/scanner/pause` and `POST /api/scanner/resume` — pause and resume scanning.
 
 ## Configuration
