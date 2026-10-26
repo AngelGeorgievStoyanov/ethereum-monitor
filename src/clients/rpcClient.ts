@@ -58,6 +58,7 @@ export function createRpcClient() {
     }
 
     return {
+        execute,
         getBlock(blockTag: string | number, includeTransactions = false) {
             return execute(`getBlock(${String(blockTag)})`, (provider) =>
                 provider.getBlock(blockTag, includeTransactions),
