@@ -124,6 +124,20 @@ Transaction.init(
         tableName: 'Transactions',
         modelName: 'Transaction',
         timestamps: true,
+        indexes: [
+            {
+                name: 'transactions_native_identity_unique',
+                unique: true,
+                fields: ['txHash', 'transferType'],
+                where: { transferType: 'native' },
+            },
+            {
+                name: 'transactions_erc20_identity_unique',
+                unique: true,
+                fields: ['txHash', 'transferType', 'logIndex'],
+                where: { transferType: 'erc20' },
+            },
+        ],
     },
 );
 
