@@ -25,6 +25,14 @@ export function createRpcClient() {
     const endpoints = env.rpcUrls.map((url, index) => ({
         index: index + 1,
         provider: new JsonRpcProvider(url),
+        metrics: {
+            attempts: 0,
+            successes: 0,
+            failures: 0,
+            retryableFailures: 0,
+            totalDurationMs: 0,
+            lastFailureAt: null as string | null,
+        },
     }));
     let nextEndpointIndex = 0;
 
@@ -38,11 +46,21 @@ export function createRpcClient() {
             const endpoint = endpoints[nextEndpointIndex];
             nextEndpointIndex = (nextEndpointIndex + 1) % endpoints.length;
 
+            const startedAt = Date.now();
+            endpoint.metrics.attempts += 1;
+
             try {
-                return await operation(endpoint.provider);
+                const result = await operation(endpoint.provider);
+                endpoint.metrics.successes += 1;
+                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+                return result;
             } catch (error) {
+                endpoint.metrics.failures += 1;
+                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+                endpoint.metrics.lastFailureAt = new Date().toISOString();
                 lastError = error;
                 if (!isRetryableEndpointError(error)) throw error;
+                endpoint.metrics.retryableFailures += 1;
 
                 console.warn(
                     `[RPC] Endpoint ${endpoint.index} failed temporarily during ${operationName}; ` +
@@ -68,6 +86,11 @@ export function createRpcClient() {
             return execute(method, (provider) => provider.send(method, params));
         },
         getEndpointCount: () => endpoints.length,
+        getMetrics: () =>
+            endpoints.map(({ index, metrics }) => ({
+                index,
+                ...metrics,
+            })),
     };
 }
 
