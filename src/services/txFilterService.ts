@@ -145,6 +145,7 @@ export function createTxFilterService() {
         if (updates.rule) validateTxFilterGroup(updates.rule);
         const current = await findTxFilterById(id);
         if (!current) return null;
+        const existingRule = updates.rule === undefined ? await findRuleForFilter(id) : null;
         if (
             updates.rule === null &&
             !current.from &&
@@ -185,7 +186,7 @@ export function createTxFilterService() {
         const rule =
             updates.rule !== undefined
                 ? updates.rule ?? legacyRule(filter)
-                : (await findRuleForFilter(filter.id)) ?? legacyRule(filter);
+                : existingRule ?? legacyRule(filter);
         const result = { ...filter.toJSON(), rule };
         if (!(await reloadTxFiltersWithRetry())) throw new TxFilterSyncError(result);
         return result;
