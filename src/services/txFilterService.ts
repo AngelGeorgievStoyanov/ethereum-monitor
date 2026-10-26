@@ -35,12 +35,15 @@ export function createTxFilterService() {
         const activeFilters = await findActiveTxFilters();
         const rulesByFilterId = await findRulesForFilters(activeFilters.map((filter) => filter.id));
         const next = new Map<number, ActiveTxFilter>();
+        let missingFiltersStartBlock: number | undefined;
         for (const filter of activeFilters) {
             const rule = rulesByFilterId.get(filter.id) ?? legacyRule(filter);
             if (!rule) continue;
             if (filter.activeFromBlock === null || filter.activeFromBlock === undefined) {
-                const startBlock = await getNextFilterStartBlock();
-                filter.activeFromBlock = startBlock;
+                if (missingFiltersStartBlock === undefined) {
+                    missingFiltersStartBlock = await getNextFilterStartBlock();
+                }
+                filter.activeFromBlock = missingFiltersStartBlock;
                 await filter.save();
             }
             next.set(filter.id, {
