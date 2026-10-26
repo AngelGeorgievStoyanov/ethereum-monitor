@@ -15,8 +15,54 @@ interface ConnectionManager {
 
 let lockConnection: PgConnection | undefined;
 
+async function clearLockConnection(): Promise<void> {
+    const connection = lockConnection;
+    lockConnection = undefined;
+
+    if (!connection) return;
+
+    const connectionManager = sequelize.connectionManager as unknown as ConnectionManager;
+
+    try {
+        await connectionManager.releaseConnection(connection);
+    } catch {
+        // The connection may already have been terminated by the database or pool.
+    }
+}
+
+export async function isScannerLockHeld(): Promise<boolean> {
+    if (!lockConnection) return false;
+
+    try {
+        const result = await lockConnection.query(
+            `SELECT EXISTS (
+                SELECT 1
+                FROM pg_locks
+                WHERE locktype = 'advisory'
+                  AND pid = pg_backend_pid()
+                  AND classid = 0::oid
+                  AND objid = $1::oid
+                  AND objsubid = 1
+                  AND granted
+            ) AS locked`,
+            [SCANNER_ADVISORY_LOCK_KEY],
+        );
+
+        if (result.rows?.[0]?.locked === true) return true;
+
+        await clearLockConnection();
+        return false;
+    } catch (error) {
+        console.warn(
+            `[Scanner] Advisory lock connection check failed; lock must be reacquired: ${String(error)}`,
+        );
+        await clearLockConnection();
+        return false;
+    }
+}
+
 export async function tryAcquireScannerLock(): Promise<boolean> {
-    if (lockConnection) return true;
+    if (await isScannerLockHeld()) return true;
 
     const connectionManager = sequelize.connectionManager as unknown as ConnectionManager;
     const connection = await connectionManager.getConnection({
