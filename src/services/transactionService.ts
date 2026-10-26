@@ -1,5 +1,6 @@
 import { TransactionResponse } from 'ethers';
 import TxFilter from '../models/txFilter';
+import { TransactionCreationAttributes } from '../models/transaction';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import {
     createTxMatches,
@@ -7,7 +8,6 @@ import {
     findAllTransactions,
     findOrCreateTransfer,
 } from '../repositories/transactionRepository';
-import { TransactionCreationAttributes } from '../models/transaction';
 
 export interface TransferMetadata {
     transferType: 'native' | 'erc20';
@@ -37,7 +37,6 @@ export async function createTransactionFromEthereumData(
         transferType: transfer.transferType,
         tokenAddress: transfer.tokenAddress ?? null,
         logIndex: transfer.logIndex,
-        internalCount: 1,
         status: Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed',
         transactionType: tx.type?.toString(),
         timestamp: new Date(blockTimestamp * 1000),

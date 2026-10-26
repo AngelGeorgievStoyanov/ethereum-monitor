@@ -16,7 +16,7 @@ interface TransactionAttributes {
     from: string;
     to?: string | null;
     value: string;
-    internalCount: number;
+    internalCount: number | null;
     status?: string;
     transactionType?: string;
     timestamp?: Date;
@@ -43,7 +43,7 @@ class Transaction
     public from!: string;
     public to?: string | null;
     public value!: string;
-    public internalCount!: number;
+    public internalCount!: number | null;
     public status?: string;
     public transactionType?: string;
     public timestamp?: Date;
@@ -103,8 +103,8 @@ Transaction.init(
         },
         internalCount: {
             type: DataTypes.INTEGER,
-            allowNull: false,
-            defaultValue: 1,
+            allowNull: true,
+            defaultValue: null,
         },
         status: {
             type: DataTypes.STRING,
