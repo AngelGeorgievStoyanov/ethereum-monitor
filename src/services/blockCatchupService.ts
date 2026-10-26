@@ -72,9 +72,7 @@ export async function catchUpToFinalizedBlock(
 
     const durationMs = Date.now() - catchupStartedAt;
     const blocksPerSecond =
-        durationMs > 0
-            ? ((processedBlocks * 1000) / durationMs).toFixed(2)
-            : 'n/a';
+        durationMs > 0 ? ((processedBlocks * 1000) / durationMs).toFixed(2) : 'n/a';
     const averageFetchDurationMs = (totalFetchDurationMs / processedBlocks).toFixed(1);
     const averageBlockDurationMs = (totalBlockDurationMs / processedBlocks).toFixed(1);
     const totalDatabaseWriteDurationMs =
