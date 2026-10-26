@@ -116,7 +116,8 @@ To rescan from an earlier block, set `RESCAN_FROM_BLOCK` to the desired block nu
 
 ### Transactions
 
-- `GET /api/transactions`: retrieve stored transfers, including their filter matches.
+- `GET /api/transactions?page=1&limit=20`: retrieve a page of stored transfers, including their filter matches. Both parameters are optional; defaults are `page=1` and `limit=20`. `limit` must be between 1 and 100. Results are ordered by block number, transaction index, and ID, descending.
+- The response contains `items` and `pagination` (`page`, `limit`, `total`, `totalPages`).
 - `DELETE /api/transactions/:id`: delete a transfer by its integer ID.
 
 Bulk deletion and query-based deletion endpoints are not exposed. The raw SQL query endpoint has been removed.

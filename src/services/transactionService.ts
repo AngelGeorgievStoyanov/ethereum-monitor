@@ -4,7 +4,7 @@ import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import {
     createTxMatches,
     deleteTransactionById,
-    findAllTransactions,
+    findTransactionsPage,
     findOrCreateTransfer,
 } from '../repositories/transactionRepository';
 import {
@@ -31,8 +31,8 @@ export async function createTransactionFromEthereumData(
     return transaction;
 }
 
-export function listStoredTransactions() {
-    return findAllTransactions();
+export function listStoredTransactions(page: number, limit: number) {
+    return findTransactionsPage(page, limit);
 }
 
 export function deleteStoredTransaction(id: number) {

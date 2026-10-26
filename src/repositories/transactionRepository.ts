@@ -58,8 +58,8 @@ export async function createTxMatches(txId: number, txFilterIds: number[]) {
     );
 }
 
-export function findAllTransactions() {
-    return Transaction.findAll({
+export async function findTransactionsPage(page: number, limit: number) {
+    const result = await Transaction.findAndCountAll({
         include: [
             {
                 model: TxMatch,
@@ -67,7 +67,25 @@ export function findAllTransactions() {
                 include: [{ model: TxFilter, as: 'txFilter' }],
             },
         ],
+        distinct: true,
+        order: [
+            ['blockNumber', 'DESC'],
+            ['transactionIndex', 'DESC'],
+            ['id', 'DESC'],
+        ],
+        limit,
+        offset: (page - 1) * limit,
     });
+
+    return {
+        items: result.rows,
+        pagination: {
+            page,
+            limit,
+            total: result.count,
+            totalPages: Math.ceil(result.count / limit),
+        },
+    };
 }
 
 export function deleteTransactionById(id: number) {

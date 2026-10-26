@@ -3,9 +3,36 @@ import { deleteStoredTransaction, listStoredTransactions } from '../services/tra
 import { sendHttpError } from '../utils/httpError';
 import { parsePositiveId } from '../utils/parsePositiveId';
 
-export async function getAllStoredTransactions(_req: Request, res: Response): Promise<void> {
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
+
+function parsePositiveQueryInteger(value: unknown): number | undefined {
+    if (typeof value !== 'string' || !/^\d+$/.test(value)) return undefined;
+
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export async function getAllStoredTransactions(req: Request, res: Response): Promise<void> {
+    const page =
+        req.query.page === undefined
+            ? DEFAULT_PAGE
+            : parsePositiveQueryInteger(req.query.page);
+    const limit =
+        req.query.limit === undefined
+            ? DEFAULT_LIMIT
+            : parsePositiveQueryInteger(req.query.limit);
+
+    if (page === undefined || limit === undefined || limit > MAX_LIMIT) {
+        res.status(400).json({
+            message: 'Invalid pagination parameters. page must be a positive integer and limit must be between 1 and 100.',
+        });
+        return;
+    }
+
     try {
-        res.json(await listStoredTransactions());
+        res.json(await listStoredTransactions(page, limit));
     } catch (error) {
         sendHttpError(res, 'Error fetching transactions', error);
     }
