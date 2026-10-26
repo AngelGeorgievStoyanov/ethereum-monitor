@@ -2,9 +2,9 @@ import { ethers, TransactionResponse } from 'ethers';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { ERC20_TRANSFER_TOPIC } from '../constants/erc20-transfer.constants';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
-import { createTransactionFromEthereumData } from './transactionService';
 import { matchesTxFilter } from '../utils/matchesTxFilter';
 import { mapTransactionFilterContext } from '../mappers/transactionContextMapper';
+import type { TransferBatchCandidate } from './transactionService';
 
 const ERC20_INTERFACE = new ethers.Interface([
     'function transfer(address to, uint256 value)',
@@ -61,7 +61,7 @@ export async function processErc20Transfers(
     let transfersMatched = 0;
     let failedAttemptsSeen = 0;
     let failedAttemptsMatched = 0;
-    let databaseWriteDurationMs = 0;
+    const candidates: TransferBatchCandidate[] = [];
 
     for (const receipt of receipts) {
         const txHash = receipt.transactionHash.toLowerCase();
@@ -100,15 +100,13 @@ export async function processErc20Transfers(
             );
             if (matchingTxFilters.length === 0) continue;
 
-            const startedAt = Date.now();
-            await createTransactionFromEthereumData(
+            candidates.push({
                 tx,
                 receipt,
                 blockTimestamp,
                 transfer,
                 matchingTxFilters,
-            );
-            databaseWriteDurationMs += Date.now() - startedAt;
+            });
             failedAttemptsMatched += 1;
             continue;
         }
@@ -149,15 +147,13 @@ export async function processErc20Transfers(
             );
             if (matchingTxFilters.length === 0) continue;
 
-            const startedAt = Date.now();
-            await createTransactionFromEthereumData(
+            candidates.push({
                 tx,
                 receipt,
                 blockTimestamp,
                 transfer,
                 matchingTxFilters,
-            );
-            databaseWriteDurationMs += Date.now() - startedAt;
+            });
             transfersMatched += 1;
         }
     }
@@ -167,6 +163,6 @@ export async function processErc20Transfers(
         transfersMatched,
         failedAttemptsSeen,
         failedAttemptsMatched,
-        databaseWriteDurationMs,
+        candidates,
     };
 }
