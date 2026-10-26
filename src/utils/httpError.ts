@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { ValidationError } from './validationError';
 
 export class HttpError extends Error {
     constructor(
@@ -20,11 +21,11 @@ export function sendHttpError(res: Response, message: string, error: unknown): v
         return;
     }
 
-    const details = error instanceof Error ? error.message : String(error);
-    const isValidationError =
-        /unsupported|requires|invalid|must have|must contain|must be|only supported|every filter group|at least one condition/i.test(
-            details,
-        );
+    if (error instanceof ValidationError) {
+        res.status(400).json({ message: error.message });
+        return;
+    }
 
-    res.status(isValidationError ? 400 : 500).json({ message, details });
+    const details = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ message, details });
 }
