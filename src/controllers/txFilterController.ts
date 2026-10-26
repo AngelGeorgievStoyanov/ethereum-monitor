@@ -8,28 +8,40 @@ function parseId(value: string): number | undefined {
     return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 }
 
+function sendError(res: Response, message: string, error: unknown) {
+    const details = error instanceof Error ? error.message : String(error);
+    const status = /unsupported|requires|invalid|must have|must contain|only supported|every filter group/i.test(details)
+        ? 400
+        : 500;
+    res.status(status).json({ message, details });
+}
+
 export const getTxFilters = async (_req: Request, res: Response) => {
     try {
         res.json(await txFilterService.getAllTxFilters());
-    } catch {
-        res.status(500).json({ message: 'Error retrieving transaction filters' });
+    } catch (error) {
+        sendError(res, 'Error retrieving transaction filters', error);
     }
 };
 
 export const createTxFilter = async (req: Request, res: Response) => {
-    const { description, from, to, isActive } = req.body;
+    const { description, from, to, isActive, rule } = req.body ?? {};
+    if (typeof description !== 'string' || description.trim().length === 0) {
+        res.status(400).json({ message: 'A filter description is required' });
+        return;
+    }
 
     try {
         const txFilter = await txFilterService.createTxFilter({
-            description,
+            description: description.trim(),
             from: from || null,
             to: to || null,
             isActive: isActive ?? true,
+            ...(rule !== undefined ? { rule } : {}),
         });
-
         res.status(201).json(txFilter);
-    } catch {
-        res.status(500).json({ message: 'Error creating transaction filter' });
+    } catch (error) {
+        sendError(res, 'Error creating transaction filter', error);
     }
 };
 
@@ -40,24 +52,28 @@ export const updateTxFilter = async (req: Request<{ id: string }>, res: Response
         return;
     }
 
-    const { description, from, to, isActive } = req.body;
+    const { description, from, to, isActive, rule } = req.body ?? {};
+    if (description !== undefined && (typeof description !== 'string' || description.trim().length === 0)) {
+        res.status(400).json({ message: 'Filter description must be a non-empty string' });
+        return;
+    }
 
     try {
         const txFilter = await txFilterService.updateTxFilter(id, {
-            ...(description !== undefined ? { description } : {}),
+            ...(description !== undefined ? { description: description.trim() } : {}),
             ...(from !== undefined ? { from: from || null } : {}),
             ...(to !== undefined ? { to: to || null } : {}),
             ...(isActive !== undefined ? { isActive } : {}),
+            ...(rule !== undefined ? { rule } : {}),
         });
 
         if (!txFilter) {
             res.status(404).json({ message: 'Transaction filter not found' });
             return;
         }
-
         res.json(txFilter);
-    } catch {
-        res.status(500).json({ message: 'Error updating transaction filter' });
+    } catch (error) {
+        sendError(res, 'Error updating transaction filter', error);
     }
 };
 
@@ -74,9 +90,8 @@ export const deleteTxFilter = async (req: Request<{ id: string }>, res: Response
             res.status(404).json({ message: 'Transaction filter not found' });
             return;
         }
-
         res.json({ message: 'Transaction filter deleted' });
-    } catch {
-        res.status(500).json({ message: 'Error deleting transaction filter' });
+    } catch (error) {
+        sendError(res, 'Error deleting transaction filter', error);
     }
 };
