@@ -28,7 +28,9 @@ export async function catchUpToFinalizedBlock(
 
         try {
             const metrics = await processBlock(blockNumber, activeTxFilters);
+            const checkpointStartedAt = Date.now();
             await updateScannerCheckpoint(state.id, blockNumber);
+            const blockDurationMs = metrics.blockDurationMs + Date.now() - checkpointStartedAt;
             state.lastProcessedBlock = blockNumber;
 
             const databaseWriteDurationMs =
@@ -40,7 +42,7 @@ export async function catchUpToFinalizedBlock(
                     `ERC-20 failed attempts=${metrics.erc20FailedAttemptsSeen}, ` +
                     `failed matches=${metrics.erc20FailedAttemptsMatched}, ` +
                     `fetch=${metrics.fetchDurationMs}ms, db writes=${databaseWriteDurationMs}ms, ` +
-                    `total=${metrics.blockDurationMs}ms, checkpoint=${state.lastProcessedBlock}` +
+                    `total=${blockDurationMs}ms, checkpoint=${state.lastProcessedBlock}` +
                     (metrics.fetchAttempts > 1 ? `, fetch attempts=${metrics.fetchAttempts}` : ''),
             );
 
@@ -51,7 +53,7 @@ export async function catchUpToFinalizedBlock(
             totalErc20FailedAttemptsSeen += metrics.erc20FailedAttemptsSeen;
             totalErc20FailedAttemptsMatched += metrics.erc20FailedAttemptsMatched;
             totalFetchDurationMs += metrics.fetchDurationMs;
-            totalBlockDurationMs += metrics.blockDurationMs;
+            totalBlockDurationMs += blockDurationMs;
             totalNativeDatabaseWriteDurationMs += metrics.nativeDatabaseWriteDurationMs;
             totalErc20DatabaseWriteDurationMs += metrics.erc20DatabaseWriteDurationMs;
             processedBlocks += 1;
