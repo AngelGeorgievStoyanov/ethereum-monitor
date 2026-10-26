@@ -1,3 +1,4 @@
+import sequelize from '../database';
 import TxFilter from '../models/txFilter';
 import {
     createTxFilter as insertTxFilter,
@@ -87,14 +88,18 @@ export function createTxFilterService() {
         }
         if (data.rule) validateTxFilterGroup(data.rule);
         const activeFromBlock = data.isActive ? await getNextFilterStartBlock() : null;
-        const filter = await insertTxFilter({
-            description: data.description,
-            from: data.from ?? null,
-            to: data.to ?? null,
-            isActive: data.isActive,
-            activeFromBlock,
+        const filter = await sequelize.transaction(async (transaction) => {
+            const createdFilter = await insertTxFilter({
+                description: data.description,
+                from: data.from ?? null,
+                to: data.to ?? null,
+                isActive: data.isActive,
+                activeFromBlock,
+            }, transaction);
+            if (data.rule) await saveRuleForFilter(createdFilter.id, data.rule, transaction);
+            return createdFilter;
         });
-        if (data.rule) await saveRuleForFilter(filter.id, data.rule);
+
         await refreshFilter(filter);
         return { ...filter.toJSON(), rule: data.rule ?? legacyRule(filter) };
     }
@@ -135,27 +140,36 @@ export function createTxFilterService() {
                   ? await getNextFilterStartBlock()
                   : current.activeFromBlock;
 
-        const filter = await persistTxFilter(id, {
-            ...(updates.description !== undefined ? { description: updates.description } : {}),
-            ...(updates.from !== undefined ? { from: updates.from } : {}),
-            ...(updates.to !== undefined ? { to: updates.to } : {}),
-            ...(updates.isActive !== undefined ? { isActive: updates.isActive } : {}),
-            ...(activeFromBlock !== undefined ? { activeFromBlock } : {}),
+        const filter = await sequelize.transaction(async (transaction) => {
+            const updatedFilter = await persistTxFilter(id, {
+                ...(updates.description !== undefined ? { description: updates.description } : {}),
+                ...(updates.from !== undefined ? { from: updates.from } : {}),
+                ...(updates.to !== undefined ? { to: updates.to } : {}),
+                ...(updates.isActive !== undefined ? { isActive: updates.isActive } : {}),
+                ...(activeFromBlock !== undefined ? { activeFromBlock } : {}),
+            }, transaction);
+            if (updates.rule !== undefined) {
+                await saveRuleForFilter(id, updates.rule, transaction);
+            }
+            return updatedFilter;
         });
-        if (updates.rule !== undefined) await saveRuleForFilter(id, updates.rule);
+
         await refreshFilter(filter);
         if (!filter) return null;
         const rule =
             updates.rule !== undefined
-                ? updates.rule
+                ? updates.rule ?? legacyRule(filter)
                 : (await findRuleForFilter(filter.id)) ?? legacyRule(filter);
         return { ...filter.toJSON(), rule };
     }
 
     async function removeTxFilter(id: number) {
-        txFilters.delete(id);
-        await saveRuleForFilter(id, null);
-        return deleteTxFilterById(id);
+        const deleted = await sequelize.transaction(async (transaction) => {
+            await saveRuleForFilter(id, null, transaction);
+            return deleteTxFilterById(id, transaction);
+        });
+        if (deleted > 0) txFilters.delete(id);
+        return deleted;
     }
 
     return {
