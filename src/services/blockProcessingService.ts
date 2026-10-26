@@ -34,6 +34,7 @@ export async function processBlock(
     }
 
     const transactionsByHash = new Map<string, TransactionResponse>();
+
     for (const tx of transactions) {
         transactionsByHash.set(tx.hash.toLowerCase(), tx);
     }
