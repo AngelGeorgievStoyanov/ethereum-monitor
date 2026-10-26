@@ -39,7 +39,7 @@ export async function processFinalizedBlocks(
         const expectedCheckpoint = state.lastProcessedBlock;
 
         try {
-            const preparedBlocks = await Promise.all(
+            const settledBlocks = await Promise.allSettled(
                 blockNumbers.map(async (blockNumber) => {
                     try {
                         return {
@@ -53,6 +53,14 @@ export async function processFinalizedBlocks(
                     }
                 }),
             );
+            const failedBlock = settledBlocks.find((result) => result.status === 'rejected');
+            if (failedBlock?.status === 'rejected') {
+                throw failedBlock.reason;
+            }
+            const preparedBlocks = settledBlocks.map((result) => {
+                if (result.status === 'rejected') throw result.reason;
+                return result.value;
+            });
 
             const candidates = preparedBlocks.flatMap(({ result }) => result.candidates);
             if (!(await isScannerLockHeld())) {
