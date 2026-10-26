@@ -7,6 +7,7 @@ import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
 import { catchUpToFinalizedBlock } from './blockCatchupService';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
+import { isScannerPausePendingOrActive } from './scannerControlService';
 
 export function createBlockMonitorService() {
     const txFilterService = getTxFilterService();
@@ -48,12 +49,14 @@ export function createBlockMonitorService() {
                     waitingForFilters = true;
                 } else {
                     if (waitingForFilters) {
-                        if (state.lastProcessedBlock < finalized.number) {
+                        if (!isScannerPausePendingOrActive() && state.lastProcessedBlock < finalized.number) {
                             await updateScannerCheckpoint(state.id, finalized.number);
                             state.lastProcessedBlock = finalized.number;
                         }
                         console.log(
-                            `[Scanner] Active filters detected; starting after finalized block ${state.lastProcessedBlock}`,
+                            isScannerPausePendingOrActive()
+                                ? `[Scanner] Active filters detected while paused; preserving checkpoint ${state.lastProcessedBlock}`
+                                : `[Scanner] Active filters detected; starting after finalized block ${state.lastProcessedBlock}`,
                         );
                         waitingForFilters = false;
                     }
