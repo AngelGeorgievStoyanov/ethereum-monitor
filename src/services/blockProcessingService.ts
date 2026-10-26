@@ -1,6 +1,6 @@
 import { TransactionResponse } from 'ethers';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
-import TxFilter from '../models/txFilter';
+import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { fetchBlockData } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
@@ -22,7 +22,7 @@ export interface ProcessedBlockMetrics {
 
 export async function processBlock(
     blockNumber: number,
-    activeTxFilters: TxFilter[],
+    activeTxFilters: ActiveTxFilter[],
 ): Promise<ProcessedBlockMetrics> {
     const blockStartedAt = Date.now();
     const {
