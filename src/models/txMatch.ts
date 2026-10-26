@@ -4,10 +4,11 @@ import sequelize from '../database';
 interface TxMatchAttributes {
     id: number;
     txId: number;
-    txFilterId: number;
+    txFilterId: number | null;
+    txFilterDescription: string | null;
 }
 
-type TxMatchCreationAttributes = Optional<TxMatchAttributes, 'id'>;
+type TxMatchCreationAttributes = Optional<TxMatchAttributes, 'id' | 'txFilterDescription'>;
 
 class TxMatch
     extends Model<TxMatchAttributes, TxMatchCreationAttributes>
@@ -15,7 +16,8 @@ class TxMatch
 {
     public id!: number;
     public txId!: number;
-    public txFilterId!: number;
+    public txFilterId!: number | null;
+    public txFilterDescription!: string | null;
 }
 
 TxMatch.init(
@@ -33,9 +35,13 @@ TxMatch.init(
         },
         txFilterId: {
             type: DataTypes.INTEGER,
-            allowNull: false,
+            allowNull: true,
             references: { model: 'TxFilters', key: 'id' },
-            onDelete: 'CASCADE',
+            onDelete: 'SET NULL',
+        },
+        txFilterDescription: {
+            type: DataTypes.STRING,
+            allowNull: true,
         },
     },
     {
