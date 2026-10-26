@@ -44,18 +44,21 @@ function makeFilter() {
     };
 }
 
-test('does not classify a failed ETH transaction as a native transfer', async () => {
+test('preserves a failed ETH transfer attempt and its receipt status', async () => {
+    const receipt = makeReceipt('0x0');
     const result = await processNativeTransfers(
         [makeTransaction()],
-        new Map([[txHash, makeReceipt('0x0')]]),
+        new Map([[txHash, receipt]]),
         [makeFilter()],
         16,
         1_700_000_000,
     );
 
-    assert.equal(result.transfersSeen, 0);
-    assert.equal(result.transfersMatched, 0);
-    assert.equal(result.candidates.length, 0);
+    assert.equal(result.transfersSeen, 1);
+    assert.equal(result.transfersMatched, 1);
+    assert.equal(result.candidates.length, 1);
+    assert.equal(result.candidates[0].receipt.status, '0x0');
+    assert.equal(result.candidates[0].transfer.value, '100');
 });
 
 test('collects a successful matching ETH transfer for batch persistence', async () => {
@@ -70,5 +73,6 @@ test('collects a successful matching ETH transfer for batch persistence', async 
     assert.equal(result.transfersSeen, 1);
     assert.equal(result.transfersMatched, 1);
     assert.equal(result.candidates.length, 1);
+    assert.equal(result.candidates[0].receipt.status, '0x1');
     assert.equal(result.candidates[0].transfer.value, '100');
 });
