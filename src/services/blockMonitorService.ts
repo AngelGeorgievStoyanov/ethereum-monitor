@@ -1,5 +1,5 @@
 import ScannerState from '../models/scannerState';
-import { SCANNER_ID, SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
+import { SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
 import { ethereumProvider } from './ethereumRpcService';
 import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
