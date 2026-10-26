@@ -54,6 +54,14 @@ export function validateTxFilterGroup(group: TxFilterGroupRule): void {
         throw new Error('Every filter group must contain at least one condition or subgroup');
     }
     for (const condition of group.conditions) {
+        if (
+            !condition ||
+            typeof condition.field !== 'string' ||
+            typeof condition.operator !== 'string' ||
+            condition.value === undefined
+        ) {
+            throw new Error('Every filter condition requires a field, operator, and value');
+        }
         evaluateTxFilterOperator(condition.field, condition.operator, null, condition.value);
     }
     for (const child of group.groups) validateTxFilterGroup(child);
