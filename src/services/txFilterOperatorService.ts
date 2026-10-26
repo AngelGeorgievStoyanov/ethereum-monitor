@@ -19,24 +19,30 @@ function normalize(value: unknown, type: string, caseInsensitive: boolean): unkn
     if (value === null || value === undefined) return value;
     if (type === 'bigint') {
         if (typeof value !== 'string' && typeof value !== 'bigint') {
-            throw new Error('Big integer filter values must be strings or integers');
+            throw new Error('Big integer filter values must be exact integer strings');
         }
         const stringValue = String(value);
         if (!/^-?\d+$/.test(stringValue)) throw new Error('Invalid integer filter value');
         return BigInt(stringValue);
     }
     if (type === 'number') {
+        if (typeof value !== 'number' && typeof value !== 'string') {
+            throw new Error('Numeric filter values must be numbers');
+        }
         const numberValue = Number(value);
         if (!Number.isFinite(numberValue)) throw new Error('Invalid numeric filter value');
         return numberValue;
     }
     if (type === 'date') {
-        const dateValue = new Date(String(value)).getTime();
+        if (!(value instanceof Date) && typeof value !== 'string' && typeof value !== 'number') {
+            throw new Error('Date filter values must be dates, strings, or timestamps');
+        }
+        const dateValue = (value instanceof Date ? value : new Date(value)).getTime();
         if (!Number.isFinite(dateValue)) throw new Error('Invalid date filter value');
         return dateValue;
     }
-    const stringValue = String(value);
-    return caseInsensitive ? stringValue.toLowerCase() : stringValue;
+    if (typeof value !== 'string') throw new Error('String filter values must be strings');
+    return caseInsensitive ? value.toLowerCase() : value;
 }
 
 export function validateTxFilterOperator(field: string, operator: string, value: unknown): void {
