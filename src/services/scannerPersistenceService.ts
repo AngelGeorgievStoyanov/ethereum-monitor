@@ -68,6 +68,7 @@ export interface ReorgRecoveryProgress {
     active: boolean;
     stableBlocks: number;
     startBlock: number | null;
+    targetBlock: number | null;
 }
 
 export async function persistProcessedBlockBatch(
@@ -130,6 +131,7 @@ export async function persistProcessedBlockBatch(
             state.reorgRecoveryActive = recoveryProgress.active;
             state.reorgRecoveryStableBlocks = recoveryProgress.stableBlocks;
             state.reorgRecoveryStartBlock = recoveryProgress.startBlock;
+            state.reorgRecoveryTargetBlock = recoveryProgress.targetBlock;
         }
         await state.save({ transaction });
 

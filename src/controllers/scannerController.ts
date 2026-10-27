@@ -166,6 +166,7 @@ export const retryBlockedReorgRecovery = async (_req: Request, res: Response): P
             reorgRecoveryActive: state.reorgRecoveryActive,
             reorgRecoveryBlocked: state.reorgRecoveryBlocked,
             reorgRecoveryStartBlock: state.reorgRecoveryStartBlock,
+            reorgRecoveryTargetBlock: state.reorgRecoveryTargetBlock,
         });
     } catch (error) {
         sendHttpError(res, 'Unable to retry reorg recovery', error);
