@@ -1,9 +1,7 @@
 import express from 'express';
-import { Op } from 'sequelize';
 import './models/associations';
 import './models/block';
 import './models/scannerRescanJob';
-import ScannerRescanJob from './models/scannerRescanJob';
 import sequelize from './database';
 import httpRouter from './httpRouter';
 import { HTTP_HOST, HTTP_PORT } from './constants/http.constants';
@@ -48,14 +46,6 @@ async function startScannerWithRetry() {
 
 async function startServer() {
     await sequelize.sync();
-    await ScannerRescanJob.update(
-        {
-            status: 'INTERRUPTED',
-            error: 'Process restarted before the rescan operation completed',
-            completedAt: new Date(),
-        },
-        { where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } } },
-    );
     console.log('Database connected');
 
     await txFilterService.loadTxFilters();
