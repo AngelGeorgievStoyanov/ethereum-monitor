@@ -1,7 +1,4 @@
 import { Op, Transaction as SequelizeTransaction } from 'sequelize';
-import { TransactionResponse } from 'ethers';
-import { ActiveTxFilter } from './txFilterEvaluatorService';
-import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import {
     createTransfersBatch,
     TransferBatchItem,
@@ -12,7 +9,7 @@ import ScannerState from '../models/scannerState';
 import Block from '../models/block';
 import Transaction from '../models/transaction';
 import { isScannerLockHeld } from './scannerLockService';
-import type { TransferBatchCandidate, TransferMetadata } from './transactionService';
+import type { TransferBatchCandidate } from './transactionService';
 
 function mapTransferBatchItems(candidates: readonly TransferBatchCandidate[]): TransferBatchItem[] {
     return candidates.map((candidate) => ({
