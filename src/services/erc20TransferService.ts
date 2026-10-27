@@ -56,6 +56,7 @@ export async function processErc20Transfers(
     txFilters: ActiveTxFilter[],
     blockNumber: number,
     blockTimestamp: number,
+    includeUnmatched = false,
 ) {
     let transferLogsSeen = 0;
     let transfersMatched = 0;
@@ -98,7 +99,7 @@ export async function processErc20Transfers(
             const matchingTxFilters = txFilters.filter((filter) =>
                 matchesTxFilter(context, filter, blockNumber),
             );
-            if (matchingTxFilters.length === 0) continue;
+            if (matchingTxFilters.length === 0 && !includeUnmatched) continue;
 
             candidates.push({
                 tx,
@@ -145,7 +146,7 @@ export async function processErc20Transfers(
             const matchingTxFilters = txFilters.filter((filter) =>
                 matchesTxFilter(context, filter, blockNumber),
             );
-            if (matchingTxFilters.length === 0) continue;
+            if (matchingTxFilters.length === 0 && !includeUnmatched) continue;
 
             candidates.push({
                 tx,

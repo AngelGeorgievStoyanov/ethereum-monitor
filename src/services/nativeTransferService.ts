@@ -11,6 +11,7 @@ export async function processNativeTransfers(
     txFilters: ActiveTxFilter[],
     blockNumber: number,
     blockTimestamp: number,
+    includeUnmatched = false,
 ) {
     let transfersSeen = 0;
     let transfersMatched = 0;
@@ -48,7 +49,7 @@ export async function processNativeTransfers(
         const matchingTxFilters = txFilters.filter((filter) =>
             matchesTxFilter(context, filter, blockNumber),
         );
-        if (matchingTxFilters.length === 0) continue;
+        if (matchingTxFilters.length === 0 && !includeUnmatched) continue;
 
         candidates.push({
             tx,

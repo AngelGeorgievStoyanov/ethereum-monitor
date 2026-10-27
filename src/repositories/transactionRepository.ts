@@ -24,6 +24,7 @@ function getTransferIdentity(data: {
 export async function createTransfersBatch(
     items: readonly TransferBatchItem[],
     transaction?: SequelizeTransaction,
+    reconcileMatches = false,
 ): Promise<void> {
     if (items.length === 0) return;
 
@@ -53,7 +54,7 @@ export async function createTransfersBatch(
         const filterIds = [
             ...new Set(items.flatMap((item) => item.matchingTxFilterIds)),
         ];
-        if (filterIds.length === 0) return;
+        if (filterIds.length === 0 && !reconcileMatches) return;
 
         const filters = await TxFilter.findAll({
             where: { id: { [Op.in]: filterIds } },
@@ -94,6 +95,35 @@ export async function createTransfersBatch(
                 ignoreDuplicates: true,
                 transaction: dbTransaction,
             });
+        }
+
+        if (reconcileMatches) {
+            const txIds = [...new Set([...transactionsByIdentity.values()].map((item) => item.id))];
+            const existingMatches = txIds.length === 0
+                ? []
+                : await TxMatch.findAll({
+                    where: { txId: { [Op.in]: txIds } },
+                    transaction: dbTransaction,
+                });
+            const matchingFilterIdsByTxId = new Map<number, Set<number>>();
+            for (const item of items) {
+                const storedTransaction = transactionsByIdentity.get(getTransferIdentity(item.data));
+                if (!storedTransaction) continue;
+                matchingFilterIdsByTxId.set(
+                    storedTransaction.id,
+                    new Set(item.matchingTxFilterIds.filter((id) => descriptionsById.has(id))),
+                );
+            }
+
+            for (const match of existingMatches) {
+                if (match.matchStatus === 'FILTER_DELETED' || match.txFilterId === null) continue;
+                const isMatching = matchingFilterIdsByTxId.get(match.txId)?.has(match.txFilterId) ?? false;
+                const description = isMatching ? descriptionsById.get(match.txFilterId) : undefined;
+                await match.update({
+                    matchStatus: isMatching ? 'ACTIVE' : 'NOT_MATCHED',
+                    ...(description !== undefined ? { txFilterDescription: description } : {}),
+                }, { transaction: dbTransaction });
+            }
         }
     };
 

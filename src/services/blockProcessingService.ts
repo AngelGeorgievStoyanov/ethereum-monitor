@@ -31,6 +31,7 @@ export interface PreparedBlockResult extends ProcessedBlockMetrics {
 export async function processBlock(
     blockNumber: number,
     activeTxFilters: ActiveTxFilter[],
+    includeUnmatched = false,
 ): Promise<PreparedBlockResult> {
     const blockStartedAt = Date.now();
     const {
@@ -64,6 +65,7 @@ export async function processBlock(
         activeTxFilters,
         blockNumber,
         block.timestamp,
+        includeUnmatched,
     );
     const erc20 = await processErc20Transfers(
         receipts,
@@ -71,6 +73,7 @@ export async function processBlock(
         activeTxFilters,
         blockNumber,
         block.timestamp,
+        includeUnmatched,
     );
     const filterMatchingDurationMs = Date.now() - filterMatchingStartedAt;
 
