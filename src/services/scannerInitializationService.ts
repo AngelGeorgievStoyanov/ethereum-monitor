@@ -11,18 +11,27 @@ export async function initializeScannerState(): Promise<ScannerState> {
     let state = await findScannerState(SCANNER_ID);
 
     if (!state) {
-        const startBlock = env.startBlock;
-        let initialBlock: number;
+        const finalized = await ethereumProvider.getBlock('finalized');
+        if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
-        if (
-            startBlock !== undefined &&
-            Number.isSafeInteger(startBlock) &&
-            startBlock >= 0
-        ) {
-            initialBlock = startBlock;
+        let initialBlock: number;
+        if (env.startBlock !== undefined) {
+            if (env.startBlock > finalized.number) {
+                throw new Error(
+                    `Unsafe scanner start: START_BLOCK ${env.startBlock} is above the latest finalized block ${finalized.number}`,
+                );
+            }
+
+            const requestedStartBlock = await ethereumProvider.getBlock(env.startBlock);
+            if (!requestedStartBlock || requestedStartBlock.number !== env.startBlock) {
+                throw new Error(
+                    `Unsafe scanner start: START_BLOCK ${env.startBlock} could not be verified by the RPC provider`,
+                );
+            }
+
+            initialBlock = env.startBlock;
         } else {
-            const finalized = await ethereumProvider.getBlock('finalized');
-            if (!finalized) throw new Error('Unable to resolve the latest finalized block');
+            // No explicit start block means begin after the current finalized checkpoint.
             initialBlock = finalized.number;
         }
 
