@@ -11,7 +11,11 @@ import Block from '../models/block';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { HttpError, sendHttpError } from '../utils/httpError';
 import { ethereumProvider } from '../services/ethereumRpcService';
-import { isScannerProcessingBlocks } from '../services/blockMonitorService';
+import {
+    isScannerProcessingBlocks,
+    releaseManualRescanReservation,
+    tryReserveManualRescan,
+} from '../services/blockMonitorService';
 import { getTxFilterService } from '../services/txFilterService';
 import { runManualRescan, RescanReorgDetectedError } from '../services/rescanService';
 import { getRecoveryMetrics, recordRescanFailure } from '../services/recoveryMetrics';
@@ -118,7 +122,10 @@ export const resumeScannerController = async (_req: Request, res: Response): Pro
 
 async function executeRescanJob(jobId: string, fromBlock: number, toBlock: number): Promise<void> {
     const job = await ScannerRescanJob.findByPk(jobId);
-    if (!job) return;
+    if (!job) {
+        releaseManualRescanReservation();
+        return;
+    }
 
     try {
         const state = await ScannerState.findByPk(SCANNER_ID);
@@ -166,11 +173,14 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
             completedAt: new Date(),
         });
         console.error(`[Rescan] Job ${jobId} failed: ${message}`);
+    } finally {
+        releaseManualRescanReservation();
     }
 }
 
 export const rescanScannerController = async (req: Request, res: Response): Promise<void> => {
     const fromBlock = req.body?.fromBlock;
+    let reservedForThisRequest = false;
     if (!Number.isSafeInteger(fromBlock) || fromBlock < 0) {
         res.status(400).json({ message: 'fromBlock must be a non-negative integer' });
         return;
@@ -234,6 +244,14 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             return;
         }
 
+        if (!tryReserveManualRescan()) {
+            res.status(409).json({
+                message: 'The scanner is processing blocks or another rescan is reserved. Retry when it is idle.',
+            });
+            return;
+        }
+        reservedForThisRequest = true;
+
         const operationId = randomUUID();
         await ScannerRescanJob.create({
             id: operationId,
@@ -248,8 +266,10 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
         });
 
         void executeRescanJob(operationId, fromBlock, state.lastProcessedBlock).catch((error) => {
+            releaseManualRescanReservation();
             console.error(`[Rescan] Job ${operationId} failed before its status could be updated: ${formatError(error)}`);
         });
+        reservedForThisRequest = false;
         res.status(202).json({
             message: 'Manual rescan started',
             operationId,
@@ -259,6 +279,7 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             statusUrl: `/api/scanner/rescan/${operationId}`,
         });
     } catch (error) {
+        if (reservedForThisRequest) releaseManualRescanReservation();
         sendHttpError(res, 'Unable to start manual rescan', error);
     }
 };
