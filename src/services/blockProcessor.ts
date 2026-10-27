@@ -199,6 +199,23 @@ export async function processFinalizedBlocks(
             console.error(
                 `[Scanner] Processing failed at block ${currentBatchStart}; checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
             );
+            if (error instanceof BlockReceiptConsistencyError || error instanceof BlockChainDiscontinuityError) {
+                recordReorgDetected();
+                try {
+                    await markReorgRecoveryPending(
+                        state,
+                        state.lastProcessedBlock,
+                        error.blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
+                    );
+                    console.warn(
+                        `[Reorg] Block/receipt consistency failure at block ${error.blockNumber}; recovery scheduled from checkpoint ${state.lastProcessedBlock}`,
+                    );
+                } catch (recoveryError) {
+                    console.error(
+                        `[Reorg] Failed to schedule recovery after consistency failure: ${formatError(recoveryError)}`,
+                    );
+                }
+            }
             return;
         }
     }
