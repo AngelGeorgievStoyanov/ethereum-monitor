@@ -1,5 +1,9 @@
 import sequelize from '../database';
+import Block from '../models/block';
+import ScannerState from '../models/scannerState';
 import TxFilter from '../models/txFilter';
+import { env } from '../config/env';
+import { SCANNER_ID } from '../constants/scanner.constants';
 import {
     createTxFilter as insertTxFilter,
     deleteTxFilterById,
@@ -107,6 +111,21 @@ export function createTxFilterService() {
         }));
     }
 
+    async function getInitialConfiguredStartBlock(): Promise<number | undefined> {
+        if (env.startBlock === undefined) return undefined;
+
+        const state = await ScannerState.findByPk(SCANNER_ID);
+        if (state && state.lastProcessedBlock !== env.startBlock - 1) return undefined;
+
+        const existingCanonicalBlock = await Block.findOne({
+            where: { status: 'CANONICAL' },
+            attributes: ['id'],
+        });
+        if (existingCanonicalBlock) return undefined;
+
+        return env.startBlock;
+    }
+
     async function createTxFilter(data: {
         description: string;
         from?: string | null;
@@ -118,7 +137,10 @@ export function createTxFilterService() {
             throw new ValidationError('A filter requires at least one condition');
         }
         if (data.rule) validateTxFilterGroup(data.rule);
-        const activeFromBlock = data.isActive ? await getNextFilterStartBlock() : null;
+        const initialStartBlock = data.isActive ? await getInitialConfiguredStartBlock() : undefined;
+        const activeFromBlock = data.isActive
+            ? (initialStartBlock ?? (await getNextFilterStartBlock()))
+            : null;
         const filter = await sequelize.transaction(async (transaction) => {
             const createdFilter = await insertTxFilter(
                 {
