@@ -6,7 +6,8 @@ import StoredTransaction from '../models/transaction';
 import TxMatch from '../models/txMatch';
 import ScannerState from '../models/scannerState';
 import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
-import { BlockVerificationUnavailableError, ConsensusUnavailableError } from './blockConsensusService';
+import { BlockVerificationUnavailableError } from '../errors/blockVerificationUnavailableError';
+import { ConsensusUnavailableError } from './blockConsensusService';
 import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcService';
 
@@ -201,8 +202,8 @@ async function processReorgRecoveryInternal(
             );
         }
 
-        // Cheaply check the checkpoint with the currently selected provider during normal scanning.
-        // Ask every configured provider for consensus only if that first read suggests a reorg.
+        // Cheaply check the checkpoint with the selected provider during normal scanning.
+        // If it disagrees, the verification service selects single-provider verification or strict consensus.
         const currentCheckpoint = await ethereumProvider.getBlock(state.lastProcessedBlock);
         if (!currentCheckpoint) throw new Error(`Unable to read checkpoint block ${state.lastProcessedBlock}`);
         const primaryMatches = sameBlock(storedCheckpoint, {
@@ -324,7 +325,7 @@ async function markVerificationRecoveryBlocked(
     }
     if (error instanceof ConsensusUnavailableError) recordReorgConsensusFailure();
     await sequelize.transaction(async (transaction) => {
-        if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before persisting consensus-blocked recovery state');
+        if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before persisting block-verification-blocked recovery state');
         const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
             lock: transaction.LOCK.UPDATE,
