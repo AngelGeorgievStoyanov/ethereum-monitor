@@ -7,6 +7,7 @@ import TxMatch from '../models/txMatch';
 import ScannerState from '../models/scannerState';
 import { processBlock } from './blockProcessingService';
 import { ConsensusUnavailableError, getBlockWithConsensus } from './blockConsensusService';
+import { ethereumProvider } from './ethereumRpcService';
 
 class ReorgRecoverySafetyError extends Error {
     constructor(message: string) {
@@ -30,7 +31,11 @@ function sameBlock(stored: Block, current: { blockHash: string; parentHash: stri
         stored.parentHash.toLowerCase() === current.parentHash.toLowerCase();
 }
 
-export async function markReorgRecoveryPending(state: ScannerState, checkpoint: number): Promise<void> {
+export async function markReorgRecoveryPending(
+    state: ScannerState,
+    checkpoint: number,
+    targetBlock = checkpoint + REORG_RECOVERY_STABLE_BLOCKS,
+): Promise<void> {
     if (!(await isScannerLockHeld())) throw new Error('Cannot mark reorg recovery pending without owning the scanner lock');
     await sequelize.transaction(async (transaction) => {
         if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before persisting reorg recovery state');
@@ -44,6 +49,7 @@ export async function markReorgRecoveryPending(state: ScannerState, checkpoint: 
         persistedState.reorgRecoveryBlockReason = null;
         persistedState.reorgRecoveryStableBlocks = 0;
         persistedState.reorgRecoveryStartBlock = checkpoint;
+        persistedState.reorgRecoveryTargetBlock = targetBlock;
         await persistedState.save({ transaction });
     });
     await state.reload();
@@ -180,8 +186,21 @@ async function processReorgRecoveryInternal(
             );
         }
 
-        const currentCheckpoint = await getBlockWithConsensus(state.lastProcessedBlock, 'reorg detection');
-        if (sameBlock(storedCheckpoint, currentCheckpoint)) return false;
+        // Cheaply check the checkpoint with the currently selected provider during normal scanning.
+        // Ask every configured provider for consensus only if that first read suggests a reorg.
+        const currentCheckpoint = await ethereumProvider.getBlock(state.lastProcessedBlock);
+        if (!currentCheckpoint) throw new Error(`Unable to read checkpoint block ${state.lastProcessedBlock}`);
+        const primaryMatches = sameBlock(storedCheckpoint, {
+            blockHash: currentCheckpoint.hash ?? '',
+            parentHash: currentCheckpoint.parentHash,
+        });
+        if (primaryMatches) return false;
+
+        const consensusCheckpoint = await getBlockWithConsensus(state.lastProcessedBlock, 'reorg detection');
+        if (sameBlock(storedCheckpoint, consensusCheckpoint)) {
+            console.warn(`[Reorg] Primary provider disagreed at checkpoint ${state.lastProcessedBlock}, but configured providers agree with stored history; continuing normal scan`);
+            return false;
+        }
 
         console.error(
             `[Reorg] Detected chain mismatch at block ${state.lastProcessedBlock}; storedHash=${storedCheckpoint.blockHash}; currentHash=${currentCheckpoint.blockHash}`,
@@ -212,7 +231,7 @@ async function processReorgRecoveryInternal(
         if (previousCanonicalBlock && consensusBlock.parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()) {
             console.warn(`[Reorg] Chain changed again during recovery at block ${blockNumber}; restarting ancestor search`);
             recordReorgDetected();
-            await markReorgRecoveryPending(state, state.lastProcessedBlock);
+            await markReorgRecoveryPending(state, state.lastProcessedBlock, blockNumber + REORG_RECOVERY_STABLE_BLOCKS);
             await findAncestorAndRollback(state);
             continue;
         }
@@ -226,8 +245,11 @@ async function processReorgRecoveryInternal(
             throw new Error(`Block data fetched for recovery block ${blockNumber} does not match provider consensus`);
         }
 
-        const stableBlocks = state.reorgRecoveryStableBlocks + 1;
-        const recoveryComplete = stableBlocks >= REORG_RECOVERY_STABLE_BLOCKS;
+        const recoveryTargetBlock = state.reorgRecoveryTargetBlock ?? (state.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS);
+        const stableBlocks = blockNumber > recoveryTargetBlock - REORG_RECOVERY_STABLE_BLOCKS
+            ? state.reorgRecoveryStableBlocks + 1
+            : 0;
+        const recoveryComplete = blockNumber >= recoveryTargetBlock;
         if (!(await isScannerLockHeld())) {
             console.warn(`[Reorg] Scanner lock lost before committing recovery block ${blockNumber}`);
             return true;
@@ -242,6 +264,7 @@ async function processReorgRecoveryInternal(
                 active: !recoveryComplete,
                 stableBlocks: recoveryComplete ? 0 : stableBlocks,
                 startBlock: null,
+                targetBlock: recoveryComplete ? null : recoveryTargetBlock,
             },
         );
         if (committedCheckpoint !== blockNumber) {
@@ -254,8 +277,9 @@ async function processReorgRecoveryInternal(
         state.reorgRecoveryActive = !recoveryComplete;
         state.reorgRecoveryStableBlocks = recoveryComplete ? 0 : stableBlocks;
         state.reorgRecoveryStartBlock = null;
+        state.reorgRecoveryTargetBlock = recoveryComplete ? null : recoveryTargetBlock;
         console.log(
-            `[Reorg] Recovery block ${blockNumber} committed with consensus; stable=${stableBlocks}/${REORG_RECOVERY_STABLE_BLOCKS}; checkpoint=${state.lastProcessedBlock}`,
+            `[Reorg] Recovery block ${blockNumber} committed with consensus; stable=${stableBlocks}/${REORG_RECOVERY_STABLE_BLOCKS}; target=${recoveryTargetBlock}; checkpoint=${state.lastProcessedBlock}`,
         );
         if (recoveryComplete) {
             recordReorgRecoveryCompleted();
@@ -284,6 +308,7 @@ async function markConsensusRecoveryBlocked(state: ScannerState, error: Consensu
         if (!persistedState.reorgRecoveryActive) {
             persistedState.reorgRecoveryActive = true;
             persistedState.reorgRecoveryStartBlock = persistedState.lastProcessedBlock;
+            persistedState.reorgRecoveryTargetBlock = persistedState.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS;
             persistedState.reorgRecoveryStableBlocks = 0;
         }
         persistedState.reorgRecoveryBlocked = true;
@@ -328,6 +353,9 @@ async function markRecoverySafetyBlocked(state: ScannerState, error: ReorgRecove
         persistedState.reorgRecoveryBlocked = true;
         if (persistedState.reorgRecoveryStartBlock === null) {
             persistedState.reorgRecoveryStartBlock = persistedState.lastProcessedBlock;
+        }
+        if (persistedState.reorgRecoveryTargetBlock === null) {
+            persistedState.reorgRecoveryTargetBlock = persistedState.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS;
         }
         persistedState.reorgRecoveryBlockReason = `SAFETY:${error.message}`.slice(0, 500);
         await persistedState.save({ transaction });

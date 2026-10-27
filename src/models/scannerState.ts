@@ -10,6 +10,7 @@ class ScannerState extends Model {
     public reorgRecoveryBlockReason!: string | null;
     public reorgRecoveryStableBlocks!: number;
     public reorgRecoveryStartBlock!: number | null;
+    public reorgRecoveryTargetBlock!: number | null;
 }
 
 ScannerState.init(
@@ -49,6 +50,11 @@ ScannerState.init(
         reorgRecoveryStartBlock: {
             type: DataTypes.INTEGER,
             allowNull: true,
+        },
+        reorgRecoveryTargetBlock: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            defaultValue: null,
         },
     },
     {
