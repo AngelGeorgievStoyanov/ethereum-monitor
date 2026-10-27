@@ -242,7 +242,7 @@ async function processReorgRecoveryInternal(
             prepared.block.blockHash.toLowerCase() !== consensusBlock.blockHash.toLowerCase() ||
             prepared.block.parentHash.toLowerCase() !== consensusBlock.parentHash.toLowerCase()
         ) {
-            throw new Error(`Block data fetched for recovery block ${blockNumber} does not match provider consensus`);
+            throw new ReorgRecoverySafetyError(`Block data fetched for recovery block ${blockNumber} does not match provider consensus`);
         }
 
         const recoveryTargetBlock = state.reorgRecoveryTargetBlock ?? (state.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS);
