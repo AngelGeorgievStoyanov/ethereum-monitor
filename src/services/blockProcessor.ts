@@ -91,14 +91,14 @@ export async function processFinalizedBlocks(
 ): Promise<void> {
     const catchupStartedAt = Date.now();
     const catchupStartBlock = state.lastProcessedBlock + 1;
-    if (shouldPauseBeforeBlock(catchupStartBlock, state.lastProcessedBlock)) return;
+    if (await shouldPauseBeforeBlock(catchupStartBlock, state.lastProcessedBlock)) return;
 
     const totals = createBlockProcessingTotals();
     let currentBatchStart: number | undefined;
 
     while (state.lastProcessedBlock < finalizedBlockNumber) {
         currentBatchStart = state.lastProcessedBlock + 1;
-        if (shouldPauseBeforeBlock(currentBatchStart, state.lastProcessedBlock)) return;
+        if (await shouldPauseBeforeBlock(currentBatchStart, state.lastProcessedBlock)) return;
         const activeTxFilters = getActiveTxFilters();
         if (activeTxFilters.length === 0) return;
 
