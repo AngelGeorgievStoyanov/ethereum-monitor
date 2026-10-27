@@ -28,7 +28,7 @@ The scanner saves its checkpoint in PostgreSQL and resumes from it after a resta
 - An existing checkpoint takes priority over `START_BLOCK`.
 - On a new database, without `START_BLOCK`, scanning starts after the current finalized block.
 - On a new database, with `START_BLOCK`, the value must be a non-negative safe integer at or below the current finalized block, and the RPC provider must return that block.
-- Filters normally become active from the next finalized block. They do not automatically match older blocks just because `START_BLOCK` is set.
+- With `START_BLOCK`, the first active filter created before any block history exists starts at that block, allowing the initial scan to find matching transfers. After block history exists, new filters start from the next finalized block and do not backfill automatically.
 - With no active filters, the scanner waits without advancing the checkpoint.
 
 ## Block processing and recovery
