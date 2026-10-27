@@ -32,6 +32,9 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
         res.json({
             ...getScannerControlState(),
             lastProcessedBlock,
+            reorgRecoveryActive: checkpoint?.reorgRecoveryActive ?? false,
+            reorgRecoveryStableBlocks: checkpoint?.reorgRecoveryStableBlocks ?? 0,
+            reorgRecoveryStartBlock: checkpoint?.reorgRecoveryStartBlock ?? null,
             latestFinalizedBlock,
             lagBlocks:
                 lastProcessedBlock !== null && latestFinalizedBlock !== null
