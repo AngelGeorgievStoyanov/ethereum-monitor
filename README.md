@@ -66,7 +66,7 @@ The API listens on port `8000`.
 - `DELETE /api/tx-filters/:id` — delete a filter.
 - `GET /api/transactions?page=1&limit=20` — list transfers with pagination.
 - `DELETE /api/transactions/:id` — delete a transfer.
-- `GET /api/scanner/status` — get the last processed block, latest finalized block, block lag, RPC availability, reorg-recovery state, and per-endpoint RPC metrics.
+- `GET /api/scanner/status` — get the last processed block, latest finalized block, block lag, RPC availability, reorg-recovery state, recovery counters/durations, and per-endpoint RPC metrics. Recovery metrics are in-memory and reset when the process restarts.
 - `GET /api/health/live` — process liveness check.
 - `GET /api/health/ready` — readiness check; returns HTTP 503 when PostgreSQL or the Ethereum RPC is unavailable.
 - `POST /api/scanner/pause` and `POST /api/scanner/resume` — pause and resume scanning.
