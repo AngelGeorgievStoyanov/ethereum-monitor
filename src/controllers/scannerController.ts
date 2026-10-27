@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
+import { Op } from 'sequelize';
 import {
     getScannerControlState,
     requestScannerPause,
@@ -200,7 +201,9 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             return;
         }
 
-        const activeJob = await ScannerRescanJob.findOne({ where: { status: 'RUNNING' } });
+        const activeJob = await ScannerRescanJob.findOne({
+            where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } },
+        });
         if (activeJob) {
             res.status(409).json({ message: 'A rescan job is already running.', operationId: activeJob.id });
             return;
