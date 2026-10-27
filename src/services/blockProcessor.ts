@@ -7,7 +7,7 @@ import {
 } from '../constants/scanner.constants';
 import { shouldPauseBeforeBlock } from './scannerControlService';
 import { formatError } from '../utils/formatError';
-import { processBlock } from './blockProcessingService';
+import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
 import { BlockReceiptConsistencyError } from './ethereumRpcService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { recordReorgDetected } from './recoveryMetrics';
@@ -113,10 +113,32 @@ export async function processFinalizedBlocks(
 
         try {
             const previousConfirmedBlock = await getConfirmedCheckpointBlock(expectedCheckpoint);
-            const settledBlocks = await Promise.allSettled(
+            const fetchedSettledBlocks = await Promise.allSettled(
                 blockNumbers.map(async (blockNumber) => ({
                     blockNumber,
-                    result: await processBlock(blockNumber, activeTxFilters, false),
+                    fetched: await fetchBlockForProcessing(blockNumber),
+                })),
+            );
+            const failedFetch = fetchedSettledBlocks.find((result) => result.status === 'rejected');
+            if (failedFetch?.status === 'rejected') {
+                throw failedFetch.reason;
+            }
+            const fetchedBlocks = fetchedSettledBlocks.map((result) => {
+                if (result.status === 'rejected') throw result.reason;
+                return result.value;
+            });
+
+            const fetchedBlockRecords = fetchedBlocks.map(({ fetched }) => ({
+                blockNumber: fetched.block.number,
+                blockHash: fetched.block.hash,
+                parentHash: fetched.block.parentHash,
+            }));
+            validateBatchConnectivity(previousConfirmedBlock, fetchedBlockRecords, blockNumbers);
+
+            const settledBlocks = await Promise.allSettled(
+                fetchedBlocks.map(async ({ blockNumber, fetched }) => ({
+                    blockNumber,
+                    result: await processFetchedBlock(fetched, activeTxFilters, false),
                 })),
             );
             const failedBlock = settledBlocks.find((result) => result.status === 'rejected');
@@ -129,8 +151,6 @@ export async function processFinalizedBlocks(
             });
 
             const processedBlockRecords = preparedBlocks.map(({ result }) => result.block);
-            validateBatchConnectivity(previousConfirmedBlock, processedBlockRecords, blockNumbers);
-
             const candidates = preparedBlocks.flatMap(({ result }) => result.candidates);
             if (!(await isScannerLockHeld())) {
                 console.warn(

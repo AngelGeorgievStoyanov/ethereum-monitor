@@ -28,8 +28,37 @@ export interface PreparedBlockResult extends ProcessedBlockMetrics {
     candidates: TransferBatchCandidate[];
 }
 
-export async function processBlock(
-    blockNumber: number,
+type ValidatedEthereumBlock = Awaited<ReturnType<typeof fetchBlockData>>['block'] & {
+    hash: string;
+    parentHash: string;
+};
+
+export interface FetchedBlockForProcessing {
+    block: ValidatedEthereumBlock;
+    receipts: RpcTransactionReceipt[];
+    fetchDurationMs: number;
+    getBlockDurationMs: number;
+    getBlockReceiptsDurationMs: number;
+    attempt: number;
+}
+
+export async function fetchBlockForProcessing(blockNumber: number): Promise<FetchedBlockForProcessing> {
+    const fetched = await fetchBlockData(blockNumber);
+    if (!fetched.block.hash || !fetched.block.parentHash) {
+        throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
+    }
+    return {
+        block: fetched.block as ValidatedEthereumBlock,
+        receipts: fetched.receipts,
+        fetchDurationMs: fetched.durationMs,
+        getBlockDurationMs: fetched.getBlockDurationMs,
+        getBlockReceiptsDurationMs: fetched.getBlockReceiptsDurationMs,
+        attempt: fetched.attempt,
+    };
+}
+
+export async function processFetchedBlock(
+    fetched: FetchedBlockForProcessing,
     activeTxFilters: ActiveTxFilter[],
     includeUnmatched = false,
 ): Promise<PreparedBlockResult> {
@@ -37,14 +66,12 @@ export async function processBlock(
     const {
         block,
         receipts,
-        durationMs: fetchDurationMs,
+        fetchDurationMs,
         getBlockDurationMs,
         getBlockReceiptsDurationMs,
         attempt,
-    } = await fetchBlockData(blockNumber);
-    if (!block.hash || !block.parentHash) {
-        throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
-    }
+    } = fetched;
+    const blockNumber = block.number;
     const transactions = block.prefetchedTransactions;
     const receiptsByHash = new Map<string, RpcTransactionReceipt>();
 
@@ -95,4 +122,13 @@ export async function processBlock(
         databaseWriteDurationMs: 0,
         candidates: [...native.candidates, ...erc20.candidates],
     };
+}
+
+export async function processBlock(
+    blockNumber: number,
+    activeTxFilters: ActiveTxFilter[],
+    includeUnmatched = false,
+): Promise<PreparedBlockResult> {
+    const fetched = await fetchBlockForProcessing(blockNumber);
+    return processFetchedBlock(fetched, activeTxFilters, includeUnmatched);
 }

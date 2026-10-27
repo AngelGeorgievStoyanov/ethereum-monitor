@@ -5,7 +5,7 @@ import Block from '../models/block';
 import StoredTransaction from '../models/transaction';
 import TxMatch from '../models/txMatch';
 import ScannerState from '../models/scannerState';
-import { processBlock } from './blockProcessingService';
+import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
 import { ConsensusUnavailableError, getBlockWithConsensus } from './blockConsensusService';
 import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcService';
 
@@ -239,14 +239,15 @@ async function processReorgRecoveryInternal(
             continue;
         }
 
-        const prepared = await processBlock(blockNumber, filters, true);
+        const fetched = await fetchBlockForProcessing(blockNumber);
         if (
-            prepared.block.blockNumber !== consensusBlock.blockNumber ||
-            prepared.block.blockHash.toLowerCase() !== consensusBlock.blockHash.toLowerCase() ||
-            prepared.block.parentHash.toLowerCase() !== consensusBlock.parentHash.toLowerCase()
+            fetched.block.number !== consensusBlock.blockNumber ||
+            fetched.block.hash.toLowerCase() !== consensusBlock.blockHash.toLowerCase() ||
+            fetched.block.parentHash.toLowerCase() !== consensusBlock.parentHash.toLowerCase()
         ) {
             throw new ReorgRecoverySafetyError(`Block data fetched for recovery block ${blockNumber} does not match provider consensus`);
         }
+        const prepared = await processFetchedBlock(fetched, filters, true);
 
         const recoveryTargetBlock = state.reorgRecoveryTargetBlock ?? (state.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS);
         const stableBlocks = blockNumber > recoveryTargetBlock - REORG_RECOVERY_STABLE_BLOCKS
