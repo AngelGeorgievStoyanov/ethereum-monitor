@@ -51,8 +51,11 @@ The API listens on port `8000`.
 
 ## Transfer uniqueness
 
-- **Native ETH:** unique by `txHash + transferType`.
-- **ERC-20:** unique by `txHash + transferType + logIndex`, because a transaction can contain multiple token transfers.
+- **Native ETH:** unique by `txHash + transferType + blockHash`, preserving a transfer if the same transaction appears on a replacement block.
+- **ERC-20:** unique by `txHash + transferType + logIndex + blockHash`, because a transaction can contain multiple token transfers and a reorg can place it in a different block.
+- Block versions are stored in `Blocks`; replaced versions can be marked `REORGED`.
+- `Transactions.chainStatus` preserves the receipt result, while `Transactions.recordStatus` represents whether the transfer belongs to the canonical chain.
+- `TxMatches.matchStatus` represents the current match state, including deleted filters and reorged transfers.
 - **Internal transfers:** are not processed by this service and have no unique index. A transaction can contain distinct trace records with identical data. Processing them is planned for a separate microservice.
 
 ## API

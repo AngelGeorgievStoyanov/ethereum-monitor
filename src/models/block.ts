@@ -1,4 +1,4 @@
-import { DataTypes, Model } from 'sequelize';
+import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../database';
 
 export type BlockStatus = 'CANONICAL' | 'REORGED';
@@ -11,7 +11,9 @@ interface BlockAttributes {
     status: BlockStatus;
 }
 
-class Block extends Model<BlockAttributes> implements BlockAttributes {
+type BlockCreationAttributes = Optional<BlockAttributes, 'id' | 'status'>;
+
+class Block extends Model<BlockAttributes, BlockCreationAttributes> implements BlockAttributes {
     public id!: number;
     public blockNumber!: number;
     public blockHash!: string;
@@ -34,7 +36,12 @@ Block.init(
         timestamps: true,
         indexes: [
             { name: 'blocks_block_hash_unique', unique: true, fields: ['blockHash'] },
-            { name: 'blocks_canonical_height_unique', unique: true, fields: ['blockNumber'], where: { status: 'CANONICAL' } },
+            {
+                name: 'blocks_canonical_height_unique',
+                unique: true,
+                fields: ['blockNumber'],
+                where: { status: 'CANONICAL' },
+            },
             { name: 'blocks_number_status_index', fields: ['blockNumber', 'status'] },
         ],
     },
