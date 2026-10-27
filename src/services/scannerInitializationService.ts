@@ -23,7 +23,12 @@ export async function initializeScannerState(): Promise<ScannerState> {
             }
 
             const requestedStartBlock = await ethereumProvider.getBlock(env.startBlock);
-            if (!requestedStartBlock || requestedStartBlock.number !== env.startBlock) {
+            if (
+                !requestedStartBlock ||
+                requestedStartBlock.number !== env.startBlock ||
+                !requestedStartBlock.hash ||
+                !requestedStartBlock.parentHash
+            ) {
                 throw new Error(
                     `Unsafe scanner start: START_BLOCK ${env.startBlock} could not be verified by the RPC provider`,
                 );
