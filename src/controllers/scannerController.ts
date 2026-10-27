@@ -112,8 +112,9 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
         return;
     }
 
-    if (!getScannerControlState().paused) {
-        res.status(409).json({ message: 'Pause the scanner before starting a manual rescan.' });
+    const scannerControl = getScannerControlState();
+    if (!scannerControl.paused || scannerControl.mode !== 'manual') {
+        res.status(409).json({ message: 'Pause the scanner with mode="manual" before starting a rescan; temporary pauses may expire during the operation.' });
         return;
     }
     if (isScannerProcessingBlocks()) {
