@@ -145,6 +145,9 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
             );
         }
 
+        if (persistedState.reorgRecoveryTargetBlock === null) {
+            persistedState.reorgRecoveryTargetBlock = originalCheckpoint + REORG_RECOVERY_STABLE_BLOCKS;
+        }
         persistedState.lastProcessedBlock = ancestor!.blockNumber;
         persistedState.reorgRecoveryActive = true;
         persistedState.reorgRecoveryStableBlocks = 0;
