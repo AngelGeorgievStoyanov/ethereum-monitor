@@ -9,7 +9,7 @@ import { SCANNER_ID } from '../constants/scanner.constants';
 import { HttpError, sendHttpError } from '../utils/httpError';
 import { ethereumProvider } from '../services/ethereumRpcService';
 import { isScannerProcessingBlocks } from '../services/blockMonitorService';
-import { getScannerControlState } from '../services/scannerControlService';
+import { getTxFilterService } from '../services/txFilterService';
 import { runManualRescan, RescanReorgDetectedError } from '../services/rescanService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
@@ -124,8 +124,7 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             return;
         }
         const result = await runManualRescan(fromBlock, state, () =>
-            // Use the same current filter set as the normal scanner.
-            require('../services/txFilterService').getTxFilterService().getTxFilters(),
+            getTxFilterService().getTxFilters(),
         );
         res.json({ message: 'Manual rescan completed', ...result });
     } catch (error) {

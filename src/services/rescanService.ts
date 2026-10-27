@@ -14,7 +14,7 @@ export class RescanReorgDetectedError extends Error {
 }
 
 function matchesBlock(
-    stored: Block,
+    stored: { blockNumber: number; blockHash: string; parentHash: string },
     current: { blockNumber: number; blockHash: string; parentHash: string },
 ): boolean {
     return stored.blockNumber === current.blockNumber &&
@@ -66,7 +66,7 @@ export async function runManualRescan(
         }
 
         const prepared = await processBlock(blockNumber, getActiveTxFilters(), true);
-        if (!matchesBlock(storedBlock, prepared.block) || !matchesBlock(consensusBlock as Block, prepared.block)) {
+        if (!matchesBlock(storedBlock, prepared.block) || !matchesBlock(consensusBlock, prepared.block)) {
             await markReorgRecoveryPending(state, checkpoint);
             throw new RescanReorgDetectedError(
                 `Fetched block data changed or disagreed with consensus at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}.`,

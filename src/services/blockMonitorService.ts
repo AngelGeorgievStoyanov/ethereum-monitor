@@ -10,7 +10,6 @@ import { updateScannerCheckpoint } from '../repositories/scannerStateRepository'
 import { getScannerControlState, isScannerPausePendingOrActive } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
-import { getScannerControlState } from './scannerControlService';
 
 let processingFinalizedBlocks = false;
 
