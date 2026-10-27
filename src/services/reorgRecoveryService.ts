@@ -174,7 +174,7 @@ export async function processReorgRecovery(
         });
         if (previousCanonicalBlock && consensusBlock.parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()) {
             console.warn(`[Reorg] Chain changed again during recovery at block ${blockNumber}; restarting ancestor search`);
-            await setRecoveryPending(state, state.lastProcessedBlock);
+            await markReorgRecoveryPending(state, state.lastProcessedBlock);
             await findAncestorAndRollback(state);
             continue;
         }
