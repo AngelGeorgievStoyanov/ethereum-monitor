@@ -17,6 +17,7 @@ import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
 
 let processingFinalizedBlocks = false;
+let manualRescanReserved = false;
 
 async function markInterruptedRescanJobs(): Promise<void> {
     const [count] = await ScannerRescanJob.update(
@@ -34,6 +35,16 @@ async function markInterruptedRescanJobs(): Promise<void> {
 
 export function isScannerProcessingBlocks(): boolean {
     return processingFinalizedBlocks;
+}
+
+export function tryReserveManualRescan(): boolean {
+    if (processingFinalizedBlocks || manualRescanReserved) return false;
+    manualRescanReserved = true;
+    return true;
+}
+
+export function releaseManualRescanReservation(): void {
+    manualRescanReserved = false;
 }
 
 export function createBlockMonitorService() {
@@ -194,6 +205,11 @@ export function createBlockMonitorService() {
                         );
                     }
 
+                    // Reserve and block normal processing atomically with respect to the rescan endpoint.
+                    if (manualRescanReserved) {
+                        await sleep(SCANNER_POLL_INTERVAL_MS);
+                        continue;
+                    }
                     processingFinalizedBlocks = true;
                     lastObservedCheckpoint = state.lastProcessedBlock;
                     lastProgressAt = Date.now();
