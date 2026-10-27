@@ -16,6 +16,9 @@ function validateBlockReceipts(
     block: ethers.Block,
     receipts: RpcTransactionReceipt[],
 ): void {
+    if (!block.hash || !block.parentHash) {
+        throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
+    }
     const transactions = block.prefetchedTransactions;
     if (transactions.length !== receipts.length) {
         throw new Error(

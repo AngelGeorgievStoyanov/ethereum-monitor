@@ -89,7 +89,7 @@ export async function persistProcessedBlockBatch(
                 throw new Error(`Block ${blocks[0].blockNumber} parent hash does not match canonical block ${expectedCheckpoint}; reorg recovery is required`);
             }
             await Block.bulkCreate(blocks.map((block) => ({ ...block, status: 'CANONICAL' })), {
-                updateOnDuplicate: ['blockNumber', 'parentHash', 'status', 'updatedAt'],
+                updateOnDuplicate: ['blockNumber', 'parentHash', 'status'],
                 transaction,
             });
         }

@@ -41,6 +41,9 @@ export async function processBlock(
         getBlockReceiptsDurationMs,
         attempt,
     } = await fetchBlockData(blockNumber);
+    if (!block.hash || !block.parentHash) {
+        throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
+    }
     const transactions = block.prefetchedTransactions;
     const receiptsByHash = new Map<string, RpcTransactionReceipt>();
 
