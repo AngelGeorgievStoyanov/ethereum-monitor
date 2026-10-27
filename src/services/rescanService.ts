@@ -5,6 +5,7 @@ import { getBlockWithConsensus } from './blockConsensusService';
 import { reconcileBlockCandidates } from './transactionService';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
+import { recordRescanBlockProcessed, recordRescanStarted } from './recoveryMetrics';
 
 export class RescanReorgDetectedError extends Error {
     constructor(message: string) {
@@ -41,6 +42,7 @@ export async function runManualRescan(
     }
 
     console.log(`[Rescan] Started; range=${fromBlock}-${checkpoint}; checkpoint will not be changed`);
+    recordRescanStarted();
     let blocksProcessed = 0;
 
     for (let blockNumber = fromBlock; blockNumber <= checkpoint; blockNumber += 1) {
@@ -75,6 +77,7 @@ export async function runManualRescan(
 
         await reconcileBlockCandidates(prepared.candidates);
         blocksProcessed += 1;
+        recordRescanBlockProcessed();
         if (blocksProcessed % 100 === 0) {
             console.log(`[Rescan] Progress: processed ${blocksProcessed} block(s), current=${blockNumber}, range=${fromBlock}-${checkpoint}`);
         }

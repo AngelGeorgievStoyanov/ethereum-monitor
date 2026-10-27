@@ -133,6 +133,7 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
         );
         res.json({ message: 'Manual rescan completed', ...result });
     } catch (error) {
+        recordRescanFailure();
         if (error instanceof RescanReorgDetectedError) {
             res.status(409).json({ message: error.message, reorgRecoveryPending: true });
             return;

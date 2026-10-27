@@ -17,6 +17,13 @@ class ReorgRecoverySafetyError extends Error {
 import { persistProcessedBlockBatch } from './transactionService';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { isScannerLockHeld } from './scannerLockService';
+import {
+    recordReorgAncestorFound,
+    recordReorgBlockReprocessed,
+    recordReorgConsensusFailure,
+    recordReorgDetected,
+    recordReorgRecoveryCompleted,
+} from './recoveryMetrics';
 
 function sameBlock(stored: Block, current: { blockHash: string; parentHash: string }): boolean {
     return stored.blockHash.toLowerCase() === current.blockHash.toLowerCase() &&
@@ -45,6 +52,7 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
 
     console.warn(`[Reorg] Searching for a common ancestor below block ${originalCheckpoint}`);
     let ancestor: Block | null = null;
+    let ancestorDepth = 0;
 
     for (let depth = 1; depth <= MAX_REORG_LOOKBACK_BLOCKS; depth += 1) {
         const blockNumber = originalCheckpoint - depth;
@@ -60,6 +68,7 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
         const currentBlock = await getBlockWithConsensus(blockNumber, 'common ancestor search');
         if (sameBlock(storedBlock, currentBlock)) {
             ancestor = storedBlock;
+            ancestorDepth = depth;
             break;
         }
     }
@@ -132,6 +141,7 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
     });
 
     await state.reload();
+    recordReorgAncestorFound(ancestorDepth);
     console.warn(
         `[Reorg] Common ancestor=${ancestor.blockNumber}; marked ${state.lastProcessedBlock < originalCheckpoint ? originalCheckpoint - state.lastProcessedBlock : 0} block(s) as reorged; checkpoint rolled back to ${state.lastProcessedBlock}`,
     );
@@ -160,6 +170,7 @@ async function processReorgRecoveryInternal(
         console.error(
             `[Reorg] Detected chain mismatch at block ${state.lastProcessedBlock}; storedHash=${storedCheckpoint.blockHash}; currentHash=${currentCheckpoint.blockHash}`,
         );
+        recordReorgDetected();
         await markReorgRecoveryPending(state, state.lastProcessedBlock);
         await findAncestorAndRollback(state);
     }
@@ -184,6 +195,7 @@ async function processReorgRecoveryInternal(
         });
         if (previousCanonicalBlock && consensusBlock.parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()) {
             console.warn(`[Reorg] Chain changed again during recovery at block ${blockNumber}; restarting ancestor search`);
+            recordReorgDetected();
             await markReorgRecoveryPending(state, state.lastProcessedBlock);
             await findAncestorAndRollback(state);
             continue;
@@ -218,6 +230,7 @@ async function processReorgRecoveryInternal(
         }
 
         state.lastProcessedBlock = blockNumber;
+        recordReorgBlockReprocessed();
         state.reorgRecoveryActive = !recoveryComplete;
         state.reorgRecoveryStableBlocks = recoveryComplete ? 0 : stableBlocks;
         state.reorgRecoveryStartBlock = null;
@@ -225,6 +238,7 @@ async function processReorgRecoveryInternal(
             `[Reorg] Recovery block ${blockNumber} committed with consensus; stable=${stableBlocks}/${REORG_RECOVERY_STABLE_BLOCKS}; checkpoint=${state.lastProcessedBlock}`,
         );
         if (recoveryComplete) {
+            recordReorgRecoveryCompleted();
             console.log(`[Reorg] Recovery completed at block ${blockNumber}; normal scanner mode may resume`);
             return true;
         }
@@ -235,6 +249,7 @@ async function processReorgRecoveryInternal(
 
 
 async function markConsensusRecoveryBlocked(state: ScannerState, error: ConsensusUnavailableError): Promise<void> {
+    recordReorgConsensusFailure();
     await sequelize.transaction(async (transaction) => {
         const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
