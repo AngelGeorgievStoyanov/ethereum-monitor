@@ -1,4 +1,4 @@
-import { Transaction as SequelizeTransaction } from 'sequelize';
+import { Op, Transaction as SequelizeTransaction } from 'sequelize';
 import { TransactionResponse } from 'ethers';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
@@ -18,7 +18,6 @@ import sequelize from '../database';
 import ScannerState from '../models/scannerState';
 import Block from '../models/block';
 import Transaction from '../models/transaction';
-import { Op } from 'sequelize';
 
 export type TransferMetadata = TransferContextMetadata;
 
