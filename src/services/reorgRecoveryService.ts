@@ -7,6 +7,13 @@ import TxMatch from '../models/txMatch';
 import ScannerState from '../models/scannerState';
 import { processBlock } from './blockProcessingService';
 import { ConsensusUnavailableError, getBlockWithConsensus } from './blockConsensusService';
+
+class ReorgRecoverySafetyError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ReorgRecoverySafetyError';
+    }
+}
 import { persistProcessedBlockBatch } from './transactionService';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { isScannerLockHeld } from './scannerLockService';
@@ -47,7 +54,7 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
             where: { blockNumber, status: 'CANONICAL' },
         });
         if (!storedBlock) {
-            throw new Error(`Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`);
+            throw new ReorgRecoverySafetyError(`Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`);
         }
 
         const currentBlock = await getBlockWithConsensus(blockNumber, 'common ancestor search');
@@ -58,7 +65,7 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
     }
 
     if (!ancestor) {
-        throw new Error(`No common ancestor found within ${MAX_REORG_LOOKBACK_BLOCKS} blocks below ${originalCheckpoint}`);
+        throw new ReorgRecoverySafetyError(`No common ancestor found within ${MAX_REORG_LOOKBACK_BLOCKS} blocks below ${originalCheckpoint}`);
     }
 
     await sequelize.transaction(async (transaction) => {
@@ -255,7 +262,25 @@ export async function processReorgRecovery(
     } catch (error) {
         if (error instanceof ConsensusUnavailableError) {
             await markConsensusRecoveryBlocked(state, error);
+        } else if (error instanceof ReorgRecoverySafetyError) {
+            await markRecoverySafetyBlocked(state, error);
         }
         throw error;
     }
+}
+
+
+async function markRecoverySafetyBlocked(state: ScannerState, error: ReorgRecoverySafetyError): Promise<void> {
+    await sequelize.transaction(async (transaction) => {
+        const persistedState = await ScannerState.findByPk(state.id, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
+        if (!persistedState) throw new Error(`Scanner state "${state.id}" was not found`);
+        persistedState.reorgRecoveryActive = true;
+        persistedState.reorgRecoveryBlocked = true;
+        await persistedState.save({ transaction });
+    });
+    await state.reload();
+    console.error(`[Reorg] CRITICAL: recovery blocked for safety; ${error.message}. Explicit operator intervention is required.`);
 }
