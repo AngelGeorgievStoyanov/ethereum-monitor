@@ -1,7 +1,10 @@
 import { Op } from 'sequelize';
 import ScannerState from '../models/scannerState';
 import ScannerRescanJob from '../models/scannerRescanJob';
-import { SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
+import {
+    MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+    SCANNER_POLL_INTERVAL_MS,
+} from '../constants/scanner.constants';
 import { ethereumProvider } from './ethereumRpcService';
 import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
@@ -130,6 +133,39 @@ export function createBlockMonitorService() {
                     const finalized = await ethereumProvider.getBlock('finalized');
                     if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
+                    if (finalized.number < state.lastProcessedBlock) {
+                        const providerResults = await ethereumProvider.getFinalizedFromAllEndpoints();
+                        const hasConsensus =
+                            providerResults.length === ethereumProvider.getEndpointCount() &&
+                            providerResults.length > 0 &&
+                            providerResults.every(
+                                (result) =>
+                                    result.error === null &&
+                                    result.blockNumber === providerResults[0].blockNumber &&
+                                    result.blockHash?.toLowerCase() === providerResults[0].blockHash?.toLowerCase(),
+                            );
+                        const providerSummary = providerResults
+                            .map((result) =>
+                                result.error
+                                    ? `P${result.endpointIndex}=ERROR(${result.error})`
+                                    : `P${result.endpointIndex}=${result.blockNumber}(hash=${result.blockHash})`,
+                            )
+                            .join('; ');
+                        console.warn(
+                            `[Finalized] Regression detected: checkpoint=${state.lastProcessedBlock}, primaryFinalized=${finalized.number}; diagnosticConsensus=${hasConsensus ? 'YES' : 'NO'}; ${providerSummary}`,
+                        );
+                    }
+
+                    const finalizedCatchupTarget = Math.min(
+                        finalized.number,
+                        state.lastProcessedBlock + MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+                    );
+                    if (finalizedCatchupTarget < finalized.number) {
+                        console.log(
+                            `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${MAX_BLOCKS_PER_FINALIZED_CATCHUP}`,
+                        );
+                    }
+
                     if (waitingForFilters) {
                         if (!(await isScannerPausePendingOrActive())) {
                             const activationStartBlock = Math.min(
@@ -158,14 +194,14 @@ export function createBlockMonitorService() {
                     try {
                         const recoveryHandled = await processReorgRecovery(
                             state,
-                            finalized.number,
+                            finalizedCatchupTarget,
                             () => txFilterService.getTxFilters(),
                         );
                         if (recoveryHandled) {
                             // Recovery can roll the checkpoint back and later replace its canonical hash.
                             invalidateConfirmedBlockCache();
                         } else {
-                            await processFinalizedBlocks(state, finalized.number, () =>
+                            await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
                                 txFilterService.getTxFilters(),
                             );
                         }
