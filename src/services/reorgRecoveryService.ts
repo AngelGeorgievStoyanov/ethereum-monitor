@@ -212,8 +212,8 @@ async function processReorgRecoveryInternal(
         });
         if (primaryMatches) return false;
 
-        const consensusCheckpoint = await getReorgVerifiedBlock(state.lastProcessedBlock, 'reorg detection');
-        if (sameBlock(storedCheckpoint, consensusCheckpoint)) {
+        const verifiedCheckpoint = await getReorgVerifiedBlock(state.lastProcessedBlock, 'reorg detection');
+        if (sameBlock(storedCheckpoint, verifiedCheckpoint)) {
             console.warn(
                 ethereumProvider.getEndpointCount() === 1
                     ? `[Reorg] Provider P1's follow-up read matches stored history at checkpoint ${state.lastProcessedBlock}; continuing normal scan`
@@ -245,11 +245,11 @@ async function processReorgRecoveryInternal(
         }
 
         const blockNumber = state.lastProcessedBlock + 1;
-        const consensusBlock = await getReorgVerifiedBlock(blockNumber, 'reorg recovery');
+        const verifiedBlock = await getReorgVerifiedBlock(blockNumber, 'reorg recovery');
         const previousCanonicalBlock = await Block.findOne({
             where: { blockNumber: state.lastProcessedBlock, status: 'CANONICAL' },
         });
-        if (previousCanonicalBlock && consensusBlock.parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()) {
+        if (previousCanonicalBlock && verifiedBlock.parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()) {
             console.warn(`[Reorg] Chain changed again during recovery at block ${blockNumber}; restarting ancestor search`);
             recordReorgDetected();
             await markReorgRecoveryPending(state, state.lastProcessedBlock, blockNumber + REORG_RECOVERY_STABLE_BLOCKS);
@@ -259,9 +259,9 @@ async function processReorgRecoveryInternal(
 
         const fetched = await fetchBlockForProcessing(blockNumber);
         if (
-            fetched.block.number !== consensusBlock.blockNumber ||
-            fetched.block.hash.toLowerCase() !== consensusBlock.blockHash.toLowerCase() ||
-            fetched.block.parentHash.toLowerCase() !== consensusBlock.parentHash.toLowerCase()
+            fetched.block.number !== verifiedBlock.blockNumber ||
+            fetched.block.hash.toLowerCase() !== verifiedBlock.blockHash.toLowerCase() ||
+            fetched.block.parentHash.toLowerCase() !== verifiedBlock.parentHash.toLowerCase()
         ) {
             throw new ReorgRecoverySafetyError(`Block data fetched for recovery block ${blockNumber} does not match the verified provider block`);
         }
