@@ -9,6 +9,7 @@ import ScannerState from '../models/scannerState';
 import Block from '../models/block';
 import Transaction from '../models/transaction';
 import { isScannerLockHeld } from './scannerLockService';
+import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
 import type { TransferBatchCandidate } from './transactionService';
 
 function mapTransferBatchItems(candidates: readonly TransferBatchCandidate[]): TransferBatchItem[] {
@@ -100,7 +101,10 @@ export async function persistProcessedBlockBatch(
 
         for (let index = 1; index < blocks.length; index += 1) {
             if (blocks[index].parentHash.toLowerCase() !== blocks[index - 1].blockHash.toLowerCase()) {
-                throw new Error(`Block chain discontinuity between ${blocks[index - 1].blockNumber} and ${blocks[index].blockNumber}`);
+                throw new BlockChainDiscontinuityError(
+                    blocks[index].blockNumber,
+                    `Block chain discontinuity between ${blocks[index - 1].blockNumber} and ${blocks[index].blockNumber}`,
+                );
             }
         }
 
@@ -110,7 +114,10 @@ export async function persistProcessedBlockBatch(
                 transaction,
             });
             if (previousCanonicalBlock && blocks[0].parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()) {
-                throw new Error(`Block ${blocks[0].blockNumber} parent hash does not match canonical block ${expectedCheckpoint}; reorg recovery is required`);
+                throw new BlockChainDiscontinuityError(
+                    blocks[0].blockNumber,
+                    `Block ${blocks[0].blockNumber} parent hash does not match canonical block ${expectedCheckpoint}; reorg recovery is required`,
+                );
             }
             await Block.bulkCreate(blocks.map((block) => ({ ...block, status: 'CANONICAL' })), {
                 updateOnDuplicate: ['blockNumber', 'parentHash', 'status'],
