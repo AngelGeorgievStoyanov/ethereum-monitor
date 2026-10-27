@@ -136,6 +136,7 @@ export function createBlockMonitorService() {
                     if (finalized.number < state.lastProcessedBlock) {
                         const providerResults = await ethereumProvider.getFinalizedFromAllEndpoints();
                         const hasConsensus =
+                            ethereumProvider.getEndpointCount() > 1 &&
                             providerResults.length === ethereumProvider.getEndpointCount() &&
                             providerResults.length > 0 &&
                             providerResults.every(
@@ -144,6 +145,11 @@ export function createBlockMonitorService() {
                                     result.blockNumber === providerResults[0].blockNumber &&
                                     result.blockHash?.toLowerCase() === providerResults[0].blockHash?.toLowerCase(),
                             );
+                        const diagnosticConsensus = ethereumProvider.getEndpointCount() === 1
+                            ? 'NOT_APPLICABLE_SINGLE_PROVIDER'
+                            : hasConsensus
+                                ? 'YES'
+                                : 'NO';
                         const providerSummary = providerResults
                             .map((result) =>
                                 result.error
@@ -152,7 +158,7 @@ export function createBlockMonitorService() {
                             )
                             .join('; ');
                         console.warn(
-                            `[Finalized] Regression detected: checkpoint=${state.lastProcessedBlock}, primaryFinalized=${finalized.number}; diagnosticConsensus=${hasConsensus ? 'YES' : 'NO'}; ${providerSummary}`,
+                            `[Finalized] Regression detected: checkpoint=${state.lastProcessedBlock}, primaryFinalized=${finalized.number}; diagnosticConsensus=${diagnosticConsensus}; ${providerSummary}`,
                         );
                     }
 
