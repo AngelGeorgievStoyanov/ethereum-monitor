@@ -133,25 +133,23 @@ export function createBlockMonitorService() {
                         waitingForFilters = false;
                     }
 
-                    const recoveryHandled = await processReorgRecovery(
-                        state,
-                        finalized.number,
-                        () => txFilterService.getTxFilters(),
-                    );
-                    if (!recoveryHandled) {
-                        processingFinalizedBlocks = state.lastProcessedBlock < finalized.number;
-                        if (processingFinalizedBlocks) {
-                            lastObservedCheckpoint = state.lastProcessedBlock;
-                            lastProgressAt = Date.now();
-                            lastStallWarningAt = 0;
-                        }
-                        try {
+                    processingFinalizedBlocks = true;
+                    lastObservedCheckpoint = state.lastProcessedBlock;
+                    lastProgressAt = Date.now();
+                    lastStallWarningAt = 0;
+                    try {
+                        const recoveryHandled = await processReorgRecovery(
+                            state,
+                            finalized.number,
+                            () => txFilterService.getTxFilters(),
+                        );
+                        if (!recoveryHandled) {
                             await processFinalizedBlocks(state, finalized.number, () =>
                                 txFilterService.getTxFilters(),
                             );
-                        } finally {
-                            processingFinalizedBlocks = false;
                         }
+                    } finally {
+                        processingFinalizedBlocks = false;
                     }
                 }
             } catch (error) {

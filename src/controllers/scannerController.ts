@@ -35,6 +35,7 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
             lastProcessedBlock,
             reorgRecoveryActive: checkpoint?.reorgRecoveryActive ?? false,
             reorgRecoveryBlocked: checkpoint?.reorgRecoveryBlocked ?? false,
+            reorgRecoveryBlockReason: checkpoint?.reorgRecoveryBlockReason ?? null,
             reorgRecoveryStableBlocks: checkpoint?.reorgRecoveryStableBlocks ?? 0,
             reorgRecoveryStartBlock: checkpoint?.reorgRecoveryStartBlock ?? null,
             recoveryMetrics: getRecoveryMetrics(),
@@ -157,6 +158,7 @@ export const retryBlockedReorgRecovery = async (_req: Request, res: Response): P
             return;
         }
         state.reorgRecoveryBlocked = false;
+        state.reorgRecoveryBlockReason = null;
         await state.save();
         res.json({
             message: 'Reorg recovery unblocked. Resume the scanner if it is paused.',
