@@ -145,11 +145,12 @@ export function createBlockMonitorService() {
                                     result.blockNumber === providerResults[0].blockNumber &&
                                     result.blockHash?.toLowerCase() === providerResults[0].blockHash?.toLowerCase(),
                             );
-                        const diagnosticConsensus = ethereumProvider.getEndpointCount() === 1
-                            ? 'NOT_APPLICABLE_SINGLE_PROVIDER'
-                            : hasConsensus
-                                ? 'YES'
-                                : 'NO';
+                        let diagnosticConsensus = 'NO';
+                        if (ethereumProvider.getEndpointCount() === 1) {
+                            diagnosticConsensus = 'NOT_APPLICABLE_SINGLE_PROVIDER';
+                        } else if (hasConsensus) {
+                            diagnosticConsensus = 'YES';
+                        }
                         const providerSummary = providerResults
                             .map((result) =>
                                 result.error
