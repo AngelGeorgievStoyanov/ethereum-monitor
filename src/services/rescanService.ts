@@ -6,7 +6,7 @@ import { reconcileBlockCandidates } from './scannerPersistenceService';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { isScannerLockHeld } from './scannerLockService';
-import { recordRescanBlockProcessed, recordRescanStarted } from './recoveryMetrics';
+import { recordReorgDetected, recordRescanBlockProcessed, recordRescanStarted } from './recoveryMetrics';
 
 let rescanInProgress = false;
 
@@ -72,6 +72,7 @@ async function runManualRescanInternal(
 
         const consensusBlock = await getBlockWithConsensus(blockNumber, 'manual rescan');
         if (!matchesBlock(storedBlock, consensusBlock)) {
+            recordReorgDetected();
             await markReorgRecoveryPending(state, checkpoint);
             throw new RescanReorgDetectedError(
                 `Chain mismatch found at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. Resume the scanner to recover before retrying the rescan.`,
@@ -80,6 +81,7 @@ async function runManualRescanInternal(
 
         const prepared = await processBlock(blockNumber, activeTxFilters, true);
         if (!matchesBlock(storedBlock, prepared.block) || !matchesBlock(consensusBlock, prepared.block)) {
+            recordReorgDetected();
             await markReorgRecoveryPending(state, checkpoint);
             throw new RescanReorgDetectedError(
                 `Fetched block data changed or disagreed with consensus at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}.`,
