@@ -89,7 +89,7 @@ async function runManualRescanInternal(
         if (!(await isScannerLockHeld())) {
             throw new Error(`Manual rescan stopped before saving block ${blockNumber}: scanner lock ownership was lost`);
         }
-        await reconcileBlockCandidates(prepared.candidates);
+        await reconcileBlockCandidates(prepared.candidates, state.id, checkpoint);
         blocksProcessed += 1;
         recordRescanBlockProcessed();
         if (blocksProcessed % 100 === 0) {

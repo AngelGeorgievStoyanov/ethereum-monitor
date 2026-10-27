@@ -18,6 +18,7 @@ import sequelize from '../database';
 import ScannerState from '../models/scannerState';
 import Block from '../models/block';
 import Transaction from '../models/transaction';
+import { isScannerLockHeld } from './scannerLockService';
 
 export type TransferMetadata = TransferContextMetadata;
 
@@ -49,8 +50,29 @@ export async function createTransactionsFromEthereumDataBatch(
     await createTransfersBatch(mapTransferBatchItems(candidates), transaction, reconcileMatches);
 }
 
-export async function reconcileBlockCandidates(candidates: readonly TransferBatchCandidate[]): Promise<void> {
+export async function reconcileBlockCandidates(
+    candidates: readonly TransferBatchCandidate[],
+    scannerStateId: string,
+    expectedCheckpoint: number,
+): Promise<void> {
+    if (!(await isScannerLockHeld())) {
+        throw new Error('Cannot reconcile rescan matches without owning the scanner lock');
+    }
     await sequelize.transaction(async (transaction) => {
+        const state = await ScannerState.findByPk(scannerStateId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
+        if (!state) throw new Error(`Scanner state "${scannerStateId}" was not found`);
+        if (state.lastProcessedBlock !== expectedCheckpoint) {
+            throw new Error(`Scanner checkpoint changed during rescan: expected ${expectedCheckpoint}, found ${state.lastProcessedBlock}`);
+        }
+        if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
+            throw new Error('Cannot reconcile rescan matches while reorg recovery is active or blocked');
+        }
+        if (!(await isScannerLockHeld())) {
+            throw new Error('Scanner lock ownership was lost before reconciling rescan matches');
+        }
         await createTransfersBatch(mapTransferBatchItems(candidates), transaction, true);
     });
 }
