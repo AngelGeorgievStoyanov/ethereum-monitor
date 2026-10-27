@@ -30,6 +30,7 @@ async function runManualRescanInternal(
     fromBlock: number,
     state: ScannerState,
     getActiveTxFilters: () => ActiveTxFilter[],
+    onProgress?: (currentBlock: number, blocksProcessed: number) => Promise<void>,
 ): Promise<{ fromBlock: number; toBlock: number; blocksProcessed: number }> {
     if (!(await isScannerLockHeld())) {
         throw new Error('Manual rescan requires this instance to own the scanner lock');
@@ -94,6 +95,7 @@ async function runManualRescanInternal(
         await reconcileBlockCandidates(prepared.candidates, state.id, checkpoint);
         blocksProcessed += 1;
         recordRescanBlockProcessed();
+        if (onProgress) await onProgress(blockNumber, blocksProcessed);
         if (blocksProcessed % 100 === 0) {
             console.log(`[Rescan] Progress: processed ${blocksProcessed} block(s), current=${blockNumber}, range=${fromBlock}-${checkpoint}`);
         }
@@ -107,11 +109,12 @@ export async function runManualRescan(
     fromBlock: number,
     state: ScannerState,
     getActiveTxFilters: () => ActiveTxFilter[],
+    onProgress?: (currentBlock: number, blocksProcessed: number) => Promise<void>,
 ): Promise<{ fromBlock: number; toBlock: number; blocksProcessed: number }> {
     if (rescanInProgress) throw new Error('Another manual rescan is already running in this process');
     rescanInProgress = true;
     try {
-        return await runManualRescanInternal(fromBlock, state, getActiveTxFilters);
+        return await runManualRescanInternal(fromBlock, state, getActiveTxFilters, onProgress);
     } finally {
         rescanInProgress = false;
     }

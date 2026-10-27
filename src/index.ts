@@ -1,6 +1,7 @@
 import express from 'express';
 import './models/associations';
 import './models/block';
+import './models/scannerRescanJob';
 import sequelize from './database';
 import httpRouter from './httpRouter';
 import { HTTP_HOST, HTTP_PORT } from './constants/http.constants';

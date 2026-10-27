@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import {
     getScannerControlState,
     requestScannerPause,
@@ -12,6 +13,8 @@ import { isScannerProcessingBlocks } from '../services/blockMonitorService';
 import { getTxFilterService } from '../services/txFilterService';
 import { runManualRescan, RescanReorgDetectedError } from '../services/rescanService';
 import { getRecoveryMetrics, recordRescanFailure } from '../services/recoveryMetrics';
+import ScannerRescanJob from '../models/scannerRescanJob';
+import { formatError } from '../utils/formatError';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -39,6 +42,7 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
             reorgRecoveryStableBlocks: checkpoint?.reorgRecoveryStableBlocks ?? 0,
             reorgRecoveryStartBlock: checkpoint?.reorgRecoveryStartBlock ?? null,
             reorgRecoveryTargetBlock: checkpoint?.reorgRecoveryTargetBlock ?? null,
+            rescanJob: await ScannerRescanJob.findOne({ order: [['createdAt', 'DESC']] }),
             recoveryMetrics: getRecoveryMetrics(),
             latestFinalizedBlock,
             lagBlocks:
@@ -109,6 +113,58 @@ export const resumeScannerController = (_req: Request, res: Response): void => {
 };
 
 
+async function executeRescanJob(jobId: string, fromBlock: number, toBlock: number): Promise<void> {
+    const job = await ScannerRescanJob.findByPk(jobId);
+    if (!job) return;
+
+    try {
+        const state = await ScannerState.findByPk(SCANNER_ID);
+        if (!state) throw new Error('Scanner state is not initialized');
+
+        await job.update({ status: 'RUNNING', currentBlock: fromBlock, startedAt: new Date() });
+        const result = await runManualRescan(
+            fromBlock,
+            state,
+            () => getTxFilterService().getTxFilters(),
+            async (currentBlock, blocksProcessed) => {
+                await job.update({ currentBlock, blocksProcessed });
+            },
+        );
+        await job.update({
+            status: 'COMPLETED',
+            currentBlock: result.toBlock,
+            blocksProcessed: result.blocksProcessed,
+            completedAt: new Date(),
+            error: null,
+        });
+        console.log(`[Rescan] Job ${jobId} completed; range=${fromBlock}-${toBlock}; blocksProcessed=${result.blocksProcessed}`);
+    } catch (error) {
+        const message = formatError(error);
+        if (error instanceof RescanReorgDetectedError) {
+            await job.update({
+                status: 'RECOVERY_STARTED',
+                error: message,
+                completedAt: new Date(),
+            });
+            console.warn(`[Rescan] Job ${jobId} detected a reorg; handing control to automatic recovery`);
+            try {
+                resumeScanner();
+            } catch (resumeError) {
+                console.error(`[Rescan] Job ${jobId} could not resume scanner for recovery: ${formatError(resumeError)}`);
+            }
+            return;
+        }
+
+        recordRescanFailure();
+        await job.update({
+            status: 'FAILED',
+            error: message.slice(0, 1000),
+            completedAt: new Date(),
+        });
+        console.error(`[Rescan] Job ${jobId} failed: ${message}`);
+    }
+}
+
 export const rescanScannerController = async (req: Request, res: Response): Promise<void> => {
     const fromBlock = req.body?.fromBlock;
     if (!Number.isSafeInteger(fromBlock) || fromBlock < 0) {
@@ -132,17 +188,61 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             res.status(503).json({ message: 'Scanner state is not initialized' });
             return;
         }
-        const result = await runManualRescan(fromBlock, state, () =>
-            getTxFilterService().getTxFilters(),
-        );
-        res.json({ message: 'Manual rescan completed', ...result });
-    } catch (error) {
-        recordRescanFailure();
-        if (error instanceof RescanReorgDetectedError) {
-            res.status(409).json({ message: error.message, reorgRecoveryPending: true });
+        await state.reload();
+        if (fromBlock > state.lastProcessedBlock) {
+            res.status(400).json({
+                message: `fromBlock ${fromBlock} is greater than the last processed checkpoint ${state.lastProcessedBlock}`,
+            });
             return;
         }
-        sendHttpError(res, 'Manual rescan failed', error);
+        if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
+            res.status(409).json({ message: 'Cannot start a rescan while reorg recovery is active or blocked.' });
+            return;
+        }
+
+        const activeJob = await ScannerRescanJob.findOne({ where: { status: 'RUNNING' } });
+        if (activeJob) {
+            res.status(409).json({ message: 'A rescan job is already running.', operationId: activeJob.id });
+            return;
+        }
+
+        const operationId = randomUUID();
+        await ScannerRescanJob.create({
+            id: operationId,
+            fromBlock,
+            toBlock: state.lastProcessedBlock,
+            currentBlock: fromBlock,
+            blocksProcessed: 0,
+            status: 'QUEUED',
+            error: null,
+            startedAt: null,
+            completedAt: null,
+        });
+
+        void executeRescanJob(operationId, fromBlock, state.lastProcessedBlock);
+        res.status(202).json({
+            message: 'Manual rescan started',
+            operationId,
+            status: 'QUEUED',
+            fromBlock,
+            toBlock: state.lastProcessedBlock,
+            statusUrl: `/api/scanner/rescan/${operationId}`,
+        });
+    } catch (error) {
+        sendHttpError(res, 'Unable to start manual rescan', error);
+    }
+};
+
+export const getRescanJobStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const job = await ScannerRescanJob.findByPk(req.params.id);
+        if (!job) {
+            res.status(404).json({ message: 'Rescan operation not found' });
+            return;
+        }
+        res.json(job);
+    } catch (error) {
+        sendHttpError(res, 'Unable to retrieve rescan status', error);
     }
 };
 

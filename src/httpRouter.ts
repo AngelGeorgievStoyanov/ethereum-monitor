@@ -12,6 +12,7 @@ import {
 import { getLiveness, getReadiness } from './controllers/healthController';
 import {
     getScannerStatus,
+    getRescanJobStatus,
     pauseScanner,
     resumeScannerController,
     rescanScannerController,
@@ -32,6 +33,7 @@ router.get('/scanner/status', getScannerStatus);
 router.post('/scanner/pause', pauseScanner);
 router.post('/scanner/resume', resumeScannerController);
 router.post('/scanner/rescan', rescanScannerController);
+router.get('/scanner/rescan/:id', getRescanJobStatus);
 router.post('/scanner/reorg-retry', retryBlockedReorgRecovery);
 
 router.get('/transactions', getAllStoredTransactions);
