@@ -93,6 +93,9 @@ export async function persistProcessedBlockBatch(
         if (state.lastProcessedBlock !== expectedCheckpoint) {
             return state.lastProcessedBlock;
         }
+        if (!(await isScannerLockHeld())) {
+            throw new Error('Scanner lock ownership was lost before persisting the processed block batch');
+        }
 
         for (let index = 1; index < blocks.length; index += 1) {
             if (blocks[index].parentHash.toLowerCase() !== blocks[index - 1].blockHash.toLowerCase()) {
