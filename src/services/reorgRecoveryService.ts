@@ -179,7 +179,7 @@ export async function processReorgRecovery(
             continue;
         }
 
-        const prepared = await processBlock(blockNumber, filters);
+        const prepared = await processBlock(blockNumber, filters, true);
         if (
             prepared.block.blockNumber !== consensusBlock.blockNumber ||
             prepared.block.blockHash.toLowerCase() !== consensusBlock.blockHash.toLowerCase() ||

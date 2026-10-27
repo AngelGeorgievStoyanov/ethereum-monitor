@@ -17,6 +17,8 @@ import {
 import sequelize from '../database';
 import ScannerState from '../models/scannerState';
 import Block from '../models/block';
+import Transaction from '../models/transaction';
+import { Op } from 'sequelize';
 
 export type TransferMetadata = TransferContextMetadata;
 
@@ -43,8 +45,9 @@ function mapTransferBatchItems(candidates: readonly TransferBatchCandidate[]): T
 export async function createTransactionsFromEthereumDataBatch(
     candidates: readonly TransferBatchCandidate[],
     transaction?: SequelizeTransaction,
+    reconcileMatches = false,
 ): Promise<void> {
-    await createTransfersBatch(mapTransferBatchItems(candidates), transaction);
+    await createTransfersBatch(mapTransferBatchItems(candidates), transaction, reconcileMatches);
 }
 
 export async function reconcileBlockCandidates(candidates: readonly TransferBatchCandidate[]): Promise<void> {
@@ -109,7 +112,14 @@ export async function persistProcessedBlockBatch(
             });
         }
 
-        await createTransactionsFromEthereumDataBatch(candidates, transaction);
+        const isReorgRecovery = recoveryProgress !== undefined;
+        await createTransactionsFromEthereumDataBatch(candidates, transaction, isReorgRecovery);
+        if (isReorgRecovery && blocks.length > 0) {
+            await Transaction.update(
+                { recordStatus: 'NORMAL' },
+                { where: { blockHash: { [Op.in]: blocks.map((block) => block.blockHash) } }, transaction },
+            );
+        }
         state.lastProcessedBlock = newCheckpoint;
         if (recoveryProgress) {
             state.reorgRecoveryActive = recoveryProgress.active;
