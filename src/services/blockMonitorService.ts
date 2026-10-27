@@ -156,16 +156,6 @@ export function createBlockMonitorService() {
                         );
                     }
 
-                    const finalizedCatchupTarget = Math.min(
-                        finalized.number,
-                        state.lastProcessedBlock + MAX_BLOCKS_PER_FINALIZED_CATCHUP,
-                    );
-                    if (finalizedCatchupTarget < finalized.number) {
-                        console.log(
-                            `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${MAX_BLOCKS_PER_FINALIZED_CATCHUP}`,
-                        );
-                    }
-
                     if (waitingForFilters) {
                         if (!(await isScannerPausePendingOrActive())) {
                             const activationStartBlock = Math.min(
@@ -185,6 +175,16 @@ export function createBlockMonitorService() {
                                 : `[Scanner] Active filters detected; starting at block ${state.lastProcessedBlock + 1}`,
                         );
                         waitingForFilters = false;
+                    }
+
+                    const finalizedCatchupTarget = Math.min(
+                        finalized.number,
+                        state.lastProcessedBlock + MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+                    );
+                    if (finalizedCatchupTarget < finalized.number) {
+                        console.log(
+                            `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${MAX_BLOCKS_PER_FINALIZED_CATCHUP}`,
+                        );
                     }
 
                     processingFinalizedBlocks = true;
