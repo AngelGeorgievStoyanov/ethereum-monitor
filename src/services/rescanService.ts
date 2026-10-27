@@ -2,7 +2,7 @@ import Block from '../models/block';
 import ScannerState from '../models/scannerState';
 import { processBlock } from './blockProcessingService';
 import { getBlockWithConsensus } from './blockConsensusService';
-import { reconcileBlockCandidates } from './transactionService';
+import { reconcileBlockCandidates } from './scannerPersistenceService';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { isScannerLockHeld } from './scannerLockService';

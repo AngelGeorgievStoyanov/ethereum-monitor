@@ -14,7 +14,7 @@ class ReorgRecoverySafetyError extends Error {
         this.name = 'ReorgRecoverySafetyError';
     }
 }
-import { persistProcessedBlockBatch } from './transactionService';
+import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { isScannerLockHeld } from './scannerLockService';
 import {

@@ -6,7 +6,7 @@ import {
 import { shouldPauseBeforeBlock } from './scannerControlService';
 import { formatError } from '../utils/formatError';
 import { processBlock } from './blockProcessingService';
-import { persistProcessedBlockBatch } from './transactionService';
+import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { isScannerLockHeld } from './scannerLockService';
