@@ -30,29 +30,36 @@ export async function createTransfersBatch(
 
     const persist = async (dbTransaction: SequelizeTransaction) => {
         const data = items.map((item) => item.data);
-        await Transaction.bulkCreate(data, {
-            ignoreDuplicates: true,
-            transaction: dbTransaction,
-        });
-
         const txHashes = [...new Set(data.map((item) => item.txHash))];
         const transferTypes = [...new Set(data.map((item) => item.transferType))];
         const blockHashes = [...new Set(data.map((item) => item.blockHash))];
-        const storedTransactions = await Transaction.findAll({
+        const lookup = {
             where: {
                 txHash: { [Op.in]: txHashes },
                 transferType: { [Op.in]: transferTypes },
                 blockHash: { [Op.in]: blockHashes },
             },
             transaction: dbTransaction,
+        };
+        const existingTransactions = items.length === 0 ? [] : await Transaction.findAll(lookup);
+        const existingIdentities = new Set(existingTransactions.map(getTransferIdentity));
+        const itemsToPersist = reconcileMatches
+            ? items.filter((item) => item.matchingTxFilterIds.length > 0 || existingIdentities.has(getTransferIdentity(item.data)))
+            : items;
+        await Transaction.bulkCreate(itemsToPersist.map((item) => item.data), {
+            ignoreDuplicates: true,
+            transaction: dbTransaction,
         });
+        const storedTransactions = itemsToPersist.length === 0
+            ? []
+            : await Transaction.findAll(lookup);
         const transactionsByIdentity = new Map<string, Transaction>();
         for (const storedTransaction of storedTransactions) {
             transactionsByIdentity.set(getTransferIdentity(storedTransaction), storedTransaction);
         }
 
         const filterIds = [
-            ...new Set(items.flatMap((item) => item.matchingTxFilterIds)),
+            ...new Set(itemsToPersist.flatMap((item) => item.matchingTxFilterIds)),
         ];
         if (filterIds.length === 0 && !reconcileMatches) return;
 
@@ -71,7 +78,7 @@ export async function createTransfersBatch(
             txFilterDescription: string;
         }> = [];
 
-        for (const item of items) {
+        for (const item of itemsToPersist) {
             const storedTransaction = transactionsByIdentity.get(getTransferIdentity(item.data));
             if (!storedTransaction) {
                 throw new Error(
@@ -98,7 +105,7 @@ export async function createTransfersBatch(
         }
 
         if (reconcileMatches) {
-            const txIds = [...new Set(items
+            const txIds = [...new Set(itemsToPersist
                 .map((item) => transactionsByIdentity.get(getTransferIdentity(item.data))?.id)
                 .filter((id): id is number => id !== undefined))];
             const existingMatches = txIds.length === 0
@@ -108,7 +115,7 @@ export async function createTransfersBatch(
                     transaction: dbTransaction,
                 });
             const matchingFilterIdsByTxId = new Map<number, Set<number>>();
-            for (const item of items) {
+            for (const item of itemsToPersist) {
                 const storedTransaction = transactionsByIdentity.get(getTransferIdentity(item.data));
                 if (!storedTransaction) continue;
                 matchingFilterIdsByTxId.set(

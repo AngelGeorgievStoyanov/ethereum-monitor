@@ -11,6 +11,12 @@ import { getScannerControlState, isScannerPausePendingOrActive } from './scanner
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
 
+let processingFinalizedBlocks = false;
+
+export function isScannerProcessingBlocks(): boolean {
+    return processingFinalizedBlocks;
+}
+
 export function createBlockMonitorService() {
     const txFilterService = getTxFilterService();
     let scannerStarted = false;
@@ -34,7 +40,6 @@ export function createBlockMonitorService() {
         }
 
         let needsStateReload = false;
-        let processingFinalizedBlocks = false;
         let lastObservedCheckpoint = state.lastProcessedBlock;
         let lastProgressAt = Date.now();
         let lastStallWarningAt = 0;

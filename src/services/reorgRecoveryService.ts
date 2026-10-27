@@ -16,7 +16,7 @@ function sameBlock(stored: Block, current: { blockHash: string; parentHash: stri
         stored.parentHash.toLowerCase() === current.parentHash.toLowerCase();
 }
 
-async function setRecoveryPending(state: ScannerState, checkpoint: number): Promise<void> {
+export async function markReorgRecoveryPending(state: ScannerState, checkpoint: number): Promise<void> {
     await sequelize.transaction(async (transaction) => {
         const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
@@ -150,7 +150,7 @@ export async function processReorgRecovery(
         console.error(
             `[Reorg] Detected chain mismatch at block ${state.lastProcessedBlock}; storedHash=${storedCheckpoint.blockHash}; currentHash=${currentCheckpoint.blockHash}`,
         );
-        await setRecoveryPending(state, state.lastProcessedBlock);
+        await markReorgRecoveryPending(state, state.lastProcessedBlock);
         await findAncestorAndRollback(state);
     }
 

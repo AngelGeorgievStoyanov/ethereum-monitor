@@ -28,11 +28,8 @@ export interface TransferBatchCandidate {
     matchingTxFilters: ActiveTxFilter[];
 }
 
-export async function createTransactionsFromEthereumDataBatch(
-    candidates: readonly TransferBatchCandidate[],
-    transaction?: SequelizeTransaction,
-): Promise<void> {
-    const items: TransferBatchItem[] = candidates.map((candidate) => ({
+function mapTransferBatchItems(candidates: readonly TransferBatchCandidate[]): TransferBatchItem[] {
+    return candidates.map((candidate) => ({
         data: mapTransactionCreationData(
             candidate.tx,
             candidate.receipt,
@@ -41,8 +38,19 @@ export async function createTransactionsFromEthereumDataBatch(
         ),
         matchingTxFilterIds: candidate.matchingTxFilters.map((filter) => filter.id),
     }));
+}
 
-    await createTransfersBatch(items, transaction);
+export async function createTransactionsFromEthereumDataBatch(
+    candidates: readonly TransferBatchCandidate[],
+    transaction?: SequelizeTransaction,
+): Promise<void> {
+    await createTransfersBatch(mapTransferBatchItems(candidates), transaction);
+}
+
+export async function reconcileBlockCandidates(candidates: readonly TransferBatchCandidate[]): Promise<void> {
+    await sequelize.transaction(async (transaction) => {
+        await createTransfersBatch(mapTransferBatchItems(candidates), transaction, true);
+    });
 }
 
 export interface ProcessedBlockRecord {
