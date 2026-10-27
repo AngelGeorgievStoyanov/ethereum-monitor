@@ -7,7 +7,7 @@ import {
 import { shouldPauseBeforeBlock } from './scannerControlService';
 import { formatError } from '../utils/formatError';
 import { processBlock } from './blockProcessingService';
-import { fetchBlockHeader } from './ethereumRpcService';
+import { fetchBlockHeader, fetchBlockHeaders } from './ethereumRpcService';
 import type { BlockHeader } from './ethereumRpcService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
@@ -100,23 +100,7 @@ export async function processFinalizedBlocks(
         try {
             // Validate lightweight block headers before fetching receipts or processing transactions.
             const previousConfirmedBlock = await getConfirmedCheckpointBlock(expectedCheckpoint);
-            const settledHeaders = await Promise.allSettled(
-                blockNumbers.map(async (blockNumber) => {
-                    try {
-                        return await fetchBlockHeader(blockNumber);
-                    } catch (error) {
-                        throw new Error(
-                            `Block header ${blockNumber} failed: ${formatError(error)}`,
-                        );
-                    }
-                }),
-            );
-            const failedHeader = settledHeaders.find((result) => result.status === 'rejected');
-            if (failedHeader?.status === 'rejected') throw failedHeader.reason;
-            const headers = settledHeaders.map((result) => {
-                if (result.status === 'rejected') throw result.reason;
-                return result.value;
-            });
+            const headers = await fetchBlockHeaders(blockNumbers);
             validateBatchConnectivity(previousConfirmedBlock, headers, blockNumbers);
 
             const settledBlocks = await Promise.allSettled(

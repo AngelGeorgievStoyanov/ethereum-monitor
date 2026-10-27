@@ -137,22 +137,32 @@ export interface BlockHeader {
     parentHash: string;
 }
 
-export async function fetchBlockHeader(blockNumber: number): Promise<BlockHeader> {
-    const block = await ethereumProvider.execute(
-        `fetchBlockHeader(${blockNumber})`,
+export async function fetchBlockHeaders(blockNumbers: readonly number[]): Promise<BlockHeader[]> {
+    return ethereumProvider.execute(
+        `fetchBlockHeaders(${blockNumbers[0]}-${blockNumbers[blockNumbers.length - 1]})`,
         async (provider) => {
-            const result = await provider.getBlock(blockNumber);
-            if (!result) throw new Error(`Unable to load block header ${blockNumber}`);
-            if (!result.hash || !result.parentHash) {
-                throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
-            }
-            return result;
+            // Read the complete batch through one selected endpoint to avoid mixing forks from
+            // different providers during the cheap connectivity preflight.
+            const blocks = await Promise.all(
+                blockNumbers.map(async (blockNumber) => {
+                    const block = await provider.getBlock(blockNumber);
+                    if (!block) throw new Error(`Unable to load block header ${blockNumber}`);
+                    if (!block.hash || !block.parentHash) {
+                        throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
+                    }
+                    return {
+                        blockNumber: block.number,
+                        blockHash: block.hash,
+                        parentHash: block.parentHash,
+                    };
+                }),
+            );
+            return blocks;
         },
     );
+}
 
-    return {
-        blockNumber: block.number,
-        blockHash: block.hash!,
-        parentHash: block.parentHash!,
-    };
+export async function fetchBlockHeader(blockNumber: number): Promise<BlockHeader> {
+    const [block] = await fetchBlockHeaders([blockNumber]);
+    return block;
 }
