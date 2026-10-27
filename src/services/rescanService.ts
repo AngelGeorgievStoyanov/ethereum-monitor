@@ -76,7 +76,7 @@ async function runManualRescanInternal(
             recordReorgDetected();
             await markReorgRecoveryPending(state, checkpoint);
             throw new RescanReorgDetectedError(
-                `Chain mismatch found at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. Resume the scanner to recover before retrying the rescan.`,
+                `Chain mismatch found at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
             );
         }
 
@@ -85,7 +85,7 @@ async function runManualRescanInternal(
             recordReorgDetected();
             await markReorgRecoveryPending(state, checkpoint);
             throw new RescanReorgDetectedError(
-                `Fetched block data changed or disagreed with consensus at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}.`,
+                `Fetched block data changed or disagreed with consensus at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
             );
         }
 

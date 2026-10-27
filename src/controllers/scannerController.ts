@@ -242,7 +242,9 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             completedAt: null,
         });
 
-        void executeRescanJob(operationId, fromBlock, state.lastProcessedBlock);
+        void executeRescanJob(operationId, fromBlock, state.lastProcessedBlock).catch((error) => {
+            console.error(`[Rescan] Job ${operationId} failed before its status could be updated: ${formatError(error)}`);
+        });
         res.status(202).json({
             message: 'Manual rescan started',
             operationId,
