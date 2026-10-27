@@ -5,7 +5,7 @@ import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
-import { processFinalizedBlocks } from './blockProcessor';
+import { invalidateConfirmedBlockCache, processFinalizedBlocks } from './blockProcessor';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
 import { getScannerControlState, isScannerPausePendingOrActive } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
@@ -143,7 +143,10 @@ export function createBlockMonitorService() {
                             finalized.number,
                             () => txFilterService.getTxFilters(),
                         );
-                        if (!recoveryHandled) {
+                        if (recoveryHandled) {
+                            // Recovery can roll the checkpoint back and later replace its canonical hash.
+                            invalidateConfirmedBlockCache();
+                        } else {
                             await processFinalizedBlocks(state, finalized.number, () =>
                                 txFilterService.getTxFilters(),
                             );

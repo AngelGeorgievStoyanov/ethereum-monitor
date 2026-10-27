@@ -1,4 +1,5 @@
 import ScannerState from '../models/scannerState';
+import Block from '../models/block';
 import {
     SCANNER_MAX_PARALLEL_BLOCKS,
     SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
@@ -6,10 +7,68 @@ import {
 import { shouldPauseBeforeBlock } from './scannerControlService';
 import { formatError } from '../utils/formatError';
 import { processBlock } from './blockProcessingService';
+import { fetchBlockHeader } from './ethereumRpcService';
+import type { BlockHeader } from './ethereumRpcService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { isScannerLockHeld } from './scannerLockService';
+
+type ConfirmedBlock = BlockHeader;
+
+let lastConfirmedBlock: ConfirmedBlock | null = null;
+
+async function getConfirmedCheckpointBlock(checkpoint: number): Promise<ConfirmedBlock | null> {
+    if (checkpoint < 0) return null;
+
+    if (lastConfirmedBlock?.blockNumber === checkpoint) {
+        return lastConfirmedBlock;
+    }
+
+    const persistedBlock = await Block.findOne({
+        where: { blockNumber: checkpoint, status: 'CANONICAL' },
+        attributes: ['blockNumber', 'blockHash', 'parentHash'],
+    });
+
+    if (persistedBlock) {
+        lastConfirmedBlock = {
+            blockNumber: persistedBlock.blockNumber,
+            blockHash: persistedBlock.blockHash,
+            parentHash: persistedBlock.parentHash,
+        };
+        return lastConfirmedBlock;
+    }
+
+    // On a fresh scanner start the initial checkpoint may not yet have a persisted Block row.
+    // Seed the cache from the selected RPC provider in that case.
+    lastConfirmedBlock = await fetchBlockHeader(checkpoint);
+    return lastConfirmedBlock;
+}
+
+export function invalidateConfirmedBlockCache(): void {
+    lastConfirmedBlock = null;
+}
+
+function validateBatchConnectivity(
+    previousBlock: ConfirmedBlock | null,
+    headers: readonly ConfirmedBlock[],
+    expectedBlockNumbers: readonly number[],
+): void {
+    for (let index = 0; index < headers.length; index += 1) {
+        const current = headers[index];
+        if (current.blockNumber !== expectedBlockNumbers[index]) {
+            throw new Error(
+                `RPC returned block ${current.blockNumber} when block ${expectedBlockNumbers[index]} was requested`,
+            );
+        }
+        const previous = index === 0 ? previousBlock : headers[index - 1];
+        if (previous && current.parentHash.toLowerCase() !== previous.blockHash.toLowerCase()) {
+            throw new Error(
+                `Block chain discontinuity between ${previous.blockNumber} and ${current.blockNumber}; transaction processing was skipped and reorg recovery is required`,
+            );
+        }
+    }
+}
 
 export async function processFinalizedBlocks(
     state: ScannerState,
@@ -39,16 +98,37 @@ export async function processFinalizedBlocks(
         const expectedCheckpoint = state.lastProcessedBlock;
 
         try {
-            const settledBlocks = await Promise.allSettled(
+            // Validate lightweight block headers before fetching receipts or processing transactions.
+            const previousConfirmedBlock = await getConfirmedCheckpointBlock(expectedCheckpoint);
+            const settledHeaders = await Promise.allSettled(
                 blockNumbers.map(async (blockNumber) => {
                     try {
+                        return await fetchBlockHeader(blockNumber);
+                    } catch (error) {
+                        throw new Error(
+                            `Block header ${blockNumber} failed: ${formatError(error)}`,
+                        );
+                    }
+                }),
+            );
+            const failedHeader = settledHeaders.find((result) => result.status === 'rejected');
+            if (failedHeader?.status === 'rejected') throw failedHeader.reason;
+            const headers = settledHeaders.map((result) => {
+                if (result.status === 'rejected') throw result.reason;
+                return result.value;
+            });
+            validateBatchConnectivity(previousConfirmedBlock, headers, blockNumbers);
+
+            const settledBlocks = await Promise.allSettled(
+                headers.map(async (header) => {
+                    try {
                         return {
-                            blockNumber,
-                            result: await processBlock(blockNumber, activeTxFilters),
+                            blockNumber: header.blockNumber,
+                            result: await processBlock(header.blockNumber, activeTxFilters, false, header),
                         };
                     } catch (error) {
                         throw new Error(
-                            `Block ${blockNumber} failed: ${formatError(error)}`,
+                            `Block ${header.blockNumber} failed: ${formatError(error)}`,
                         );
                     }
                 }),
@@ -82,10 +162,14 @@ export async function processFinalizedBlocks(
 
             if (committedCheckpoint !== blockNumbers[blockNumbers.length - 1]) {
                 state.lastProcessedBlock = committedCheckpoint;
+                // Another replica changed the checkpoint; never keep a cache for a different range.
+                lastConfirmedBlock = null;
                 continue;
             }
 
             state.lastProcessedBlock = committedCheckpoint;
+            // Advance the in-memory checkpoint only after the DB transaction has committed.
+            lastConfirmedBlock = headers[headers.length - 1] ?? null;
             const perBlockDatabaseWriteDurationMs = Math.ceil(
                 databaseWriteDurationMs / preparedBlocks.length,
             );

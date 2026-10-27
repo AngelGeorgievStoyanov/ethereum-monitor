@@ -130,3 +130,29 @@ export async function fetchBlockData(blockNumber: number) {
 
     throw new Error(`Unable to fetch block data for block ${blockNumber}`);
 }
+
+export interface BlockHeader {
+    blockNumber: number;
+    blockHash: string;
+    parentHash: string;
+}
+
+export async function fetchBlockHeader(blockNumber: number): Promise<BlockHeader> {
+    const block = await ethereumProvider.execute(
+        `fetchBlockHeader(${blockNumber})`,
+        async (provider) => {
+            const result = await provider.getBlock(blockNumber);
+            if (!result) throw new Error(`Unable to load block header ${blockNumber}`);
+            if (!result.hash || !result.parentHash) {
+                throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
+            }
+            return result;
+        },
+    );
+
+    return {
+        blockNumber: block.number,
+        blockHash: block.hash!,
+        parentHash: block.parentHash!,
+    };
+}
