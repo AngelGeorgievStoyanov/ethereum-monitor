@@ -27,5 +27,6 @@ export function sendHttpError(res: Response, message: string, error: unknown): v
     }
 
     const details = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ message, details });
+    console.error(`[HTTP] ${message}: ${details}`);
+    res.status(500).json({ message });
 }
