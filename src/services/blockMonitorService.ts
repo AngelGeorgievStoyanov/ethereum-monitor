@@ -1,4 +1,6 @@
+import { Op } from 'sequelize';
 import ScannerState from '../models/scannerState';
+import ScannerRescanJob from '../models/scannerRescanJob';
 import { SCANNER_POLL_INTERVAL_MS } from '../constants/scanner.constants';
 import { ethereumProvider } from './ethereumRpcService';
 import { getTxFilterService } from './txFilterService';
@@ -12,6 +14,20 @@ import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
 
 let processingFinalizedBlocks = false;
+
+async function markInterruptedRescanJobs(): Promise<void> {
+    const [count] = await ScannerRescanJob.update(
+        {
+            status: 'INTERRUPTED',
+            error: 'Scanner ownership was lost before the rescan operation completed',
+            completedAt: new Date(),
+        },
+        { where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } } },
+    );
+    if (count > 0) {
+        console.warn('[Rescan] Marked ' + count + ' abandoned rescan job(s) as INTERRUPTED after acquiring scanner ownership');
+    }
+}
 
 export function isScannerProcessingBlocks(): boolean {
     return processingFinalizedBlocks;
@@ -33,6 +49,7 @@ export function createBlockMonitorService() {
                 await sleep(SCANNER_POLL_INTERVAL_MS);
             }
             console.log('[Scanner] Acquired PostgreSQL advisory lock');
+            await markInterruptedRescanJobs();
             state = await initializeScannerState();
         } catch (error) {
             scannerStarted = false;
@@ -83,6 +100,7 @@ export function createBlockMonitorService() {
                         await sleep(SCANNER_POLL_INTERVAL_MS);
                     }
                     console.log('[Scanner] Reacquired PostgreSQL advisory lock');
+                    await markInterruptedRescanJobs();
                 }
 
                 if (needsStateReload) {
