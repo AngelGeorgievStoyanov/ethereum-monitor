@@ -350,6 +350,46 @@ async function markVerificationRecoveryBlocked(
     );
 }
 
+async function markReceiptConsistencyRecoveryBlocked(
+    state: ScannerState,
+    error: BlockReceiptConsistencyError,
+): Promise<void> {
+    if (!(await isScannerLockHeld())) {
+        console.error('[Reorg] Cannot persist receipt-consistency-blocked recovery because scanner lock ownership was lost');
+        return;
+    }
+
+    await sequelize.transaction(async (transaction) => {
+        if (!(await isScannerLockHeld())) {
+            throw new Error('Scanner lock ownership was lost before persisting receipt-consistency-blocked recovery');
+        }
+        const persistedState = await ScannerState.findByPk(state.id, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
+        if (!persistedState) throw new Error(`Scanner state "${state.id}" was not found`);
+
+        persistedState.reorgRecoveryActive = true;
+        persistedState.reorgRecoveryBlocked = true;
+        if (persistedState.reorgRecoveryStartBlock === null) {
+            persistedState.reorgRecoveryStartBlock = persistedState.lastProcessedBlock;
+        }
+        if (persistedState.reorgRecoveryTargetBlock === null) {
+            persistedState.reorgRecoveryTargetBlock =
+                persistedState.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS;
+        }
+        persistedState.reorgRecoveryBlockReason =
+            `RECEIPT_CONSISTENCY:block=${error.blockNumber}:${error.message}`.slice(0, 500);
+        await persistedState.save({ transaction });
+    });
+
+    await state.reload();
+    console.error(
+        `[Reorg] CRITICAL: recovery blocked after receipt inconsistency at block ${error.blockNumber}. Automatic retries stopped; check RPC provider consistency before explicitly retrying recovery.`,
+    );
+}
+
+
 export async function processReorgRecovery(
     state: ScannerState,
     finalizedBlockNumber: number,
@@ -367,11 +407,7 @@ export async function processReorgRecovery(
                 `[Reorg] Receipt consistency failure during recovery at block ${error.blockNumber}: ${error.message}`,
             );
             recordReorgDetected();
-            await markReorgRecoveryPending(
-                state,
-                state.lastProcessedBlock,
-                error.blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
-            );
+            await markReceiptConsistencyRecoveryBlocked(state, error);
             return true;
         }
         throw error;
