@@ -29,10 +29,15 @@ function validateBlockReceipts(
     if (!block.hash || !block.parentHash) {
         throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
     }
+    const transactions = block.prefetchedTransactions;
     if (receipts.length === 0) {
+        if (transactions.length === 0) {
+            // Empty blocks legitimately have no receipts, so there is no receipt blockHash to compare.
+            return;
+        }
         throw new BlockReceiptConsistencyError(
             blockNumber,
-            `Block ${blockNumber} returned no receipts; block hash consistency cannot be verified`,
+            `Block ${blockNumber} contains ${transactions.length} transactions but returned no receipts`,
         );
     }
 
@@ -57,7 +62,6 @@ function validateBlockReceipts(
         );
     }
 
-    const transactions = block.prefetchedTransactions;
     if (transactions.length !== receipts.length) {
         throw new Error(
             `Block ${blockNumber} has ${transactions.length} transactions but ${receipts.length} receipts`,
