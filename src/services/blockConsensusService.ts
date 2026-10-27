@@ -12,13 +12,20 @@ export interface ConsensusBlock {
     parentHash: string;
 }
 
-export class ConsensusUnavailableError extends Error {
+export class BlockVerificationUnavailableError extends Error {
     constructor(
         public readonly blockNumber: number,
         public readonly operation: string,
         message: string,
     ) {
         super(message);
+        this.name = 'BlockVerificationUnavailableError';
+    }
+}
+
+export class ConsensusUnavailableError extends BlockVerificationUnavailableError {
+    constructor(blockNumber: number, operation: string, message: string) {
+        super(blockNumber, operation, message);
         this.name = 'ConsensusUnavailableError';
     }
 }
