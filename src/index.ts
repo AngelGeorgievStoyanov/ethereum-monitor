@@ -10,6 +10,7 @@ import {
     SCANNER_START_RETRY_MAX_DELAY_MS,
 } from './constants/scanner.constants';
 import { getEthereumService } from './services/ethereumService';
+import { UnsafeScannerStartError } from './services/scannerInitializationService';
 import { getTxFilterService } from './services/txFilterService';
 import { formatError } from './utils/formatError';
 import { sleep } from './utils/sleep';
@@ -30,6 +31,11 @@ async function startScannerWithRetry() {
             await ethereumService.start();
             return;
         } catch (error) {
+            if (error instanceof UnsafeScannerStartError) {
+                console.error(`[Scanner] Startup stopped because START_BLOCK is unsafe: ${formatError(error)}`);
+                return;
+            }
+
             attempt += 1;
             const delayMs = Math.min(
                 SCANNER_START_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
