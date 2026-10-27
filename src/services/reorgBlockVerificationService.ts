@@ -1,8 +1,5 @@
-import {
-    BlockVerificationUnavailableError,
-    ConsensusBlock,
-    getBlockWithConsensus,
-} from './blockConsensusService';
+import { BlockVerificationUnavailableError } from '../errors/blockVerificationUnavailableError';
+import { ConsensusBlock, getBlockWithConsensus } from './blockConsensusService';
 import {
     CONSENSUS_LOG_INTERVAL_MS,
     CONSENSUS_MAX_RETRIES,
