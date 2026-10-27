@@ -6,7 +6,8 @@ import StoredTransaction from '../models/transaction';
 import TxMatch from '../models/txMatch';
 import ScannerState from '../models/scannerState';
 import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
-import { ConsensusUnavailableError, getBlockWithConsensus } from './blockConsensusService';
+import { BlockVerificationUnavailableError, ConsensusUnavailableError } from './blockConsensusService';
+import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcService';
 
 class ReorgRecoverySafetyError extends Error {
@@ -25,6 +26,16 @@ import {
     recordReorgDetected,
     recordReorgRecoveryCompleted,
 } from './recoveryMetrics';
+
+let singleProviderReorgWarningLogged = false;
+
+function logSingleProviderReorgMode(): void {
+    if (ethereumProvider.getEndpointCount() !== 1 || singleProviderReorgWarningLogged) return;
+    console.warn(
+        '[Reorg] WARNING: Only one RPC provider is configured. Independent consensus is unavailable; provider P1 is the source of truth for reorg detection and recovery. Consensus verification is disabled.',
+    );
+    singleProviderReorgWarningLogged = true;
+}
 
 function sameBlock(stored: Block, current: { blockHash: string; parentHash: string }): boolean {
     return stored.blockHash.toLowerCase() === current.blockHash.toLowerCase() &&
@@ -75,7 +86,7 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
             throw new ReorgRecoverySafetyError(`Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`);
         }
 
-        const currentBlock = await getBlockWithConsensus(blockNumber, 'common ancestor search');
+        const currentBlock = await getReorgVerifiedBlock(blockNumber, 'common ancestor search');
         if (sameBlock(storedBlock, currentBlock)) {
             ancestor = storedBlock;
             ancestorDepth = depth;
@@ -173,6 +184,7 @@ async function processReorgRecoveryInternal(
         return true;
     }
     if (state.reorgRecoveryBlocked) return true;
+    if (state.reorgRecoveryActive) logSingleProviderReorgMode();
     if (state.lastProcessedBlock < 0 && !state.reorgRecoveryActive) return false;
 
     if (state.reorgRecoveryActive && state.reorgRecoveryStartBlock !== null) {
@@ -199,12 +211,17 @@ async function processReorgRecoveryInternal(
         });
         if (primaryMatches) return false;
 
-        const consensusCheckpoint = await getBlockWithConsensus(state.lastProcessedBlock, 'reorg detection');
+        const consensusCheckpoint = await getReorgVerifiedBlock(state.lastProcessedBlock, 'reorg detection');
         if (sameBlock(storedCheckpoint, consensusCheckpoint)) {
-            console.warn(`[Reorg] Primary provider disagreed at checkpoint ${state.lastProcessedBlock}, but configured providers agree with stored history; continuing normal scan`);
+            console.warn(
+                ethereumProvider.getEndpointCount() === 1
+                    ? `[Reorg] Provider P1's follow-up read matches stored history at checkpoint ${state.lastProcessedBlock}; continuing normal scan`
+                    : `[Reorg] Primary provider disagreed at checkpoint ${state.lastProcessedBlock}, but configured providers agree with stored history; continuing normal scan`,
+            );
             return false;
         }
 
+        logSingleProviderReorgMode();
         console.error(
             `[Reorg] Detected chain mismatch at block ${state.lastProcessedBlock}; storedHash=${storedCheckpoint.blockHash}; currentHash=${currentCheckpoint.hash}`,
         );
@@ -227,7 +244,7 @@ async function processReorgRecoveryInternal(
         }
 
         const blockNumber = state.lastProcessedBlock + 1;
-        const consensusBlock = await getBlockWithConsensus(blockNumber, 'reorg recovery');
+        const consensusBlock = await getReorgVerifiedBlock(blockNumber, 'reorg recovery');
         const previousCanonicalBlock = await Block.findOne({
             where: { blockNumber: state.lastProcessedBlock, status: 'CANONICAL' },
         });
@@ -245,7 +262,7 @@ async function processReorgRecoveryInternal(
             fetched.block.hash.toLowerCase() !== consensusBlock.blockHash.toLowerCase() ||
             fetched.block.parentHash.toLowerCase() !== consensusBlock.parentHash.toLowerCase()
         ) {
-            throw new ReorgRecoverySafetyError(`Block data fetched for recovery block ${blockNumber} does not match provider consensus`);
+            throw new ReorgRecoverySafetyError(`Block data fetched for recovery block ${blockNumber} does not match the verified provider block`);
         }
         const prepared = await processFetchedBlock(fetched, filters, true);
 
@@ -283,10 +300,11 @@ async function processReorgRecoveryInternal(
         state.reorgRecoveryStartBlock = null;
         state.reorgRecoveryTargetBlock = recoveryComplete ? null : recoveryTargetBlock;
         console.log(
-            `[Reorg] Recovery block ${blockNumber} committed with consensus; stable=${stableBlocks}/${REORG_RECOVERY_STABLE_BLOCKS}; target=${recoveryTargetBlock}; checkpoint=${state.lastProcessedBlock}`,
+            `[Reorg] Recovery block ${blockNumber} committed after provider verification; stable=${stableBlocks}/${REORG_RECOVERY_STABLE_BLOCKS}; target=${recoveryTargetBlock}; checkpoint=${state.lastProcessedBlock}`,
         );
         if (recoveryComplete) {
             recordReorgRecoveryCompleted();
+            singleProviderReorgWarningLogged = false;
             console.log(`[Reorg] Recovery completed at block ${blockNumber}; normal scanner mode may resume`);
             return true;
         }
@@ -296,12 +314,15 @@ async function processReorgRecoveryInternal(
 }
 
 
-async function markConsensusRecoveryBlocked(state: ScannerState, error: ConsensusUnavailableError): Promise<void> {
+async function markVerificationRecoveryBlocked(
+    state: ScannerState,
+    error: BlockVerificationUnavailableError,
+): Promise<void> {
     if (!(await isScannerLockHeld())) {
         console.error('[Reorg] Cannot persist blocked recovery state because scanner lock ownership was lost');
         return;
     }
-    recordReorgConsensusFailure();
+    if (error instanceof ConsensusUnavailableError) recordReorgConsensusFailure();
     await sequelize.transaction(async (transaction) => {
         if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before persisting consensus-blocked recovery state');
         const persistedState = await ScannerState.findByPk(state.id, {
@@ -316,11 +337,16 @@ async function markConsensusRecoveryBlocked(state: ScannerState, error: Consensu
             persistedState.reorgRecoveryStableBlocks = 0;
         }
         persistedState.reorgRecoveryBlocked = true;
-        persistedState.reorgRecoveryBlockReason = `CONSENSUS_UNAVAILABLE:${error.operation}:block=${error.blockNumber}`.slice(0, 500);
+        const reasonPrefix = error instanceof ConsensusUnavailableError
+            ? 'CONSENSUS_UNAVAILABLE'
+            : 'BLOCK_VERIFICATION_UNAVAILABLE';
+        persistedState.reorgRecoveryBlockReason = `${reasonPrefix}:${error.operation}:block=${error.blockNumber}`.slice(0, 500);
         await persistedState.save({ transaction });
     });
     await state.reload();
-    console.error(`[Reorg] CRITICAL: recovery is blocked after consensus failure; block=${error.blockNumber}; operation=${error.operation}. Explicit operator retry is required.`);
+    console.error(
+        `[Reorg] CRITICAL: recovery is blocked because block verification failed; block=${error.blockNumber}; operation=${error.operation}; reason=${error.message}. Explicit operator retry is required.`,
+    );
 }
 
 export async function processReorgRecovery(
@@ -331,8 +357,8 @@ export async function processReorgRecovery(
     try {
         return await processReorgRecoveryInternal(state, finalizedBlockNumber, getActiveTxFilters);
     } catch (error) {
-        if (error instanceof ConsensusUnavailableError) {
-            await markConsensusRecoveryBlocked(state, error);
+        if (error instanceof BlockVerificationUnavailableError) {
+            await markVerificationRecoveryBlocked(state, error);
         } else if (error instanceof ReorgRecoverySafetyError) {
             await markRecoverySafetyBlocked(state, error);
         } else if (error instanceof BlockReceiptConsistencyError) {
