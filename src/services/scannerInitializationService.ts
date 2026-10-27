@@ -31,8 +31,11 @@ export async function initializeScannerState(): Promise<ScannerState> {
 
             initialBlock = env.startBlock;
         } else {
-            // No explicit start block means begin after the current finalized checkpoint.
-            initialBlock = finalized.number;
+            // No explicit start block means skip existing history and begin after the current finalized block.
+            initialBlock = finalized.number + 1;
+            if (!Number.isSafeInteger(initialBlock)) {
+                throw new Error('Unsafe scanner start: latest finalized block cannot be incremented safely');
+            }
         }
 
         state = await createScannerState({
