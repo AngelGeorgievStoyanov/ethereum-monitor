@@ -172,7 +172,13 @@ async function processReorgRecoveryInternal(
         const storedCheckpoint = await Block.findOne({
             where: { blockNumber: state.lastProcessedBlock, status: 'CANONICAL' },
         });
-        if (!storedCheckpoint) return false;
+        if (!storedCheckpoint) {
+            const anyCanonicalBlock = await Block.findOne({ where: { status: 'CANONICAL' } });
+            if (!anyCanonicalBlock) return false; // Fresh scanner baseline: no block has been persisted yet.
+            throw new ReorgRecoverySafetyError(
+                `Canonical block history is missing at checkpoint ${state.lastProcessedBlock}`,
+            );
+        }
 
         const currentCheckpoint = await getBlockWithConsensus(state.lastProcessedBlock, 'reorg detection');
         if (sameBlock(storedCheckpoint, currentCheckpoint)) return false;
@@ -320,6 +326,9 @@ async function markRecoverySafetyBlocked(state: ScannerState, error: ReorgRecove
         if (!persistedState) throw new Error(`Scanner state "${state.id}" was not found`);
         persistedState.reorgRecoveryActive = true;
         persistedState.reorgRecoveryBlocked = true;
+        if (persistedState.reorgRecoveryStartBlock === null) {
+            persistedState.reorgRecoveryStartBlock = persistedState.lastProcessedBlock;
+        }
         persistedState.reorgRecoveryBlockReason = `SAFETY:${error.message}`.slice(0, 500);
         await persistedState.save({ transaction });
     });
