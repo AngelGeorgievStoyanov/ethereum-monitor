@@ -17,6 +17,7 @@ import { runManualRescan, RescanReorgDetectedError } from '../services/rescanSer
 import { getRecoveryMetrics, recordRescanFailure } from '../services/recoveryMetrics';
 import ScannerRescanJob from '../models/scannerRescanJob';
 import { formatError } from '../utils/formatError';
+import { isScannerLockHeld } from '../services/scannerLockService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -60,7 +61,7 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
     }
 };
 
-export const pauseScanner = (req: Request, res: Response): void => {
+export const pauseScanner = async (req: Request, res: Response): Promise<void> => {
     const mode = req.body?.mode ?? 'temporary';
     const atBlock = req.body?.atBlock;
     const durationMinutes = req.body?.durationMinutes;
@@ -94,21 +95,21 @@ export const pauseScanner = (req: Request, res: Response): void => {
     }
 
     try {
-        requestScannerPause(
+        await requestScannerPause(
             mode,
             atBlock ?? null,
             mode === 'temporary' ? (durationMinutes ?? 5) : 5,
         );
-        res.json({ message: 'Scanner pause requested', ...getScannerControlState() });
+        res.json({ message: 'Scanner pause requested', ...(await getScannerControlState()) });
     } catch (error) {
         sendHttpError(res, 'Unable to request scanner pause', error);
     }
 };
 
-export const resumeScannerController = (_req: Request, res: Response): void => {
+export const resumeScannerController = async (_req: Request, res: Response): Promise<void> => {
     try {
-        resumeScanner();
-        res.json({ message: 'Scanner resumed', ...getScannerControlState() });
+        await resumeScanner();
+        res.json({ message: 'Scanner resumed', ...(await getScannerControlState()) });
     } catch (error) {
         sendHttpError(res, 'Unable to resume scanner', error);
     }
@@ -139,7 +140,7 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
             completedAt: new Date(),
             error: null,
         });
-        resumeScanner();
+        await resumeScanner();
         console.log(`[Rescan] Job ${jobId} completed; range=${fromBlock}-${toBlock}; blocksProcessed=${result.blocksProcessed}; scanner resumed`);
     } catch (error) {
         const message = formatError(error);
@@ -151,7 +152,7 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
             });
             console.warn(`[Rescan] Job ${jobId} detected a reorg; handing control to automatic recovery`);
             try {
-                resumeScanner();
+                await resumeScanner();
             } catch (resumeError) {
                 console.error(`[Rescan] Job ${jobId} could not resume scanner for recovery: ${formatError(resumeError)}`);
             }
@@ -175,9 +176,13 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
         return;
     }
 
-    const scannerControl = getScannerControlState();
+    const scannerControl = await getScannerControlState();
     if (!scannerControl.paused || scannerControl.mode !== 'manual') {
         res.status(409).json({ message: 'Pause the scanner with mode="manual" before starting a rescan; temporary pauses may expire during the operation.' });
+        return;
+    }
+    if (!(await isScannerLockHeld())) {
+        res.status(409).json({ message: 'Manual rescan must be started on the instance that currently owns the scanner lock.' });
         return;
     }
     if (isScannerProcessingBlocks()) {
