@@ -102,7 +102,7 @@ export function createBlockMonitorService() {
                     }
                     waitingForFilters = true;
                     waitingForPause = false;
-                } else if (getScannerControlState().paused) {
+                } else if ((await getScannerControlState()).paused) {
                     if (!waitingForPause) {
                         console.log('[Scanner] Paused; skipping finalized-block RPC polling');
                     }
@@ -113,7 +113,7 @@ export function createBlockMonitorService() {
                     if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
                     if (waitingForFilters) {
-                        if (!isScannerPausePendingOrActive()) {
+                        if (!(await isScannerPausePendingOrActive())) {
                             const activationStartBlock = Math.min(
                                 ...activeTxFilters.map(
                                     (filter) => filter.activeFromBlock ?? finalized.number + 1,
@@ -126,7 +126,7 @@ export function createBlockMonitorService() {
                             }
                         }
                         console.log(
-                            isScannerPausePendingOrActive()
+                            (await isScannerPausePendingOrActive())
                                 ? `[Scanner] Active filters detected while paused; preserving checkpoint ${state.lastProcessedBlock}`
                                 : `[Scanner] Active filters detected; starting at block ${state.lastProcessedBlock + 1}`,
                         );
