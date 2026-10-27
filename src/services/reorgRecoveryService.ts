@@ -6,7 +6,7 @@ import StoredTransaction from '../models/transaction';
 import TxMatch from '../models/txMatch';
 import ScannerState from '../models/scannerState';
 import { processBlock } from './blockProcessingService';
-import { getBlockWithConsensus } from './blockConsensusService';
+import { ConsensusUnavailableError, getBlockWithConsensus } from './blockConsensusService';
 import { persistProcessedBlockBatch } from './transactionService';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { isScannerLockHeld } from './scannerLockService';
@@ -24,6 +24,7 @@ export async function markReorgRecoveryPending(state: ScannerState, checkpoint: 
         });
         if (!persistedState) throw new Error(`Scanner state "${state.id}" was not found`);
         persistedState.reorgRecoveryActive = true;
+        persistedState.reorgRecoveryBlocked = false;
         persistedState.reorgRecoveryStableBlocks = 0;
         persistedState.reorgRecoveryStartBlock = checkpoint;
         await persistedState.save({ transaction });
@@ -129,11 +130,12 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
     );
 }
 
-export async function processReorgRecovery(
+async function processReorgRecoveryInternal(
     state: ScannerState,
     finalizedBlockNumber: number,
     getActiveTxFilters: () => ActiveTxFilter[],
 ): Promise<boolean> {
+    if (state.reorgRecoveryBlocked) return true;
     if (state.lastProcessedBlock < 0 && !state.reorgRecoveryActive) return false;
 
     if (state.reorgRecoveryActive && state.reorgRecoveryStartBlock !== null) {
@@ -221,4 +223,39 @@ export async function processReorgRecovery(
     }
 
     return true;
+}
+
+
+async function markConsensusRecoveryBlocked(state: ScannerState, error: ConsensusUnavailableError): Promise<void> {
+    await sequelize.transaction(async (transaction) => {
+        const persistedState = await ScannerState.findByPk(state.id, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
+        if (!persistedState) throw new Error(`Scanner state "${state.id}" was not found`);
+        if (!persistedState.reorgRecoveryActive) {
+            persistedState.reorgRecoveryActive = true;
+            persistedState.reorgRecoveryStartBlock = persistedState.lastProcessedBlock;
+            persistedState.reorgRecoveryStableBlocks = 0;
+        }
+        persistedState.reorgRecoveryBlocked = true;
+        await persistedState.save({ transaction });
+    });
+    await state.reload();
+    console.error(`[Reorg] CRITICAL: recovery is blocked after consensus failure; block=${error.blockNumber}; operation=${error.operation}. Explicit operator retry is required.`);
+}
+
+export async function processReorgRecovery(
+    state: ScannerState,
+    finalizedBlockNumber: number,
+    getActiveTxFilters: () => ActiveTxFilter[],
+): Promise<boolean> {
+    try {
+        return await processReorgRecoveryInternal(state, finalizedBlockNumber, getActiveTxFilters);
+    } catch (error) {
+        if (error instanceof ConsensusUnavailableError) {
+            await markConsensusRecoveryBlocked(state, error);
+        }
+        throw error;
+    }
 }

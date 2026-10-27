@@ -33,6 +33,7 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
             ...getScannerControlState(),
             lastProcessedBlock,
             reorgRecoveryActive: checkpoint?.reorgRecoveryActive ?? false,
+            reorgRecoveryBlocked: checkpoint?.reorgRecoveryBlocked ?? false,
             reorgRecoveryStableBlocks: checkpoint?.reorgRecoveryStableBlocks ?? 0,
             reorgRecoveryStartBlock: checkpoint?.reorgRecoveryStartBlock ?? null,
             latestFinalizedBlock,
@@ -136,5 +137,30 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             return;
         }
         sendHttpError(res, 'Manual rescan failed', error);
+    }
+};
+
+
+export const retryBlockedReorgRecovery = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const state = await ScannerState.findByPk(SCANNER_ID);
+        if (!state || !state.reorgRecoveryActive) {
+            res.status(409).json({ message: 'No pending reorg recovery is available to retry.' });
+            return;
+        }
+        if (!state.reorgRecoveryBlocked) {
+            res.status(409).json({ message: 'Reorg recovery is not blocked; no explicit retry is needed.' });
+            return;
+        }
+        state.reorgRecoveryBlocked = false;
+        await state.save();
+        res.json({
+            message: 'Reorg recovery unblocked. Resume the scanner if it is paused.',
+            reorgRecoveryActive: state.reorgRecoveryActive,
+            reorgRecoveryBlocked: state.reorgRecoveryBlocked,
+            reorgRecoveryStartBlock: state.reorgRecoveryStartBlock,
+        });
+    } catch (error) {
+        sendHttpError(res, 'Unable to retry reorg recovery', error);
     }
 };

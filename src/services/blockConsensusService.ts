@@ -12,6 +12,17 @@ export interface ConsensusBlock {
     parentHash: string;
 }
 
+export class ConsensusUnavailableError extends Error {
+    constructor(
+        public readonly blockNumber: number,
+        public readonly operation: string,
+        message: string,
+    ) {
+        super(message);
+        this.name = 'ConsensusUnavailableError';
+    }
+}
+
 function describeDisagreement(
     expected: ConsensusBlock | undefined,
     result: Awaited<ReturnType<typeof ethereumProvider.getBlockFromAllEndpoints>>[number],
@@ -68,5 +79,5 @@ export async function getBlockWithConsensus(
 
     const message = `Consensus unavailable for block ${blockNumber} during ${operation} after ${CONSENSUS_MAX_RETRIES} retries: ${lastDisagreements.join('; ')}`;
     console.error(`[Consensus] CRITICAL ${message}`);
-    throw new Error(message);
+    throw new ConsensusUnavailableError(blockNumber, operation, message);
 }

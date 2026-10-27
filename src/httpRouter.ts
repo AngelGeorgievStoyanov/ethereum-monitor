@@ -15,6 +15,7 @@ import {
     pauseScanner,
     resumeScannerController,
     rescanScannerController,
+    retryBlockedReorgRecovery,
 } from './controllers/scannerController';
 
 const router = Router();
@@ -31,6 +32,7 @@ router.get('/scanner/status', getScannerStatus);
 router.post('/scanner/pause', pauseScanner);
 router.post('/scanner/resume', resumeScannerController);
 router.post('/scanner/rescan', rescanScannerController);
+router.post('/scanner/reorg-retry', retryBlockedReorgRecovery);
 
 router.get('/transactions', getAllStoredTransactions);
 router.delete('/transactions/:id', deleteTransactionById);
