@@ -9,6 +9,7 @@ import { processFinalizedBlocks } from './blockProcessor';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
 import { getScannerControlState, isScannerPausePendingOrActive } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
+import { processReorgRecovery } from './reorgRecoveryService';
 
 export function createBlockMonitorService() {
     const txFilterService = getTxFilterService();
@@ -127,18 +128,25 @@ export function createBlockMonitorService() {
                         waitingForFilters = false;
                     }
 
-                    processingFinalizedBlocks = state.lastProcessedBlock < finalized.number;
-                    if (processingFinalizedBlocks) {
-                        lastObservedCheckpoint = state.lastProcessedBlock;
-                        lastProgressAt = Date.now();
-                        lastStallWarningAt = 0;
-                    }
-                    try {
-                        await processFinalizedBlocks(state, finalized.number, () =>
-                            txFilterService.getTxFilters(),
-                        );
-                    } finally {
-                        processingFinalizedBlocks = false;
+                    const recoveryHandled = await processReorgRecovery(
+                        state,
+                        finalized.number,
+                        () => txFilterService.getTxFilters(),
+                    );
+                    if (!recoveryHandled) {
+                        processingFinalizedBlocks = state.lastProcessedBlock < finalized.number;
+                        if (processingFinalizedBlocks) {
+                            lastObservedCheckpoint = state.lastProcessedBlock;
+                            lastProgressAt = Date.now();
+                            lastStallWarningAt = 0;
+                        }
+                        try {
+                            await processFinalizedBlocks(state, finalized.number, () =>
+                                txFilterService.getTxFilters(),
+                            );
+                        } finally {
+                            processingFinalizedBlocks = false;
+                        }
                     }
                 }
             } catch (error) {

@@ -51,12 +51,19 @@ export interface ProcessedBlockRecord {
     parentHash: string;
 }
 
+export interface ReorgRecoveryProgress {
+    active: boolean;
+    stableBlocks: number;
+    startBlock: number | null;
+}
+
 export async function persistProcessedBlockBatch(
     candidates: readonly TransferBatchCandidate[],
     blocks: readonly ProcessedBlockRecord[],
     scannerStateId: string,
     expectedCheckpoint: number,
     newCheckpoint: number,
+    recoveryProgress?: ReorgRecoveryProgress,
 ): Promise<number> {
     return sequelize.transaction(async (transaction) => {
         const state = await ScannerState.findByPk(scannerStateId, {
@@ -96,6 +103,11 @@ export async function persistProcessedBlockBatch(
 
         await createTransactionsFromEthereumDataBatch(candidates, transaction);
         state.lastProcessedBlock = newCheckpoint;
+        if (recoveryProgress) {
+            state.reorgRecoveryActive = recoveryProgress.active;
+            state.reorgRecoveryStableBlocks = recoveryProgress.stableBlocks;
+            state.reorgRecoveryStartBlock = recoveryProgress.startBlock;
+        }
         await state.save({ transaction });
 
         return newCheckpoint;
