@@ -40,7 +40,15 @@ export async function isScannerPausePendingOrActive(): Promise<boolean> {
 }
 
 export async function getScannerControlState(): Promise<ScannerControlState> {
-    const state = await loadControlRow();
+    const state = await ScannerState.findByPk(SCANNER_ID);
+    if (!state) {
+        return {
+            paused: false,
+            mode: null,
+            pauseRequestedAtBlock: null,
+            pauseUntil: null,
+        };
+    }
     if (
         state.scannerPaused &&
         state.scannerPauseMode === 'temporary' &&
