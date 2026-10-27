@@ -24,6 +24,7 @@ export interface ProcessedBlockMetrics {
 }
 
 export interface PreparedBlockResult extends ProcessedBlockMetrics {
+    block: { blockNumber: number; blockHash: string; parentHash: string };
     candidates: TransferBatchCandidate[];
 }
 
@@ -71,6 +72,7 @@ export async function processBlock(
     const filterMatchingDurationMs = Date.now() - filterMatchingStartedAt;
 
     return {
+        block: { blockNumber: block.number, blockHash: block.hash, parentHash: block.parentHash },
         transactionCount: transactions.length,
         nativeTransfersSeen: native.transfersSeen,
         nativeMatches: native.transfersMatched,

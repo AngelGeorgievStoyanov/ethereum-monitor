@@ -6,9 +6,10 @@ interface TxMatchAttributes {
     txId: number;
     txFilterId: number | null;
     txFilterDescription: string | null;
+    matchStatus: 'ACTIVE' | 'NOT_MATCHED' | 'FILTER_DELETED' | 'REORGED';
 }
 
-type TxMatchCreationAttributes = Optional<TxMatchAttributes, 'id' | 'txFilterDescription'>;
+type TxMatchCreationAttributes = Optional<TxMatchAttributes, 'id' | 'txFilterDescription' | 'matchStatus'>;
 
 class TxMatch
     extends Model<TxMatchAttributes, TxMatchCreationAttributes>
@@ -18,6 +19,7 @@ class TxMatch
     public txId!: number;
     public txFilterId!: number | null;
     public txFilterDescription!: string | null;
+    public matchStatus!: 'ACTIVE' | 'NOT_MATCHED' | 'FILTER_DELETED' | 'REORGED';
 }
 
 TxMatch.init(
@@ -42,6 +44,11 @@ TxMatch.init(
         txFilterDescription: {
             type: DataTypes.STRING,
             allowNull: true,
+        },
+        matchStatus: {
+            type: DataTypes.STRING(30),
+            allowNull: false,
+            defaultValue: 'ACTIVE',
         },
     },
     {

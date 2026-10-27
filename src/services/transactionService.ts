@@ -16,6 +16,7 @@ import {
 } from '../mappers/transactionContextMapper';
 import sequelize from '../database';
 import ScannerState from '../models/scannerState';
+import Block from '../models/block';
 
 export type TransferMetadata = TransferContextMetadata;
 
@@ -44,8 +45,15 @@ export async function createTransactionsFromEthereumDataBatch(
     await createTransfersBatch(items, transaction);
 }
 
+export interface ProcessedBlockRecord {
+    blockNumber: number;
+    blockHash: string;
+    parentHash: string;
+}
+
 export async function persistProcessedBlockBatch(
     candidates: readonly TransferBatchCandidate[],
+    blocks: readonly ProcessedBlockRecord[],
     scannerStateId: string,
     expectedCheckpoint: number,
     newCheckpoint: number,
@@ -64,6 +72,26 @@ export async function persistProcessedBlockBatch(
         // In that case, discard this prepared batch and let the caller resume from DB state.
         if (state.lastProcessedBlock !== expectedCheckpoint) {
             return state.lastProcessedBlock;
+        }
+
+        for (let index = 1; index < blocks.length; index += 1) {
+            if (blocks[index].parentHash.toLowerCase() !== blocks[index - 1].blockHash.toLowerCase()) {
+                throw new Error(`Block chain discontinuity between ${blocks[index - 1].blockNumber} and ${blocks[index].blockNumber}`);
+            }
+        }
+
+        if (blocks.length > 0) {
+            const previousCanonicalBlock = await Block.findOne({
+                where: { blockNumber: expectedCheckpoint, status: 'CANONICAL' },
+                transaction,
+            });
+            if (previousCanonicalBlock && blocks[0].parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()) {
+                throw new Error(`Block ${blocks[0].blockNumber} parent hash does not match canonical block ${expectedCheckpoint}; reorg recovery is required`);
+            }
+            await Block.bulkCreate(blocks.map((block) => ({ ...block, status: 'CANONICAL' })), {
+                updateOnDuplicate: ['blockNumber', 'parentHash', 'status', 'updatedAt'],
+                transaction,
+            });
         }
 
         await createTransactionsFromEthereumDataBatch(candidates, transaction);

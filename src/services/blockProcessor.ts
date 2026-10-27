@@ -73,6 +73,7 @@ export async function processFinalizedBlocks(
             const databaseWriteStartedAt = Date.now();
             const committedCheckpoint = await persistProcessedBlockBatch(
                 candidates,
+                preparedBlocks.map(({ result }) => result.block),
                 state.id,
                 expectedCheckpoint,
                 blockNumbers[blockNumbers.length - 1],

@@ -13,10 +13,12 @@ function getTransferIdentity(data: {
     txHash: string;
     transferType: string;
     logIndex: number;
+    blockHash: string;
 }): string {
+    const blockHash = data.blockHash.toLowerCase();
     return data.transferType === 'erc20'
-        ? `${data.txHash.toLowerCase()}:erc20:${data.logIndex}`
-        : `${data.txHash.toLowerCase()}:${data.transferType}`;
+        ? `${data.txHash.toLowerCase()}:erc20:${data.logIndex}:${blockHash}`
+        : `${data.txHash.toLowerCase()}:${data.transferType}:${blockHash}`;
 }
 
 export async function createTransfersBatch(
@@ -34,10 +36,12 @@ export async function createTransfersBatch(
 
         const txHashes = [...new Set(data.map((item) => item.txHash))];
         const transferTypes = [...new Set(data.map((item) => item.transferType))];
+        const blockHashes = [...new Set(data.map((item) => item.blockHash))];
         const storedTransactions = await Transaction.findAll({
             where: {
                 txHash: { [Op.in]: txHashes },
                 transferType: { [Op.in]: transferTypes },
+                blockHash: { [Op.in]: blockHashes },
             },
             transaction: dbTransaction,
         });
@@ -106,6 +110,7 @@ export async function findOrCreateTransfer(data: TransactionCreationAttributes) 
         where: {
             txHash: data.txHash,
             transferType: data.transferType,
+            blockHash: data.blockHash,
             ...(data.transferType === 'erc20' ? { logIndex: data.logIndex } : {}),
         },
         defaults: data,
@@ -118,6 +123,7 @@ export async function findOrCreateInternalTransfer(data: TransactionCreationAttr
     const where = {
         txHash: data.txHash,
         transferType: 'internal' as const,
+        blockHash: data.blockHash,
         from: data.from,
         to: data.to ?? null,
         value: data.value,

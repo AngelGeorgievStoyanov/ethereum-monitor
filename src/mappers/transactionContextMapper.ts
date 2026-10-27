@@ -59,7 +59,8 @@ export function mapTransactionCreationData(
         transferType: transfer.transferType,
         tokenAddress: transfer.tokenAddress ?? null,
         logIndex: transfer.logIndex,
-        status: getTransactionStatus(receipt),
+        chainStatus: getTransactionStatus(receipt).toUpperCase() as 'SUCCESS' | 'FAILED',
+        recordStatus: 'NORMAL',
         transactionType: tx.type?.toString(),
         timestamp: new Date(blockTimestamp * 1000),
     };

@@ -17,14 +17,15 @@ interface TransactionAttributes {
     to?: string | null;
     value: string;
     internalCount: number | null;
-    status?: string;
+    chainStatus: 'SUCCESS' | 'FAILED';
+    recordStatus: 'NORMAL' | 'REORGED';
     transactionType?: string;
     timestamp?: Date;
 }
 
 export type TransactionCreationAttributes = Optional<
     TransactionAttributes,
-    'id' | 'tokenAddress' | 'to' | 'internalCount' | 'status' | 'transactionType' | 'timestamp'
+    'id' | 'tokenAddress' | 'to' | 'internalCount' | 'recordStatus' | 'transactionType' | 'timestamp'
 >;
 
 class Transaction
@@ -44,7 +45,8 @@ class Transaction
     public to?: string | null;
     public value!: string;
     public internalCount!: number | null;
-    public status?: string;
+    public chainStatus!: 'SUCCESS' | 'FAILED';
+    public recordStatus!: 'NORMAL' | 'REORGED';
     public transactionType?: string;
     public timestamp?: Date;
 }
@@ -106,9 +108,15 @@ Transaction.init(
             allowNull: true,
             defaultValue: null,
         },
-        status: {
-            type: DataTypes.STRING,
-            allowNull: true,
+        chainStatus: {
+            type: DataTypes.STRING(20),
+            allowNull: false,
+            defaultValue: 'SUCCESS',
+        },
+        recordStatus: {
+            type: DataTypes.STRING(20),
+            allowNull: false,
+            defaultValue: 'NORMAL',
         },
         transactionType: {
             type: DataTypes.STRING,
@@ -128,13 +136,13 @@ Transaction.init(
             {
                 name: 'transactions_native_identity_unique',
                 unique: true,
-                fields: ['txHash', 'transferType'],
+                fields: ['txHash', 'transferType', 'blockHash'],
                 where: { transferType: 'native' },
             },
             {
                 name: 'transactions_erc20_identity_unique',
                 unique: true,
-                fields: ['txHash', 'transferType', 'logIndex'],
+                fields: ['txHash', 'transferType', 'logIndex', 'blockHash'],
                 where: { transferType: 'erc20' },
             },
         ],

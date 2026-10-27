@@ -1,5 +1,6 @@
 import express from 'express';
 import './models/associations';
+import './models/block';
 import sequelize from './database';
 import httpRouter from './httpRouter';
 import { HTTP_HOST, HTTP_PORT } from './constants/http.constants';
@@ -11,6 +12,7 @@ import { getEthereumService } from './services/ethereumService';
 import { getTxFilterService } from './services/txFilterService';
 import { formatError } from './utils/formatError';
 import { sleep } from './utils/sleep';
+import { runMigrations } from './migrations/runMigrations';
 
 const app = express();
 
@@ -44,6 +46,7 @@ async function startScannerWithRetry() {
 
 async function startServer() {
     await sequelize.sync();
+    await runMigrations();
     console.log('Database connected');
 
     await txFilterService.loadTxFilters();

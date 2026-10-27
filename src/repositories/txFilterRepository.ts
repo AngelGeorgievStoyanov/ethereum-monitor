@@ -66,6 +66,10 @@ export async function deleteTxFilterById(id: number, transaction?: SequelizeTran
             },
         );
         await TxMatch.update(
+            { matchStatus: 'FILTER_DELETED' },
+            { where: { txFilterId: id }, transaction: activeTransaction },
+        );
+        await TxMatch.update(
             { txFilterId: null },
             { where: { txFilterId: id }, transaction: activeTransaction },
         );
