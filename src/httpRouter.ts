@@ -14,6 +14,7 @@ import {
     getScannerStatus,
     pauseScanner,
     resumeScannerController,
+    rescanScannerController,
 } from './controllers/scannerController';
 
 const router = Router();
@@ -29,6 +30,7 @@ router.delete('/tx-filters/:id', deleteTxFilter);
 router.get('/scanner/status', getScannerStatus);
 router.post('/scanner/pause', pauseScanner);
 router.post('/scanner/resume', resumeScannerController);
+router.post('/scanner/rescan', rescanScannerController);
 
 router.get('/transactions', getAllStoredTransactions);
 router.delete('/transactions/:id', deleteTransactionById);

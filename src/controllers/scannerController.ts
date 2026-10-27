@@ -8,6 +8,9 @@ import ScannerState from '../models/scannerState';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { HttpError, sendHttpError } from '../utils/httpError';
 import { ethereumProvider } from '../services/ethereumRpcService';
+import { isScannerProcessingBlocks } from '../services/blockMonitorService';
+import { getScannerControlState } from '../services/scannerControlService';
+import { runManualRescan, RescanReorgDetectedError } from '../services/rescanService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -94,5 +97,42 @@ export const resumeScannerController = (_req: Request, res: Response): void => {
         res.json({ message: 'Scanner resumed', ...getScannerControlState() });
     } catch (error) {
         sendHttpError(res, 'Unable to resume scanner', error);
+    }
+};
+
+
+export const rescanScannerController = async (req: Request, res: Response): Promise<void> => {
+    const fromBlock = req.body?.fromBlock;
+    if (!Number.isSafeInteger(fromBlock) || fromBlock < 0) {
+        res.status(400).json({ message: 'fromBlock must be a non-negative integer' });
+        return;
+    }
+
+    if (!getScannerControlState().paused) {
+        res.status(409).json({ message: 'Pause the scanner before starting a manual rescan.' });
+        return;
+    }
+    if (isScannerProcessingBlocks()) {
+        res.status(409).json({ message: 'The scanner is still finishing block processing. Retry the rescan after it becomes idle.' });
+        return;
+    }
+
+    try {
+        const state = await ScannerState.findByPk(SCANNER_ID);
+        if (!state) {
+            res.status(503).json({ message: 'Scanner state is not initialized' });
+            return;
+        }
+        const result = await runManualRescan(fromBlock, state, () =>
+            // Use the same current filter set as the normal scanner.
+            require('../services/txFilterService').getTxFilterService().getTxFilters(),
+        );
+        res.json({ message: 'Manual rescan completed', ...result });
+    } catch (error) {
+        if (error instanceof RescanReorgDetectedError) {
+            res.status(409).json({ message: error.message, reorgRecoveryPending: true });
+            return;
+        }
+        sendHttpError(res, 'Manual rescan failed', error);
     }
 };
