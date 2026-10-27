@@ -11,6 +11,7 @@ import { ethereumProvider } from '../services/ethereumRpcService';
 import { isScannerProcessingBlocks } from '../services/blockMonitorService';
 import { getTxFilterService } from '../services/txFilterService';
 import { runManualRescan, RescanReorgDetectedError } from '../services/rescanService';
+import { getRecoveryMetrics, recordRescanFailure } from '../services/recoveryMetrics';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -36,6 +37,7 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
             reorgRecoveryBlocked: checkpoint?.reorgRecoveryBlocked ?? false,
             reorgRecoveryStableBlocks: checkpoint?.reorgRecoveryStableBlocks ?? 0,
             reorgRecoveryStartBlock: checkpoint?.reorgRecoveryStartBlock ?? null,
+            recoveryMetrics: getRecoveryMetrics(),
             latestFinalizedBlock,
             lagBlocks:
                 lastProcessedBlock !== null && latestFinalizedBlock !== null
