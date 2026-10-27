@@ -114,9 +114,63 @@ export function createRpcClient() {
         return results;
     }
 
+    async function getFinalizedFromAllEndpoints() {
+        const results: Array<{
+            endpointIndex: number;
+            blockNumber: number | null;
+            blockHash: string | null;
+            error: string | null;
+        }> = [];
+
+        // Diagnostic only: inspect each endpoint once without waiting for consensus or blocking scanning.
+        for (const endpoint of endpoints) {
+            const startedAt = Date.now();
+            endpoint.metrics.attempts += 1;
+            try {
+                const block = await withTimeout(
+                    endpoint.provider.getBlock('finalized'),
+                    RPC_ENDPOINT_TIMEOUT_MS,
+                );
+                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+                if (block?.number !== undefined && block.hash) {
+                    endpoint.metrics.successes += 1;
+                    results.push({
+                        endpointIndex: endpoint.index,
+                        blockNumber: block.number,
+                        blockHash: block.hash,
+                        error: null,
+                    });
+                } else {
+                    endpoint.metrics.failures += 1;
+                    results.push({
+                        endpointIndex: endpoint.index,
+                        blockNumber: block?.number ?? null,
+                        blockHash: block?.hash ?? null,
+                        error: 'EMPTY_FINALIZED_BLOCK',
+                    });
+                }
+            } catch (error) {
+                const message = formatError(error);
+                endpoint.metrics.failures += 1;
+                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+                endpoint.metrics.lastFailureAt = new Date().toISOString();
+                if (isRetryableEndpointError(error)) endpoint.metrics.retryableFailures += 1;
+                results.push({
+                    endpointIndex: endpoint.index,
+                    blockNumber: null,
+                    blockHash: null,
+                    error: message,
+                });
+            }
+        }
+
+        return results;
+    }
+
     return {
         execute,
         getBlockFromAllEndpoints,
+        getFinalizedFromAllEndpoints,
         getBlock(blockTag: string | number, includeTransactions = false) {
             return execute(`getBlock(${String(blockTag)})`, (provider) =>
                 provider.getBlock(blockTag, includeTransactions),
