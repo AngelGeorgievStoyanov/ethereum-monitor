@@ -7,6 +7,13 @@ import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { ethereumProvider } from './ethereumRpcService';
 
+export class UnsafeScannerStartError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'UnsafeScannerStartError';
+    }
+}
+
 export async function initializeScannerState(): Promise<ScannerState> {
     let state = await findScannerState(SCANNER_ID);
 
@@ -17,8 +24,8 @@ export async function initializeScannerState(): Promise<ScannerState> {
         let initialBlock: number;
         if (env.startBlock !== undefined) {
             if (env.startBlock > finalized.number) {
-                throw new Error(
-                    `Unsafe scanner start: START_BLOCK ${env.startBlock} is above the latest finalized block ${finalized.number}`,
+                throw new UnsafeScannerStartError(
+                    `START_BLOCK ${env.startBlock} is above the latest finalized block ${finalized.number}`,
                 );
             }
 
