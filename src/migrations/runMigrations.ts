@@ -2,6 +2,7 @@ import { Transaction as SequelizeTransaction } from 'sequelize';
 import sequelize from '../database';
 
 const MIGRATION_ID = '20261027_block_history_and_statuses';
+const REORG_MIGRATION_ID = '20261027_reorg_recovery_state';
 
 const migrationStatements = [
     `DO $$ BEGIN
@@ -27,13 +28,31 @@ const migrationStatements = [
     `CREATE INDEX IF NOT EXISTS "blocks_number_status_index" ON "Blocks" ("blockNumber", "status");`,
 ];
 
+const reorgRecoveryStatements = [
+    `ALTER TABLE "ScannerStates" ADD COLUMN IF NOT EXISTS "reorgRecoveryActive" BOOLEAN NOT NULL DEFAULT FALSE;`,
+    `ALTER TABLE "ScannerStates" ADD COLUMN IF NOT EXISTS "reorgRecoveryStableBlocks" INTEGER NOT NULL DEFAULT 0;`,
+    `ALTER TABLE "ScannerStates" ADD COLUMN IF NOT EXISTS "reorgRecoveryStartBlock" INTEGER;`,
+];
+
 export async function runMigrations(): Promise<void> {
     await sequelize.query(`CREATE TABLE IF NOT EXISTS "SchemaMigrations" ("id" VARCHAR(255) PRIMARY KEY, "appliedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     await sequelize.transaction(async (transaction: SequelizeTransaction) => {
         await sequelize.query('SELECT pg_advisory_xact_lock(20261027)', { transaction });
-        const [rows] = await sequelize.query('SELECT "id" FROM "SchemaMigrations" WHERE "id" = :id', { replacements: { id: MIGRATION_ID }, transaction });
-        if ((rows as Array<{ id: string }>).length > 0) return;
-        for (const statement of migrationStatements) await sequelize.query(statement, { transaction });
-        await sequelize.query('INSERT INTO "SchemaMigrations" ("id") VALUES (:id)', { replacements: { id: MIGRATION_ID }, transaction });
+        const migrations = [
+            { id: MIGRATION_ID, statements: migrationStatements },
+            { id: REORG_MIGRATION_ID, statements: reorgRecoveryStatements },
+        ];
+        for (const migration of migrations) {
+            const [rows] = await sequelize.query(
+                'SELECT "id" FROM "SchemaMigrations" WHERE "id" = :id',
+                { replacements: { id: migration.id }, transaction },
+            );
+            if ((rows as Array<{ id: string }>).length > 0) continue;
+            for (const statement of migration.statements) await sequelize.query(statement, { transaction });
+            await sequelize.query(
+                'INSERT INTO "SchemaMigrations" ("id") VALUES (:id)',
+                { replacements: { id: migration.id }, transaction },
+            );
+        }
     });
 }

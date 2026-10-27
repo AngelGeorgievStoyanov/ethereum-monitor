@@ -5,6 +5,9 @@ class ScannerState extends Model {
     public id!: string;
     public lastProcessedBlock!: number;
     public lastRescanFromBlock!: number | null;
+    public reorgRecoveryActive!: boolean;
+    public reorgRecoveryStableBlocks!: number;
+    public reorgRecoveryStartBlock!: number | null;
 }
 
 ScannerState.init(
@@ -18,6 +21,20 @@ ScannerState.init(
             allowNull: false,
         },
         lastRescanFromBlock: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+        },
+        reorgRecoveryActive: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
+        reorgRecoveryStableBlocks: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+        },
+        reorgRecoveryStartBlock: {
             type: DataTypes.INTEGER,
             allowNull: true,
         },
