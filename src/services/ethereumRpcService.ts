@@ -11,6 +11,16 @@ import { getRpcClient } from '../clients/rpcClient';
 
 export const ethereumProvider = getRpcClient();
 
+export class BlockReceiptConsistencyError extends Error {
+    constructor(
+        public readonly blockNumber: number,
+        message: string,
+    ) {
+        super(message);
+        this.name = 'BlockReceiptConsistencyError';
+    }
+}
+
 function validateBlockReceipts(
     blockNumber: number,
     block: ethers.Block,
@@ -19,6 +29,34 @@ function validateBlockReceipts(
     if (!block.hash || !block.parentHash) {
         throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
     }
+    if (receipts.length === 0) {
+        throw new BlockReceiptConsistencyError(
+            blockNumber,
+            `Block ${blockNumber} returned no receipts; block hash consistency cannot be verified`,
+        );
+    }
+
+    const firstReceiptBlockHash = String(receipts[0].blockHash ?? '').toLowerCase();
+    const inconsistentReceiptHashes = receipts.some(
+        (receipt) => String(receipt.blockHash ?? '').toLowerCase() !== firstReceiptBlockHash,
+    );
+    if (inconsistentReceiptHashes) {
+        const distinctHashes = [...new Set(receipts.map(
+            (receipt) => String(receipt.blockHash ?? '').toLowerCase() || '<missing>',
+        ))];
+        throw new BlockReceiptConsistencyError(
+            blockNumber,
+            `Block ${blockNumber} returned inconsistent receipt blockHash values: ${distinctHashes.join(', ')}`,
+        );
+    }
+
+    if (firstReceiptBlockHash !== block.hash.toLowerCase()) {
+        throw new BlockReceiptConsistencyError(
+            blockNumber,
+            `Block ${blockNumber} hash ${block.hash} does not match receipt blockHash ${receipts[0].blockHash}`,
+        );
+    }
+
     const transactions = block.prefetchedTransactions;
     if (transactions.length !== receipts.length) {
         throw new Error(
@@ -46,11 +84,6 @@ function validateBlockReceipts(
         if (!transactionHashes.has(hash)) {
             throw new Error(
                 `Receipt ${hash} does not correspond to a transaction in block ${blockNumber}`,
-            );
-        }
-        if (String(receipt.blockHash).toLowerCase() !== block.hash.toLowerCase()) {
-            throw new Error(
-                `Receipt ${hash} has blockHash ${receipt.blockHash}, expected ${block.hash}`,
             );
         }
         if (Number(BigInt(receipt.blockNumber)) !== block.number) {
@@ -113,6 +146,10 @@ export async function fetchBlockData(blockNumber: number) {
             };
         } catch (error) {
             const message = formatError(error);
+            if (error instanceof BlockReceiptConsistencyError) {
+                console.error(`[RPC] Block ${blockNumber} receipt consistency failure: ${message}`);
+                throw error;
+            }
             if (attempt === MAX_BLOCK_FETCH_ATTEMPTS) {
                 console.error(
                     `[RPC] Block ${blockNumber} failed after ${attempt} attempts: ${message}`,
@@ -131,38 +168,3 @@ export async function fetchBlockData(blockNumber: number) {
     throw new Error(`Unable to fetch block data for block ${blockNumber}`);
 }
 
-export interface BlockHeader {
-    blockNumber: number;
-    blockHash: string;
-    parentHash: string;
-}
-
-export async function fetchBlockHeaders(blockNumbers: readonly number[]): Promise<BlockHeader[]> {
-    return ethereumProvider.execute(
-        `fetchBlockHeaders(${blockNumbers[0]}-${blockNumbers[blockNumbers.length - 1]})`,
-        async (provider) => {
-            // Read the complete batch through one selected endpoint to avoid mixing forks from
-            // different providers during the cheap connectivity preflight.
-            const blocks = await Promise.all(
-                blockNumbers.map(async (blockNumber) => {
-                    const block = await provider.getBlock(blockNumber);
-                    if (!block) throw new Error(`Unable to load block header ${blockNumber}`);
-                    if (!block.hash || !block.parentHash) {
-                        throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
-                    }
-                    return {
-                        blockNumber: block.number,
-                        blockHash: block.hash,
-                        parentHash: block.parentHash,
-                    };
-                }),
-            );
-            return blocks;
-        },
-    );
-}
-
-export async function fetchBlockHeader(blockNumber: number): Promise<BlockHeader> {
-    const [block] = await fetchBlockHeaders([blockNumber]);
-    return block;
-}

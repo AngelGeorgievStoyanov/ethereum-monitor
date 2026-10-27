@@ -2,7 +2,6 @@ import { TransactionResponse } from 'ethers';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { fetchBlockData } from './ethereumRpcService';
-import type { BlockHeader } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
 import type { TransferBatchCandidate } from './transactionService';
@@ -33,7 +32,6 @@ export async function processBlock(
     blockNumber: number,
     activeTxFilters: ActiveTxFilter[],
     includeUnmatched = false,
-    validatedHeader?: BlockHeader,
 ): Promise<PreparedBlockResult> {
     const blockStartedAt = Date.now();
     const {
@@ -46,15 +44,6 @@ export async function processBlock(
     } = await fetchBlockData(blockNumber);
     if (!block.hash || !block.parentHash) {
         throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
-    }
-    if (validatedHeader && (
-        block.number !== validatedHeader.blockNumber ||
-        block.hash.toLowerCase() !== validatedHeader.blockHash.toLowerCase() ||
-        block.parentHash.toLowerCase() !== validatedHeader.parentHash.toLowerCase()
-    )) {
-        throw new Error(
-            `Block ${blockNumber} changed between connectivity validation and transaction processing; reorg recovery is required`,
-        );
     }
     const transactions = block.prefetchedTransactions;
     const receiptsByHash = new Map<string, RpcTransactionReceipt>();

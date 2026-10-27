@@ -7,7 +7,7 @@ import TxMatch from '../models/txMatch';
 import ScannerState from '../models/scannerState';
 import { processBlock } from './blockProcessingService';
 import { ConsensusUnavailableError, getBlockWithConsensus } from './blockConsensusService';
-import { ethereumProvider } from './ethereumRpcService';
+import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcService';
 
 class ReorgRecoverySafetyError extends Error {
     constructor(message: string) {
@@ -60,11 +60,11 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
     const originalCheckpoint = state.reorgRecoveryStartBlock;
     if (originalCheckpoint === null) throw new Error('Reorg recovery has no checkpoint to reconcile');
 
-    console.warn(`[Reorg] Searching for a common ancestor below block ${originalCheckpoint}`);
+    console.warn(`[Reorg] Searching for a common ancestor at or below block ${originalCheckpoint}`);
     let ancestor: Block | null = null;
     let ancestorDepth = 0;
 
-    for (let depth = 1; depth <= MAX_REORG_LOOKBACK_BLOCKS; depth += 1) {
+    for (let depth = 0; depth <= MAX_REORG_LOOKBACK_BLOCKS; depth += 1) {
         const blockNumber = originalCheckpoint - depth;
         if (blockNumber < 0) break;
 
@@ -84,7 +84,7 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
     }
 
     if (!ancestor) {
-        throw new ReorgRecoverySafetyError(`No common ancestor found within ${MAX_REORG_LOOKBACK_BLOCKS} blocks below ${originalCheckpoint}`);
+        throw new ReorgRecoverySafetyError(`No common ancestor found within ${MAX_REORG_LOOKBACK_BLOCKS} blocks at or below ${originalCheckpoint}`);
     }
 
     if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before reorg rollback');
@@ -334,6 +334,17 @@ export async function processReorgRecovery(
             await markConsensusRecoveryBlocked(state, error);
         } else if (error instanceof ReorgRecoverySafetyError) {
             await markRecoverySafetyBlocked(state, error);
+        } else if (error instanceof BlockReceiptConsistencyError) {
+            console.error(
+                `[Reorg] Receipt consistency failure during recovery at block ${error.blockNumber}: ${error.message}`,
+            );
+            recordReorgDetected();
+            await markReorgRecoveryPending(
+                state,
+                state.lastProcessedBlock,
+                error.blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
+            );
+            return true;
         }
         throw error;
     }
