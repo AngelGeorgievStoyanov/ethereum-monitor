@@ -1,3 +1,4 @@
+import { BlockVerificationUnavailableError } from '../errors/blockVerificationUnavailableError';
 import {
     CONSENSUS_LOG_INTERVAL_MS,
     CONSENSUS_MAX_RETRIES,
@@ -10,17 +11,6 @@ export interface ConsensusBlock {
     blockNumber: number;
     blockHash: string;
     parentHash: string;
-}
-
-export class BlockVerificationUnavailableError extends Error {
-    constructor(
-        public readonly blockNumber: number,
-        public readonly operation: string,
-        message: string,
-    ) {
-        super(message);
-        this.name = 'BlockVerificationUnavailableError';
-    }
 }
 
 export class ConsensusUnavailableError extends BlockVerificationUnavailableError {
