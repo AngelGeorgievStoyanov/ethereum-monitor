@@ -142,6 +142,7 @@ async function processReorgRecoveryInternal(
     finalizedBlockNumber: number,
     getActiveTxFilters: () => ActiveTxFilter[],
 ): Promise<boolean> {
+    await state.reload();
     if (state.reorgRecoveryBlocked) return true;
     if (state.lastProcessedBlock < 0 && !state.reorgRecoveryActive) return false;
 
