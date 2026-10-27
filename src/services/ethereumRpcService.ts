@@ -27,7 +27,10 @@ function validateBlockReceipts(
     receipts: RpcTransactionReceipt[],
 ): void {
     if (!block.hash || !block.parentHash) {
-        throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
+        throw new BlockReceiptConsistencyError(
+            blockNumber,
+            `Block ${blockNumber} is missing its hash or parent hash`,
+        );
     }
     const transactions = block.prefetchedTransactions;
     if (receipts.length === 0) {
@@ -63,7 +66,8 @@ function validateBlockReceipts(
     }
 
     if (transactions.length !== receipts.length) {
-        throw new Error(
+        throw new BlockReceiptConsistencyError(
+            blockNumber,
             `Block ${blockNumber} has ${transactions.length} transactions but ${receipts.length} receipts`,
         );
     }
@@ -72,7 +76,10 @@ function validateBlockReceipts(
     for (const tx of transactions) {
         const hash = tx.hash.toLowerCase();
         if (transactionHashes.has(hash)) {
-            throw new Error(`Block ${blockNumber} contains duplicate transaction ${tx.hash}`);
+            throw new BlockReceiptConsistencyError(
+                blockNumber,
+                `Block ${blockNumber} contains duplicate transaction ${tx.hash}`,
+            );
         }
         transactionHashes.add(hash);
     }
@@ -81,24 +88,32 @@ function validateBlockReceipts(
     for (const receipt of receipts) {
         const hash = String(receipt.transactionHash).toLowerCase();
         if (receiptHashes.has(hash)) {
-            throw new Error(`Block ${blockNumber} contains duplicate receipt for ${hash}`);
+            throw new BlockReceiptConsistencyError(
+                blockNumber,
+                `Block ${blockNumber} contains duplicate receipt for ${hash}`,
+            );
         }
         receiptHashes.add(hash);
 
         if (!transactionHashes.has(hash)) {
-            throw new Error(
+            throw new BlockReceiptConsistencyError(
+                blockNumber,
                 `Receipt ${hash} does not correspond to a transaction in block ${blockNumber}`,
             );
         }
         if (Number(BigInt(receipt.blockNumber)) !== block.number) {
-            throw new Error(
+            throw new BlockReceiptConsistencyError(
+                blockNumber,
                 `Receipt ${hash} has blockNumber ${receipt.blockNumber}, expected ${block.number}`,
             );
         }
     }
 
     if (receiptHashes.size !== transactionHashes.size) {
-        throw new Error(`Block ${blockNumber} transaction and receipt sets do not match`);
+        throw new BlockReceiptConsistencyError(
+            blockNumber,
+            `Block ${blockNumber} transaction and receipt sets do not match`,
+        );
     }
 }
 
