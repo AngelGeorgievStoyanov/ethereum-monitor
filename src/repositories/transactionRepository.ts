@@ -98,7 +98,9 @@ export async function createTransfersBatch(
         }
 
         if (reconcileMatches) {
-            const txIds = [...new Set([...transactionsByIdentity.values()].map((item) => item.id))];
+            const txIds = [...new Set(items
+                .map((item) => transactionsByIdentity.get(getTransferIdentity(item.data))?.id)
+                .filter((id): id is number => id !== undefined))];
             const existingMatches = txIds.length === 0
                 ? []
                 : await TxMatch.findAll({
