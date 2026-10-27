@@ -15,6 +15,7 @@ import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { isScannerLockHeld } from './scannerLockService';
+import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
 
 type ConfirmedBlock = { blockNumber: number; blockHash: string; parentHash: string };
 
@@ -49,16 +50,6 @@ async function getConfirmedCheckpointBlock(checkpoint: number): Promise<Confirme
 
 export function invalidateConfirmedBlockCache(): void {
     lastConfirmedBlock = null;
-}
-
-class BlockChainDiscontinuityError extends Error {
-    constructor(
-        public readonly blockNumber: number,
-        message: string,
-    ) {
-        super(message);
-        this.name = 'BlockChainDiscontinuityError';
-    }
 }
 
 function validateBatchConnectivity(
