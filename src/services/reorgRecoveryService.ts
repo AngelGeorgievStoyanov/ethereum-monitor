@@ -10,13 +10,6 @@ import { BlockVerificationUnavailableError } from '../errors/blockVerificationUn
 import { ConsensusUnavailableError } from './blockConsensusService';
 import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcService';
-
-class ReorgRecoverySafetyError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'ReorgRecoverySafetyError';
-    }
-}
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { isScannerLockHeld } from './scannerLockService';
@@ -27,6 +20,13 @@ import {
     recordReorgDetected,
     recordReorgRecoveryCompleted,
 } from './recoveryMetrics';
+
+class ReorgRecoverySafetyError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ReorgRecoverySafetyError';
+    }
+}
 
 let singleProviderReorgWarningLogged = false;
 
