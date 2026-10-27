@@ -71,6 +71,7 @@ The API listens on port `8000`.
 - `GET /api/health/ready` — readiness check; returns HTTP 503 when PostgreSQL or the Ethereum RPC is unavailable.
 - `POST /api/scanner/pause` and `POST /api/scanner/resume` — pause and resume scanning.
 - `POST /api/scanner/rescan` with JSON body `{"fromBlock": 19000000}` — manually rescan from the exact block through the saved checkpoint. The scanner must be paused and idle. Every block is checked against consensus from all configured RPC providers. A chain mismatch stops the rescan and marks reorg recovery as pending; resume the scanner to perform recovery. The rescan does not change the normal checkpoint. If interrupted, submit the same `fromBlock` again to safely retry.
+- `POST /api/scanner/reorg-retry` — explicitly unblock reorg recovery after its bounded consensus retries are exhausted. This prevents automatic polling from repeatedly restarting a failed consensus operation. Resume the scanner separately if it is paused.
 
 ## Configuration
 
