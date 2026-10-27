@@ -1,6 +1,15 @@
 import { JsonRpcProvider } from 'ethers';
+import { RPC_ENDPOINT_TIMEOUT_MS } from '../constants/ethereum-rpc.constants';
 import { env } from '../config/env';
 import { formatError } from '../utils/formatError';
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`RPC request timed out after ${timeoutMs}ms`)), timeoutMs);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 function isRetryableEndpointError(error: unknown): boolean {
     let details = '';
@@ -75,8 +84,39 @@ export function createRpcClient() {
         throw lastError ?? new Error(`No RPC endpoint available for ${operationName}`);
     }
 
+    async function getBlockFromAllEndpoints(blockNumber: number) {
+        const results: Array<{
+            endpointIndex: number;
+            block: Awaited<ReturnType<JsonRpcProvider['getBlock']>> | null;
+            error: string | null;
+        }> = [];
+
+        // Consensus requests are deliberately sequential to avoid increasing RPC pressure.
+        for (const endpoint of endpoints) {
+            const startedAt = Date.now();
+            endpoint.metrics.attempts += 1;
+            try {
+                const block = await withTimeout(endpoint.provider.getBlock(blockNumber), RPC_ENDPOINT_TIMEOUT_MS);
+                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+                if (block) endpoint.metrics.successes += 1;
+                else endpoint.metrics.failures += 1;
+                results.push({ endpointIndex: endpoint.index, block, error: block ? null : 'EMPTY_BLOCK' });
+            } catch (error) {
+                const message = formatError(error);
+                endpoint.metrics.failures += 1;
+                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+                endpoint.metrics.lastFailureAt = new Date().toISOString();
+                if (isRetryableEndpointError(error)) endpoint.metrics.retryableFailures += 1;
+                results.push({ endpointIndex: endpoint.index, block: null, error: message });
+            }
+        }
+
+        return results;
+    }
+
     return {
         execute,
+        getBlockFromAllEndpoints,
         getBlock(blockTag: string | number, includeTransactions = false) {
             return execute(`getBlock(${String(blockTag)})`, (provider) =>
                 provider.getBlock(blockTag, includeTransactions),
