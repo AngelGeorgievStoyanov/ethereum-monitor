@@ -37,7 +37,7 @@ The scanner checks block and receipt consistency before saving data. Block histo
 
 The database keeps block hashes and parent hashes. When a reorg is detected, the scanner searches up to 100 blocks for a common ancestor, marks replaced blocks and transfers as reorged, then reprocesses blocks one at a time. It requires 10 stable blocks before returning to normal processing.
 
-With multiple RPC endpoints, reorg verification requires every configured endpoint to agree. With one endpoint, independent consensus is not possible. If verification fails after retries, recovery is blocked rather than advancing the checkpoint. Check `GET /api/scanner/status`; use `POST /api/scanner/reorg-retry` to retry blocked recovery.
+With multiple RPC endpoints, reorg verification requires every configured endpoint to agree. With one endpoint, independent consensus is not possible. If verification fails after retries, or the common ancestor is outside the stored block history, recovery is blocked rather than guessing or advancing the checkpoint. Check `GET /api/scanner/status`; use `POST /api/scanner/reorg-retry` to retry blocked recovery after checking the cause.
 
 Catch-up is limited to 100 blocks per cycle. When far behind, normal processing can handle up to 3 blocks in parallel. Recovery remains sequential.
 
