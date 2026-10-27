@@ -270,7 +270,7 @@ async function markConsensusRecoveryBlocked(state: ScannerState, error: Consensu
     recordReorgConsensusFailure();
     await sequelize.transaction(async (transaction) => {
         if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before persisting consensus-blocked recovery state');
-        const persistedState = await ScannerState.findByPk(state.id,
+        const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
             lock: transaction.LOCK.UPDATE,
         });
