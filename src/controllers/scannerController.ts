@@ -238,7 +238,8 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
 
 export const getRescanJobStatus = async (req: Request, res: Response): Promise<void> => {
     try {
-        const job = await ScannerRescanJob.findByPk(req.params.id);
+        const operationId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        const job = await ScannerRescanJob.findByPk(operationId);
         if (!job) {
             res.status(404).json({ message: 'Rescan operation not found' });
             return;

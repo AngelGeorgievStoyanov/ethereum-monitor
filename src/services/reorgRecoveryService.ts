@@ -203,7 +203,7 @@ async function processReorgRecoveryInternal(
         }
 
         console.error(
-            `[Reorg] Detected chain mismatch at block ${state.lastProcessedBlock}; storedHash=${storedCheckpoint.blockHash}; currentHash=${currentCheckpoint.blockHash}`,
+            `[Reorg] Detected chain mismatch at block ${state.lastProcessedBlock}; storedHash=${storedCheckpoint.blockHash}; currentHash=${currentCheckpoint.hash}`,
         );
         recordReorgDetected();
         await markReorgRecoveryPending(state, state.lastProcessedBlock);
