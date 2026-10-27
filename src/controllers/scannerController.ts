@@ -7,6 +7,7 @@ import {
     resumeScanner,
 } from '../services/scannerControlService';
 import ScannerState from '../models/scannerState';
+import Block from '../models/block';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { HttpError, sendHttpError } from '../utils/httpError';
 import { ethereumProvider } from '../services/ethereumRpcService';
@@ -138,7 +139,8 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
             completedAt: new Date(),
             error: null,
         });
-        console.log(`[Rescan] Job ${jobId} completed; range=${fromBlock}-${toBlock}; blocksProcessed=${result.blocksProcessed}`);
+        resumeScanner();
+        console.log(`[Rescan] Job ${jobId} completed; range=${fromBlock}-${toBlock}; blocksProcessed=${result.blocksProcessed}; scanner resumed`);
     } catch (error) {
         const message = formatError(error);
         if (error instanceof RescanReorgDetectedError) {
@@ -198,6 +200,24 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
         }
         if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
             res.status(409).json({ message: 'Cannot start a rescan while reorg recovery is active or blocked.' });
+            return;
+        }
+
+        const expectedBlocks = state.lastProcessedBlock - fromBlock + 1;
+        const canonicalBlocks = await Block.count({
+            where: {
+                status: 'CANONICAL',
+                blockNumber: { [Op.gte]: fromBlock, [Op.lte]: state.lastProcessedBlock },
+            },
+        });
+        if (canonicalBlocks !== expectedBlocks) {
+            res.status(409).json({
+                message: 'Cannot start rescan because canonical block history is missing in the requested range.',
+                fromBlock,
+                toBlock: state.lastProcessedBlock,
+                expectedBlocks,
+                canonicalBlocksFound: canonicalBlocks,
+            });
             return;
         }
 
