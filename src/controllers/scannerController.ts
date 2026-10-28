@@ -121,26 +121,29 @@ export const resumeScannerController = async (_req: Request, res: Response): Pro
 
 
 async function executeRescanJob(jobId: string, fromBlock: number, toBlock: number): Promise<void> {
-    const job = await ScannerRescanJob.findByPk(jobId);
-    if (!job) {
-        releaseManualRescanReservation();
-        return;
-    }
+    let job: ScannerRescanJob | null = null;
 
     try {
+        job = await ScannerRescanJob.findByPk(jobId);
+        if (!job) {
+            console.error(`[Rescan] Job ${jobId} was not found before execution`);
+            return;
+        }
+        const activeJob = job;
+
         const state = await ScannerState.findByPk(SCANNER_ID);
         if (!state) throw new Error('Scanner state is not initialized');
 
-        await job.update({ status: 'RUNNING', currentBlock: fromBlock, startedAt: new Date() });
+        await activeJob.update({ status: 'RUNNING', currentBlock: fromBlock, startedAt: new Date() });
         const result = await runManualRescan({
             fromBlock,
             state,
             getActiveTxFilters: () => getTxFilterService().getTxFilters(),
             onProgress: async (currentBlock, blocksProcessed) => {
-                await job.update({ currentBlock, blocksProcessed });
+                await activeJob.update({ currentBlock, blocksProcessed });
             },
         });
-        await job.update({
+        await activeJob.update({
             status: 'COMPLETED',
             currentBlock: result.toBlock,
             blocksProcessed: result.blocksProcessed,
@@ -151,12 +154,8 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
         console.log(`[Rescan] Job ${jobId} completed; range=${fromBlock}-${toBlock}; blocksProcessed=${result.blocksProcessed}; scanner resumed`);
     } catch (error) {
         const message = formatError(error);
-        if (error instanceof RescanReorgDetectedError) {
-            await job.update({
-                status: 'RECOVERY_STARTED',
-                error: message,
-                completedAt: new Date(),
-            });
+        if (error instanceof RescanReorgDetectedError && job) {
+            await job.update({ status: 'RECOVERY_STARTED', error: message, completedAt: new Date() });
             console.warn(`[Rescan] Job ${jobId} detected a reorg; handing control to automatic recovery`);
             try {
                 await resumeScanner();
@@ -167,11 +166,16 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
         }
 
         recordRescanFailure();
-        await job.update({
-            status: 'FAILED',
-            error: message.slice(0, 1000),
-            completedAt: new Date(),
-        });
+        try {
+            if (!job) job = await ScannerRescanJob.findByPk(jobId);
+            if (job) {
+                await job.update({ status: 'FAILED', error: message.slice(0, 1000), completedAt: new Date() });
+            } else {
+                console.error(`[Rescan] Job ${jobId} could not be marked FAILED because its row could not be loaded`);
+            }
+        } catch (statusError) {
+            console.error(`[Rescan] Job ${jobId} status update failed: ${formatError(statusError)}`);
+        }
         console.error(`[Rescan] Job ${jobId} failed: ${message}`);
     } finally {
         releaseManualRescanReservation();
