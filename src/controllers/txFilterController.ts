@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getTxFilterService, TxFilterSyncError } from '../services/txFilterService';
 import { sendHttpError } from '../utils/httpError';
 import { parsePositiveId } from '../utils/parsePositiveId';
+import { TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
 import {
     validateCreateTxFilterInput,
     validateUpdateTxFilterInput,
@@ -26,7 +27,7 @@ export const createTxFilter = async (req: Request, res: Response): Promise<void>
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
                 message:
-                    'Filter saved to the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                    `Filter saved to the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });
@@ -59,7 +60,7 @@ export const updateTxFilter = async (
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
                 message:
-                    'Filter changes were saved to the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                    `Filter changes were saved to the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });
@@ -90,7 +91,7 @@ export const deleteTxFilter = async (
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
                 message:
-                    'Filter was deleted from the database, but the scanner is still using its previous filters. Reload failed after 4 attempts.',
+                    `Filter was deleted from the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });
