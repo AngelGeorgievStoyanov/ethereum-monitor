@@ -43,6 +43,7 @@ function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
 export function createTxFilterService() {
     let txFilters = new Map<number, ActiveTxFilter>();
     let reloadQueue: Promise<void> = Promise.resolve();
+    let pendingReloadCount = 0;
     let refreshTimer: ReturnType<typeof setInterval> | undefined;
 
     async function loadTxFilters() {
@@ -85,6 +86,7 @@ export function createTxFilterService() {
     }
 
     async function reloadTxFiltersWithRetry(): Promise<boolean> {
+        pendingReloadCount += 1;
         const task = reloadQueue
             .catch(() => undefined)
             .then(async () => {
@@ -108,16 +110,22 @@ export function createTxFilterService() {
                 }
                 return false;
             });
-        reloadQueue = task.then(
+        const settledTask = task.finally(() => {
+            pendingReloadCount -= 1;
+        });
+        reloadQueue = settledTask.then(
             () => undefined,
             () => undefined,
         );
-        return task;
+        return settledTask;
     }
 
     function startRefreshTimer(intervalMs: number) {
         if (refreshTimer) return;
         refreshTimer = setInterval(() => {
+            // Do not queue periodic refreshes while a refresh is queued or running.
+            // Explicit refreshes after filter mutations still use the serialized queue.
+            if (pendingReloadCount > 0) return;
             void reloadTxFiltersWithRetry();
         }, intervalMs);
         refreshTimer.unref?.();
