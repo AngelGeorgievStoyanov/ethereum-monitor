@@ -82,8 +82,6 @@ export async function processFinalizedBlocks(
 ): Promise<void> {
     const catchupStartedAt = Date.now();
     const catchupStartBlock = state.lastProcessedBlock + 1;
-    if (await shouldPauseBeforeBlock(catchupStartBlock, state.lastProcessedBlock)) return;
-
     const totals = createBlockProcessingTotals();
     let currentBatchStart: number | undefined;
 
