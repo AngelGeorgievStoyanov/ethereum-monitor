@@ -1,6 +1,7 @@
 import { Op, Transaction as SequelizeTransaction } from 'sequelize';
 import sequelize from '../database';
 import Transaction, { TransactionCreationAttributes } from '../models/transaction';
+import TxFilter from '../models/txFilter';
 import { getTxFilterService } from '../services/txFilterService';
 import TxMatch from '../models/txMatch';
 
@@ -30,32 +31,65 @@ export async function createTransfersBatch(
 
     const persist = async (dbTransaction: SequelizeTransaction) => {
         const data = items.map((item) => item.data);
-        const txHashes = [...new Set(data.map((item) => item.txHash))];
-        const transferTypes = [...new Set(data.map((item) => item.transferType))];
-        const blockHashes = [...new Set(data.map((item) => item.blockHash))];
+        const identityConditions = [...new Map(
+            data.map((item) => {
+                const identity = getTransferIdentity(item);
+                return [identity, {
+                    txHash: item.txHash,
+                    transferType: item.transferType,
+                    blockHash: item.blockHash,
+                    ...(item.transferType === 'erc20' ? { logIndex: item.logIndex } : {}),
+                }] as const;
+            }),
+        ).values()];
         const lookup = {
-            where: {
-                txHash: { [Op.in]: txHashes },
-                transferType: { [Op.in]: transferTypes },
-                blockHash: { [Op.in]: blockHashes },
-            },
+            where: { [Op.or]: identityConditions },
             transaction: dbTransaction,
         };
-        const existingTransactions = items.length === 0 ? [] : await Transaction.findAll(lookup);
+        const existingTransactions = await Transaction.findAll(lookup);
         const existingIdentities = new Set(existingTransactions.map(getTransferIdentity));
         const itemsToPersist = reconcileMatches
             ? items.filter((item) => item.matchingTxFilterIds.length > 0 || existingIdentities.has(getTransferIdentity(item.data)))
             : items;
-        await Transaction.bulkCreate(itemsToPersist.map((item) => item.data), {
-            ignoreDuplicates: true,
-            transaction: dbTransaction,
-        });
-        const storedTransactions = itemsToPersist.length === 0
+        const insertedTransactions = itemsToPersist.length === 0
             ? []
-            : await Transaction.findAll(lookup);
+            : await Transaction.bulkCreate(itemsToPersist.map((item) => item.data), {
+                ignoreDuplicates: true,
+                returning: true,
+                transaction: dbTransaction,
+            });
         const transactionsByIdentity = new Map<string, Transaction>();
-        for (const storedTransaction of storedTransactions) {
+        for (const storedTransaction of existingTransactions) {
             transactionsByIdentity.set(getTransferIdentity(storedTransaction), storedTransaction);
+        }
+        for (const insertedTransaction of insertedTransactions) {
+            transactionsByIdentity.set(getTransferIdentity(insertedTransaction), insertedTransaction);
+        }
+
+        // Normally the first lookup plus PostgreSQL RETURNING resolves every row.
+        // Keep a targeted fallback for a concurrent insert between lookup and bulkCreate.
+        const unresolvedItems = itemsToPersist.filter(
+            (item) => !transactionsByIdentity.has(getTransferIdentity(item.data)),
+        );
+        if (unresolvedItems.length > 0) {
+            const unresolvedConditions = [...new Map(
+                unresolvedItems.map((item) => {
+                    const data = item.data;
+                    return [getTransferIdentity(data), {
+                        txHash: data.txHash,
+                        transferType: data.transferType,
+                        blockHash: data.blockHash,
+                        ...(data.transferType === 'erc20' ? { logIndex: data.logIndex } : {}),
+                    }] as const;
+                }),
+            ).values()];
+            const unresolvedTransactions = await Transaction.findAll({
+                where: { [Op.or]: unresolvedConditions },
+                transaction: dbTransaction,
+            });
+            for (const storedTransaction of unresolvedTransactions) {
+                transactionsByIdentity.set(getTransferIdentity(storedTransaction), storedTransaction);
+            }
         }
 
         const filterIds = [
@@ -121,14 +155,39 @@ export async function createTransfersBatch(
                 );
             }
 
+            const updatesByGroup = new Map<string, {
+                ids: number[];
+                matchStatus: 'ACTIVE' | 'NOT_MATCHED';
+                txFilterDescription?: string;
+            }>();
             for (const match of existingMatches) {
                 if (match.matchStatus === 'FILTER_DELETED' || match.txFilterId === null) continue;
                 const isMatching = matchingFilterIdsByTxId.get(match.txId)?.has(match.txFilterId) ?? false;
                 const description = isMatching ? descriptionsById.get(match.txFilterId) : undefined;
-                await match.update({
-                    matchStatus: isMatching ? 'ACTIVE' : 'NOT_MATCHED',
+                const matchStatus = isMatching ? 'ACTIVE' : 'NOT_MATCHED';
+                const key = `${matchStatus}:${match.txFilterId}:${description ?? ''}`;
+                const group = updatesByGroup.get(key) ?? {
+                    ids: [],
+                    matchStatus,
                     ...(description !== undefined ? { txFilterDescription: description } : {}),
-                }, { transaction: dbTransaction });
+                };
+                group.ids.push(match.id);
+                updatesByGroup.set(key, group);
+            }
+
+            for (const group of updatesByGroup.values()) {
+                await TxMatch.update(
+                    {
+                        matchStatus: group.matchStatus,
+                        ...(group.txFilterDescription !== undefined
+                            ? { txFilterDescription: group.txFilterDescription }
+                            : {}),
+                    },
+                    {
+                        where: { id: { [Op.in]: group.ids } },
+                        transaction: dbTransaction,
+                    },
+                );
             }
         }
     };
