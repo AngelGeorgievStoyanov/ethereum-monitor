@@ -152,99 +152,99 @@ export function createBlockMonitorService() {
                     } else {
                         waitingForPause = false;
                         const finalized = await ethereumProvider.getBlock('finalized');
-                    if (!finalized) throw new Error('Unable to resolve the latest finalized block');
-
-                    if (finalized.number < state.lastProcessedBlock) {
-                        const providerResults = await ethereumProvider.getFinalizedFromAllEndpoints();
-                        const hasConsensus =
-                            ethereumProvider.getEndpointCount() > 1 &&
-                            providerResults.length === ethereumProvider.getEndpointCount() &&
-                            providerResults.length > 0 &&
-                            providerResults.every(
-                                (result) =>
-                                    result.error === null &&
-                                    result.blockNumber === providerResults[0].blockNumber &&
-                                    result.blockHash?.toLowerCase() === providerResults[0].blockHash?.toLowerCase(),
-                            );
-                        let diagnosticConsensus = 'NO';
-                        if (ethereumProvider.getEndpointCount() === 1) {
-                            diagnosticConsensus = 'NOT_APPLICABLE_SINGLE_PROVIDER';
-                        } else if (hasConsensus) {
-                            diagnosticConsensus = 'YES';
-                        }
-                        const providerSummary = providerResults
-                            .map((result) =>
-                                result.error
-                                    ? `P${result.endpointIndex}=ERROR(${result.error})`
-                                    : `P${result.endpointIndex}=${result.blockNumber}(hash=${result.blockHash})`,
-                            )
-                            .join('; ');
-                        console.warn(
-                            `[Finalized] Regression detected: checkpoint=${state.lastProcessedBlock}, primaryFinalized=${finalized.number}; diagnosticConsensus=${diagnosticConsensus}; ${providerSummary}`,
-                        );
-                    }
-
-                    if (waitingForFilters) {
-                        const pausePendingOrActive = await isScannerPausePendingOrActive();
-                        if (!pausePendingOrActive) {
-                            const activationStartBlock = Math.min(
-                                ...activeTxFilters.map(
-                                    (filter) => filter.activeFromBlock ?? finalized.number + 1,
-                                ),
-                            );
-                            const activationCheckpoint = activationStartBlock - 1;
-                            if (state.lastProcessedBlock < activationCheckpoint) {
-                                await updateScannerCheckpoint(state.id, activationCheckpoint);
-                                state.lastProcessedBlock = activationCheckpoint;
+                        if (!finalized) throw new Error('Unable to resolve the latest finalized block');
+    
+                        if (finalized.number < state.lastProcessedBlock) {
+                            const providerResults = await ethereumProvider.getFinalizedFromAllEndpoints();
+                            const hasConsensus =
+                                ethereumProvider.getEndpointCount() > 1 &&
+                                providerResults.length === ethereumProvider.getEndpointCount() &&
+                                providerResults.length > 0 &&
+                                providerResults.every(
+                                    (result) =>
+                                        result.error === null &&
+                                        result.blockNumber === providerResults[0].blockNumber &&
+                                        result.blockHash?.toLowerCase() === providerResults[0].blockHash?.toLowerCase(),
+                                );
+                            let diagnosticConsensus = 'NO';
+                            if (ethereumProvider.getEndpointCount() === 1) {
+                                diagnosticConsensus = 'NOT_APPLICABLE_SINGLE_PROVIDER';
+                            } else if (hasConsensus) {
+                                diagnosticConsensus = 'YES';
                             }
-                        }
-                        console.log(
-                            pausePendingOrActive
-                                ? `[Scanner] Active filters detected while paused; preserving checkpoint ${state.lastProcessedBlock}`
-                                : `[Scanner] Active filters detected; starting at block ${state.lastProcessedBlock + 1}`,
-                        );
-                        waitingForFilters = false;
-                    }
-
-                    const finalizedCatchupTarget = Math.min(
-                        finalized.number,
-                        state.lastProcessedBlock + MAX_BLOCKS_PER_FINALIZED_CATCHUP,
-                    );
-                    if (finalizedCatchupTarget < finalized.number) {
-                        console.log(
-                            `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${MAX_BLOCKS_PER_FINALIZED_CATCHUP}`,
-                        );
-                    }
-
-                    // Reserve and block normal processing atomically with respect to the rescan endpoint.
-                    if (manualRescanReserved) {
-                        await sleep(SCANNER_POLL_INTERVAL_MS);
-                        continue;
-                    }
-                    processingFinalizedBlocks = true;
-                    lastObservedCheckpoint = state.lastProcessedBlock;
-                    lastProgressAt = Date.now();
-                    lastStallWarningAt = 0;
-                    try {
-                        const recoveryHandled = await processReorgRecovery(
-                            state,
-                            finalizedCatchupTarget,
-                            () => txFilterService.getTxFilters(),
-                        );
-                        if (recoveryHandled) {
-                            // Recovery can roll the checkpoint back and later replace its canonical hash.
-                            invalidateConfirmedBlockCache();
-                        } else {
-                            await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
-                                txFilterService.getTxFilters(),
+                            const providerSummary = providerResults
+                                .map((result) =>
+                                    result.error
+                                        ? `P${result.endpointIndex}=ERROR(${result.error})`
+                                        : `P${result.endpointIndex}=${result.blockNumber}(hash=${result.blockHash})`,
+                                )
+                                .join('; ');
+                            console.warn(
+                                `[Finalized] Regression detected: checkpoint=${state.lastProcessedBlock}, primaryFinalized=${finalized.number}; diagnosticConsensus=${diagnosticConsensus}; ${providerSummary}`,
                             );
                         }
-                    } finally {
-                        processingFinalizedBlocks = false;
+    
+                        if (waitingForFilters) {
+                            const pausePendingOrActive = await isScannerPausePendingOrActive();
+                            if (!pausePendingOrActive) {
+                                const activationStartBlock = Math.min(
+                                    ...activeTxFilters.map(
+                                        (filter) => filter.activeFromBlock ?? finalized.number + 1,
+                                    ),
+                                );
+                                const activationCheckpoint = activationStartBlock - 1;
+                                if (state.lastProcessedBlock < activationCheckpoint) {
+                                    await updateScannerCheckpoint(state.id, activationCheckpoint);
+                                    state.lastProcessedBlock = activationCheckpoint;
+                                }
+                            }
+                            console.log(
+                                pausePendingOrActive
+                                    ? `[Scanner] Active filters detected while paused; preserving checkpoint ${state.lastProcessedBlock}`
+                                    : `[Scanner] Active filters detected; starting at block ${state.lastProcessedBlock + 1}`,
+                            );
+                            waitingForFilters = false;
+                        }
+    
+                        const finalizedCatchupTarget = Math.min(
+                            finalized.number,
+                            state.lastProcessedBlock + MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+                        );
+                        if (finalizedCatchupTarget < finalized.number) {
+                            console.log(
+                                `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${MAX_BLOCKS_PER_FINALIZED_CATCHUP}`,
+                            );
+                        }
+    
+                        // Reserve and block normal processing atomically with respect to the rescan endpoint.
+                        if (manualRescanReserved) {
+                            await sleep(SCANNER_POLL_INTERVAL_MS);
+                            continue;
+                        }
+                        processingFinalizedBlocks = true;
+                        lastObservedCheckpoint = state.lastProcessedBlock;
+                        lastProgressAt = Date.now();
+                        lastStallWarningAt = 0;
+                        try {
+                            const recoveryHandled = await processReorgRecovery(
+                                state,
+                                finalizedCatchupTarget,
+                                () => txFilterService.getTxFilters(),
+                            );
+                            if (recoveryHandled) {
+                                // Recovery can roll the checkpoint back and later replace its canonical hash.
+                                invalidateConfirmedBlockCache();
+                            } else {
+                                await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
+                                    txFilterService.getTxFilters(),
+                                );
+                            }
+                            } finally {
+                            processingFinalizedBlocks = false;
+                        }
                     }
                     }
-                }
-            } catch (error) {
+                } catch (error) {
                 console.error(
                     `[Scanner] Processing failed; checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
                 );
