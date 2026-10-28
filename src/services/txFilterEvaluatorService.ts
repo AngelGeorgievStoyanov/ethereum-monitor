@@ -30,12 +30,12 @@ export function evaluateTxFilterGroup(
 ): boolean {
     const results = [
         ...group.conditions.map((condition) =>
-            evaluateTxFilterOperator(
-                condition.field,
-                condition.operator,
-                transaction[condition.field],
-                condition.value,
-            ),
+            evaluateTxFilterOperator({
+                field: condition.field,
+                operator: condition.operator,
+                actualValue: transaction[condition.field],
+                expectedValue: condition.value,
+            }),
         ),
         ...group.groups.map((child) => evaluateTxFilterGroup(child, transaction)),
     ];
