@@ -68,7 +68,18 @@ export function createTxFilterService() {
                 rule,
             });
         }
-        // Publish only after the full collection has loaded successfully.
+        // Keep the last valid cache untouched until the full collection has loaded successfully.
+        const currentSignature = JSON.stringify(
+            Array.from(txFilters.entries()).sort(([leftId], [rightId]) => leftId - rightId),
+        );
+        const nextSignature = JSON.stringify(
+            Array.from(next.entries()).sort(([leftId], [rightId]) => leftId - rightId),
+        );
+        if (currentSignature === nextSignature) {
+            console.log(`[Scanner] Transaction filter cache unchanged (${txFilters.size} active filter(s))`);
+            return;
+        }
+
         txFilters = next;
         console.log(`[Scanner] Loaded ${txFilters.size} active tx filter(s)`);
     }
