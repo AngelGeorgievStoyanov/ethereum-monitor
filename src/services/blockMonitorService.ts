@@ -145,13 +145,13 @@ export function createBlockMonitorService() {
                         lastControlStateCheckAt = now;
                     }
                     if (cachedControlPaused) {
-                    if (!waitingForPause) {
-                        console.log('[Scanner] Paused; skipping finalized-block RPC polling');
-                    }
-                    waitingForPause = true;
+                        if (!waitingForPause) {
+                            console.log('[Scanner] Paused; skipping finalized-block RPC polling');
+                        }
+                        waitingForPause = true;
                     } else {
-                    waitingForPause = false;
-                    const finalized = await ethereumProvider.getBlock('finalized');
+                        waitingForPause = false;
+                        const finalized = await ethereumProvider.getBlock('finalized');
                     if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
                     if (finalized.number < state.lastProcessedBlock) {
