@@ -8,7 +8,11 @@ import {
 } from '../services/scannerControlService';
 import ScannerState from '../models/scannerState';
 import Block from '../models/block';
-import { SCANNER_ID } from '../constants/scanner.constants';
+import {
+    SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
+    SCANNER_ID,
+    SCANNER_MAX_PAUSE_DURATION_MINUTES,
+} from '../constants/scanner.constants';
 import { HttpError, sendHttpError } from '../utils/httpError';
 import { ethereumProvider } from '../services/ethereumRpcService';
 import {
@@ -88,12 +92,12 @@ export const pauseScanner = async (req: Request, res: Response): Promise<void> =
     }
     if (
         durationMinutes !== undefined &&
-        (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440)
+        (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > SCANNER_MAX_PAUSE_DURATION_MINUTES)
     ) {
         sendHttpError(
             res,
             'Invalid scanner pause duration',
-            new HttpError(400, 'durationMinutes must be an integer between 1 and 1440'),
+            new HttpError(400, `durationMinutes must be an integer between 1 and ${SCANNER_MAX_PAUSE_DURATION_MINUTES}`),
         );
         return;
     }
@@ -102,7 +106,9 @@ export const pauseScanner = async (req: Request, res: Response): Promise<void> =
         await requestScannerPause(
             mode,
             atBlock ?? null,
-            mode === 'temporary' ? (durationMinutes ?? 5) : 5,
+            mode === 'temporary'
+                ? (durationMinutes ?? SCANNER_DEFAULT_PAUSE_DURATION_MINUTES)
+                : SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
         );
         res.json({ message: 'Scanner pause requested', ...(await getScannerControlState()) });
     } catch (error) {
