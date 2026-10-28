@@ -276,19 +276,19 @@ async function processReorgRecoveryInternal(
             console.warn(`[Reorg] Scanner lock lost before committing recovery block ${blockNumber}`);
             return true;
         }
-        const committedCheckpoint = await persistProcessedBlockBatch(
-            prepared.candidates,
-            [prepared.block],
-            state.id,
-            state.lastProcessedBlock,
-            blockNumber,
-            {
+        const committedCheckpoint = await persistProcessedBlockBatch({
+            candidates: prepared.candidates,
+            blocks: [prepared.block],
+            scannerStateId: state.id,
+            expectedCheckpoint: state.lastProcessedBlock,
+            newCheckpoint: blockNumber,
+            recoveryProgress: {
                 active: !recoveryComplete,
                 stableBlocks: recoveryComplete ? 0 : stableBlocks,
                 startBlock: null,
                 targetBlock: recoveryComplete ? null : recoveryTargetBlock,
             },
-        );
+        });
         if (committedCheckpoint !== blockNumber) {
             await state.reload();
             continue;
