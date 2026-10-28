@@ -50,14 +50,23 @@ function decodeFailedErc20TransferAttempt(
     return undefined;
 }
 
-export async function processErc20Transfers(
-    receipts: readonly RpcTransactionReceipt[],
-    transactionsByHash: Map<string, TransactionResponse>,
-    txFilters: ActiveTxFilter[],
-    blockNumber: number,
-    blockTimestamp: number,
+export interface ProcessErc20TransfersOptions {
+    receipts: readonly RpcTransactionReceipt[];
+    transactionsByHash: Map<string, TransactionResponse>;
+    txFilters: ActiveTxFilter[];
+    blockNumber: number;
+    blockTimestamp: number;
+    includeUnmatched?: boolean;
+}
+
+export async function processErc20Transfers({
+    receipts,
+    transactionsByHash,
+    txFilters,
+    blockNumber,
+    blockTimestamp,
     includeUnmatched = false,
-) {
+}: ProcessErc20TransfersOptions) {
     let transferLogsSeen = 0;
     let transfersMatched = 0;
     let failedAttemptsSeen = 0;
