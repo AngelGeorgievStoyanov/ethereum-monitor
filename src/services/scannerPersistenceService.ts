@@ -72,14 +72,23 @@ export interface ReorgRecoveryProgress {
     targetBlock: number | null;
 }
 
-export async function persistProcessedBlockBatch(
-    candidates: readonly TransferBatchCandidate[],
-    blocks: readonly ProcessedBlockRecord[],
-    scannerStateId: string,
-    expectedCheckpoint: number,
-    newCheckpoint: number,
-    recoveryProgress?: ReorgRecoveryProgress,
-): Promise<number> {
+export interface PersistProcessedBlockBatchOptions {
+    candidates: readonly TransferBatchCandidate[];
+    blocks: readonly ProcessedBlockRecord[];
+    scannerStateId: string;
+    expectedCheckpoint: number;
+    newCheckpoint: number;
+    recoveryProgress?: ReorgRecoveryProgress;
+}
+
+export async function persistProcessedBlockBatch({
+    candidates,
+    blocks,
+    scannerStateId,
+    expectedCheckpoint,
+    newCheckpoint,
+    recoveryProgress,
+}: PersistProcessedBlockBatchOptions): Promise<number> {
     return sequelize.transaction(async (transaction) => {
         const state = await ScannerState.findByPk(scannerStateId, {
             transaction,
