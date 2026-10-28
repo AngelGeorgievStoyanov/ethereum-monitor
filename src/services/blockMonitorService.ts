@@ -176,7 +176,8 @@ export function createBlockMonitorService() {
                     }
 
                     if (waitingForFilters) {
-                        if (!(await isScannerPausePendingOrActive())) {
+                        const pausePendingOrActive = await isScannerPausePendingOrActive();
+                        if (!pausePendingOrActive) {
                             const activationStartBlock = Math.min(
                                 ...activeTxFilters.map(
                                     (filter) => filter.activeFromBlock ?? finalized.number + 1,
@@ -189,7 +190,7 @@ export function createBlockMonitorService() {
                             }
                         }
                         console.log(
-                            (await isScannerPausePendingOrActive())
+                            pausePendingOrActive
                                 ? `[Scanner] Active filters detected while paused; preserving checkpoint ${state.lastProcessedBlock}`
                                 : `[Scanner] Active filters detected; starting at block ${state.lastProcessedBlock + 1}`,
                         );
