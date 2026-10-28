@@ -3,7 +3,7 @@ import Block from '../models/block';
 import ScannerState from '../models/scannerState';
 import TxFilter from '../models/txFilter';
 import { env } from '../config/env';
-import { SCANNER_ID } from '../constants/scanner.constants';
+import { FILTER_MUTATION_ADVISORY_LOCK_KEY, SCANNER_ID } from '../constants/scanner.constants';
 import {
     createTxFilter as insertTxFilter,
     deleteTxFilterById,
@@ -23,6 +23,7 @@ import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
 import { sleep } from '../utils/sleep';
 import { formatError } from '../utils/formatError';
+import { Transaction as SequelizeTransaction } from 'sequelize';
 
 export class TxFilterSyncError extends Error {
     constructor(public readonly result: unknown) {
@@ -111,15 +112,24 @@ export function createTxFilterService() {
         }));
     }
 
-    async function getInitialConfiguredStartBlock(): Promise<number | undefined> {
+    async function getInitialConfiguredStartBlock(
+        transaction: SequelizeTransaction,
+    ): Promise<number | undefined> {
         if (env.startBlock === undefined) return undefined;
 
-        const state = await ScannerState.findByPk(SCANNER_ID);
+        const existingActiveFilter = await TxFilter.findOne({
+            where: { isActive: true },
+            transaction,
+        });
+        if (existingActiveFilter) return undefined;
+
+        const state = await ScannerState.findByPk(SCANNER_ID, { transaction });
         if (state && state.lastProcessedBlock !== env.startBlock - 1) return undefined;
 
         const existingCanonicalBlock = await Block.findOne({
             where: { status: 'CANONICAL' },
             attributes: ['id'],
+            transaction,
         });
         if (existingCanonicalBlock) return undefined;
 
@@ -137,11 +147,19 @@ export function createTxFilterService() {
             throw new ValidationError('A filter requires at least one condition');
         }
         if (data.rule) validateTxFilterGroup(data.rule);
-        const initialStartBlock = data.isActive ? await getInitialConfiguredStartBlock() : undefined;
-        const activeFromBlock = data.isActive
-            ? (initialStartBlock ?? (await getNextFilterStartBlock()))
-            : null;
+
         const filter = await sequelize.transaction(async (transaction) => {
+            // Serialize filter creation so concurrent requests cannot both claim the initial backfill range.
+            await sequelize.query('SELECT pg_advisory_xact_lock(:key)', {
+                replacements: { key: FILTER_MUTATION_ADVISORY_LOCK_KEY },
+                transaction,
+            });
+            const initialStartBlock = data.isActive
+                ? await getInitialConfiguredStartBlock(transaction)
+                : undefined;
+            const activeFromBlock = data.isActive
+                ? (initialStartBlock ?? await getNextFilterStartBlock())
+                : null;
             const createdFilter = await insertTxFilter(
                 {
                     description: data.description,
@@ -172,27 +190,37 @@ export function createTxFilterService() {
         },
     ) {
         if (updates.rule) validateTxFilterGroup(updates.rule);
-        const current = await findTxFilterById(id);
-        if (!current) return null;
-        const existingRule = updates.rule === undefined ? await findRuleForFilter(id) : null;
-        if (updates.rule === null && !current.from && !current.to && !updates.from && !updates.to) {
-            throw new ValidationError('A filter requires at least one condition');
-        }
 
-        const activatingOrChangingRule =
-            updates.isActive === true ||
-            updates.rule !== undefined ||
-            updates.from !== undefined ||
-            updates.to !== undefined;
-        const activeFromBlock =
-            updates.isActive === false
-                ? null
-                : activatingOrChangingRule && (updates.isActive ?? current.isActive)
-                  ? await getNextFilterStartBlock()
-                  : current.activeFromBlock;
+        const updated = await sequelize.transaction(async (transaction) => {
+            await sequelize.query('SELECT pg_advisory_xact_lock(:key)', {
+                replacements: { key: FILTER_MUTATION_ADVISORY_LOCK_KEY },
+                transaction,
+            });
 
-        const filter = await sequelize.transaction(async (transaction) => {
-            const updatedFilter = await persistTxFilter(
+            const current = await TxFilter.findByPk(id, {
+                transaction,
+                lock: transaction.LOCK.UPDATE,
+            });
+            if (!current) return null;
+
+            const existingRule = updates.rule === undefined ? await findRuleForFilter(id) : null;
+            if (updates.rule === null && !current.from && !current.to && !updates.from && !updates.to) {
+                throw new ValidationError('A filter requires at least one condition');
+            }
+
+            const activatingOrChangingRule =
+                updates.isActive === true ||
+                updates.rule !== undefined ||
+                updates.from !== undefined ||
+                updates.to !== undefined;
+            const activeFromBlock =
+                updates.isActive === false
+                    ? null
+                    : activatingOrChangingRule && (updates.isActive ?? current.isActive)
+                      ? await getNextFilterStartBlock()
+                      : current.activeFromBlock;
+
+            const filter = await persistTxFilter(
                 id,
                 {
                     ...(updates.description !== undefined
@@ -205,26 +233,31 @@ export function createTxFilterService() {
                 },
                 transaction,
             );
+            if (!filter) return null;
             if (updates.rule !== undefined) {
                 await saveRuleForFilter(id, updates.rule, transaction);
             }
-            return updatedFilter;
+            const rule =
+                updates.rule !== undefined
+                    ? (updates.rule ?? legacyRule(filter))
+                    : (existingRule ?? legacyRule(filter));
+            return { filter, rule };
         });
 
-        if (!filter) return null;
-        const rule =
-            updates.rule !== undefined
-                ? (updates.rule ?? legacyRule(filter))
-                : (existingRule ?? legacyRule(filter));
-        const result = { ...filter.toJSON(), rule };
+        if (!updated) return null;
+        const result = { ...updated.filter.toJSON(), rule: updated.rule };
         if (!(await reloadTxFiltersWithRetry())) throw new TxFilterSyncError(result);
         return result;
     }
 
     async function removeTxFilter(id: number) {
-        const deleted = await sequelize.transaction(async (transaction) =>
-            deleteTxFilterById(id, transaction),
-        );
+        const deleted = await sequelize.transaction(async (transaction) => {
+            await sequelize.query('SELECT pg_advisory_xact_lock(:key)', {
+                replacements: { key: FILTER_MUTATION_ADVISORY_LOCK_KEY },
+                transaction,
+            });
+            return deleteTxFilterById(id, transaction);
+        });
         if (deleted > 0 && !(await reloadTxFiltersWithRetry())) {
             throw new TxFilterSyncError({ message: 'Transaction filter deleted', deleted: true });
         }
