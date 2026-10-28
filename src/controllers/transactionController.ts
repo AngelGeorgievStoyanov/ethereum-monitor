@@ -2,10 +2,7 @@ import { Request, Response } from 'express';
 import { deleteStoredTransaction, listStoredTransactions } from '../services/transactionService';
 import { sendHttpError } from '../utils/httpError';
 import { parsePositiveId } from '../utils/parsePositiveId';
-
-const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
+import { DEFAULT_LIMIT, DEFAULT_PAGE, MAX_LIMIT } from '../constants/transaction.constants';
 
 function parsePositiveQueryInteger(value: unknown): number | undefined {
     if (typeof value !== 'string' || !/^\d+$/.test(value)) return undefined;
