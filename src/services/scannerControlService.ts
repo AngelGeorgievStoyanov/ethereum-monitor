@@ -1,5 +1,5 @@
 import ScannerState from '../models/scannerState';
-import { SCANNER_ID } from '../constants/scanner.constants';
+import { SCANNER_DEFAULT_PAUSE_DURATION_MINUTES, SCANNER_ID } from '../constants/scanner.constants';
 
 export type ScannerPauseMode = 'manual' | 'temporary';
 
@@ -69,7 +69,7 @@ export async function getScannerControlState(): Promise<ScannerControlState> {
 export async function requestScannerPause(
     mode: ScannerPauseMode,
     atBlock: number | null,
-    durationMinutes = 5,
+    durationMinutes = SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
 ): Promise<void> {
     const state = await loadControlRow();
     state.scannerPauseTargetBlock = atBlock;
@@ -135,7 +135,7 @@ export async function resumeScanner(): Promise<void> {
     state.scannerPauseRequestedAtBlock = null;
     state.scannerPauseUntil = null;
     state.scannerPauseTargetBlock = null;
-    state.scannerPauseDurationMinutes = 5;
+    state.scannerPauseDurationMinutes = SCANNER_DEFAULT_PAUSE_DURATION_MINUTES;
     await state.save();
     if (wasPaused) {
         console.log('[Scanner] Persisted resume; catch-up will continue from the saved checkpoint');
