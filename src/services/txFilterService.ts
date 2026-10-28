@@ -9,7 +9,6 @@ import {
     deleteTxFilterById,
     findActiveTxFilters,
     findAllTxFilters,
-    findTxFilterById,
     updateTxFilter as persistTxFilter,
 } from '../repositories/txFilterRepository';
 import {
