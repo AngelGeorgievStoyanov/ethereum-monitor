@@ -44,6 +44,7 @@ function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
 export function createTxFilterService() {
     let txFilters = new Map<number, ActiveTxFilter>();
     let reloadQueue: Promise<void> = Promise.resolve();
+    let refreshTimer: ReturnType<typeof setInterval> | undefined;
 
     async function loadTxFilters() {
         const activeFilters = await findActiveTxFilters();
@@ -101,6 +102,21 @@ export function createTxFilterService() {
             () => undefined,
         );
         return task;
+    }
+
+    function startRefreshTimer(intervalMs: number) {
+        if (refreshTimer) return;
+        refreshTimer = setInterval(() => {
+            void reloadTxFiltersWithRetry();
+        }, intervalMs);
+        refreshTimer.unref?.();
+        console.log(`[Scanner] Transaction filter cache refresh scheduled every ${intervalMs}ms`);
+    }
+
+    function stopRefreshTimer() {
+        if (!refreshTimer) return;
+        clearInterval(refreshTimer);
+        refreshTimer = undefined;
     }
 
     async function getAllTxFilters() {
@@ -266,6 +282,8 @@ export function createTxFilterService() {
 
     return {
         loadTxFilters,
+        startRefreshTimer,
+        stopRefreshTimer,
         getAllTxFilters,
         createTxFilter,
         updateTxFilter,
