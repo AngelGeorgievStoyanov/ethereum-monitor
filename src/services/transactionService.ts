@@ -22,13 +22,21 @@ export interface TransferBatchCandidate {
     matchingTxFilters: ActiveTxFilter[];
 }
 
-export async function createTransactionFromEthereumData(
-    tx: TransactionResponse,
-    receipt: RpcTransactionReceipt,
-    blockTimestamp: number,
-    transfer: TransferMetadata,
-    matchingTxFilters: ActiveTxFilter[],
-) {
+export interface CreateTransactionFromEthereumDataOptions {
+    tx: TransactionResponse;
+    receipt: RpcTransactionReceipt;
+    blockTimestamp: number;
+    transfer: TransferMetadata;
+    matchingTxFilters: ActiveTxFilter[];
+}
+
+export async function createTransactionFromEthereumData({
+    tx,
+    receipt,
+    blockTimestamp,
+    transfer,
+    matchingTxFilters,
+}: CreateTransactionFromEthereumDataOptions) {
     const data = mapTransactionCreationData(tx, receipt, blockTimestamp, transfer);
     const transaction = await findOrCreateTransfer(data);
     await createTxMatches(
