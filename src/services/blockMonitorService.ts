@@ -124,8 +124,7 @@ export function createBlockMonitorService() {
                     needsStateReload = false;
                 }
 
-                // Refresh from PostgreSQL on the lock owner; another replica may have changed filters.
-                await txFilterService.loadTxFilters();
+                // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = txFilterService.getTxFilters();
 
                 if (activeTxFilters.length === 0) {
