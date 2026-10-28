@@ -1,7 +1,7 @@
 import { Op, Transaction as SequelizeTransaction } from 'sequelize';
 import sequelize from '../database';
 import Transaction, { TransactionCreationAttributes } from '../models/transaction';
-import TxFilter from '../models/txFilter';
+import { getTxFilterService } from '../services/txFilterService';
 import TxMatch from '../models/txMatch';
 
 export interface TransferBatchItem {
@@ -63,15 +63,12 @@ export async function createTransfersBatch(
         ];
         if (filterIds.length === 0 && !reconcileMatches) return;
 
-        const filters = await TxFilter.findAll({
-            where: { id: { [Op.in]: filterIds } },
-            attributes: ['id', 'description'],
-            transaction: dbTransaction,
-        });
-        const descriptionsById = new Map<number, string>();
-        for (const filter of filters) {
-            descriptionsById.set(filter.id, filter.description);
-        }
+        // Filter descriptions are part of the active in-memory cache; avoid querying TxFilter for each batch.
+        const descriptionsById = new Map(
+            getTxFilterService()
+                .getTxFilters()
+                .map((filter) => [filter.id, filter.description] as const),
+        );
         const matches: Array<{
             txId: number;
             txFilterId: number;
@@ -186,16 +183,18 @@ export async function findOrCreateInternalTransfer(data: TransactionCreationAttr
 export async function createTxMatches(txId: number, txFilterIds: number[]) {
     if (txFilterIds.length === 0) return;
 
-    const filters = await TxFilter.findAll({
-        where: { id: { [Op.in]: txFilterIds } },
-        attributes: ['id', 'description'],
-    });
+    const descriptionsById = new Map(
+        getTxFilterService()
+            .getTxFilters()
+            .filter((filter) => txFilterIds.includes(filter.id))
+            .map((filter) => [filter.id, filter.description] as const),
+    );
 
     await TxMatch.bulkCreate(
-        filters.map((filter) => ({
+        [...descriptionsById.entries()].map(([txFilterId, description]) => ({
             txId,
-            txFilterId: filter.id,
-            txFilterDescription: filter.description,
+            txFilterId,
+            txFilterDescription: description,
         })),
         { ignoreDuplicates: true },
     );
