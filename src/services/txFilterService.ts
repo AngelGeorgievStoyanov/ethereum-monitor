@@ -3,8 +3,8 @@ import Block from '../models/block';
 import ScannerState from '../models/scannerState';
 import TxFilter from '../models/txFilter';
 import { env } from '../config/env';
-import { FILTER_MUTATION_ADVISORY_LOCK_KEY, SCANNER_ID } from '../constants/scanner.constants';
-import { TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
+import { SCANNER_ID } from '../constants/scanner.constants';
+import { FILTER_MUTATION_ADVISORY_LOCK_KEY, TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
 import {
     createTxFilter as insertTxFilter,
     deleteTxFilterById,
