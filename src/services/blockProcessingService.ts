@@ -86,14 +86,14 @@ export async function processFetchedBlock(
     }
 
     const filterMatchingStartedAt = Date.now();
-    const native = await processNativeTransfers(
+    const native = await processNativeTransfers({
         transactions,
         receiptsByHash,
-        activeTxFilters,
+        txFilters: activeTxFilters,
         blockNumber,
-        block.timestamp,
+        blockTimestamp: block.timestamp,
         includeUnmatched,
-    );
+    });
     const erc20 = await processErc20Transfers({
         receipts,
         transactionsByHash,
