@@ -59,7 +59,7 @@ export function createRpcClient() {
             endpoint.metrics.attempts += 1;
 
             try {
-                const result = await operation(endpoint.provider);
+                const result = await withTimeout(operation(endpoint.provider), RPC_ENDPOINT_TIMEOUT_MS);
                 endpoint.metrics.successes += 1;
                 endpoint.metrics.totalDurationMs += Date.now() - startedAt;
                 return result;
