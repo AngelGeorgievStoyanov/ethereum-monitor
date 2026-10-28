@@ -5,6 +5,8 @@ import {
     MAX_BLOCKS_PER_FINALIZED_CATCHUP,
     SCANNER_CONTROL_REFRESH_INTERVAL_MS,
     SCANNER_POLL_INTERVAL_MS,
+    SCANNER_STALL_CHECK_INTERVAL_MS,
+    SCANNER_STALL_WARNING_INTERVAL_MS,
 } from '../constants/scanner.constants';
 import { ethereumProvider } from './ethereumRpcService';
 import { getTxFilterService } from './txFilterService';
@@ -88,16 +90,15 @@ export function createBlockMonitorService() {
 
             const now = Date.now();
             const noProgressMs = now - lastProgressAt;
-            const warningIntervalMs = 60_000;
-            if (noProgressMs >= warningIntervalMs &&
-                (lastStallWarningAt === 0 || now - lastStallWarningAt >= warningIntervalMs)) {
+            if (noProgressMs >= SCANNER_STALL_WARNING_INTERVAL_MS &&
+                (lastStallWarningAt === 0 || now - lastStallWarningAt >= SCANNER_STALL_WARNING_INTERVAL_MS)) {
                 console.warn(
                     `[Scanner] No checkpoint progress for ${Math.round(noProgressMs / 1000)}s; ` +
                         `checkpoint=${state.lastProcessedBlock}. Block processing may be stalled.`,
                 );
                 lastStallWarningAt = now;
             }
-        }, 15_000);
+        }, SCANNER_STALL_CHECK_INTERVAL_MS);
         let waitingForFilters = txFilterService.getTxFilters().length === 0;
         let waitingForPause = false;
         let cachedControlPaused = false;
