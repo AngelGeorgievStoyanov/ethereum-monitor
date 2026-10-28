@@ -5,14 +5,23 @@ import { matchesTxFilter } from '../utils/matchesTxFilter';
 import { mapTransactionFilterContext } from '../mappers/transactionContextMapper';
 import type { TransferBatchCandidate } from './transactionService';
 
-export async function processNativeTransfers(
-    transactions: readonly TransactionResponse[],
-    receiptsByHash: Map<string, RpcTransactionReceipt>,
-    txFilters: ActiveTxFilter[],
-    blockNumber: number,
-    blockTimestamp: number,
+export interface ProcessNativeTransfersOptions {
+    transactions: readonly TransactionResponse[];
+    receiptsByHash: Map<string, RpcTransactionReceipt>;
+    txFilters: ActiveTxFilter[];
+    blockNumber: number;
+    blockTimestamp: number;
+    includeUnmatched?: boolean;
+}
+
+export async function processNativeTransfers({
+    transactions,
+    receiptsByHash,
+    txFilters,
+    blockNumber,
+    blockTimestamp,
     includeUnmatched = false,
-) {
+}: ProcessNativeTransfersOptions) {
     let transfersSeen = 0;
     let transfersMatched = 0;
     const candidates: TransferBatchCandidate[] = [];
