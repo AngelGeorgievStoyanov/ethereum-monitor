@@ -28,7 +28,7 @@ The scanner saves its checkpoint in PostgreSQL and resumes from it after a resta
 - An existing checkpoint takes priority over `START_BLOCK`.
 - On a new database, without `START_BLOCK`, scanning starts after the current finalized block.
 - On a new database, with `START_BLOCK`, the value must be a non-negative safe integer at or below the current finalized block, and the RPC provider must return that block.
-- With `START_BLOCK`, the first active filter created before any block history exists starts at that block, allowing the initial scan to find matching transfers. After block history exists, new filters start from the next finalized block and do not backfill automatically.
+- With `START_BLOCK`, only the first active filter created before any block history exists starts at that block, allowing the initial scan to find matching transfers. Concurrent filter creation is serialized so two requests cannot both claim the initial backfill range. After an active filter exists or block history has started, new filters start from the next finalized block and do not backfill automatically. The scanner refreshes its active-filter cache from PostgreSQL each polling cycle, including after taking over scanner ownership.
 - With no active filters, the scanner waits without advancing the checkpoint.
 
 ## Block processing and recovery
@@ -86,7 +86,7 @@ All routes use the `/api` prefix.
 - `DATABASE_URL`: PostgreSQL connection URL.
 - `RPC_URL_1`: required RPC endpoint.
 - `RPC_URL_2`, `RPC_URL_3`, etc.: optional fallback and verification endpoints.
-- `START_BLOCK`: optional initial block; used only when no checkpoint exists.
+- `START_BLOCK`: optional initial block; used only when no checkpoint exists. Normal RPC requests time out after `RPC_ENDPOINT_TIMEOUT_MS` and can fail over to another configured endpoint.
 
 Native ETH transfers are unique by transaction hash and block hash. ERC-20 transfers also include the log index. This preserves separate records when a transaction appears on a replacement block. Internal trace transfers are not processed.
 
