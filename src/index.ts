@@ -8,8 +8,8 @@ import { HTTP_HOST, HTTP_PORT } from './constants/http.constants';
 import {
     SCANNER_START_RETRY_BASE_DELAY_MS,
     SCANNER_START_RETRY_MAX_DELAY_MS,
-    TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
 } from './constants/scanner.constants';
+import { TX_FILTER_CACHE_REFRESH_INTERVAL_MS } from './constants/tx-filter.constants';
 import { getEthereumService } from './services/ethereumService';
 import { UnsafeScannerStartError } from './services/scannerInitializationService';
 import { getTxFilterService } from './services/txFilterService';
