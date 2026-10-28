@@ -124,6 +124,8 @@ export function createBlockMonitorService() {
                     needsStateReload = false;
                 }
 
+                // Refresh from PostgreSQL on the lock owner; another replica may have changed filters.
+                await txFilterService.loadTxFilters();
                 const activeTxFilters = txFilterService.getTxFilters();
 
                 if (activeTxFilters.length === 0) {
