@@ -149,13 +149,13 @@ export async function processFinalizedBlocks(
             }
 
             const databaseWriteStartedAt = Date.now();
-            const committedCheckpoint = await persistProcessedBlockBatch(
+            const committedCheckpoint = await persistProcessedBlockBatch({
                 candidates,
-                processedBlockRecords,
-                state.id,
+                blocks: processedBlockRecords,
+                scannerStateId: state.id,
                 expectedCheckpoint,
-                blockNumbers[blockNumbers.length - 1],
-            );
+                newCheckpoint: blockNumbers[blockNumbers.length - 1],
+            });
             const databaseWriteDurationMs = Date.now() - databaseWriteStartedAt;
 
             if (committedCheckpoint !== blockNumbers[blockNumbers.length - 1]) {
