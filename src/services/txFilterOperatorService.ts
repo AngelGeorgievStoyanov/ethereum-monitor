@@ -72,12 +72,19 @@ export function validateTxFilterOperator(field: string, operator: string, value:
         normalize(item, definition.type, Boolean(definition.caseInsensitive));
 }
 
-export function evaluateTxFilterOperator(
-    field: string,
-    operator: string,
-    actualValue: unknown,
-    expectedValue: unknown,
-): boolean {
+export interface EvaluateTxFilterOperatorOptions {
+    field: string;
+    operator: string;
+    actualValue: unknown;
+    expectedValue: unknown;
+}
+
+export function evaluateTxFilterOperator({
+    field,
+    operator,
+    actualValue,
+    expectedValue,
+}: EvaluateTxFilterOperatorOptions): boolean {
     validateTxFilterOperator(field, operator, expectedValue);
     const definition = getTxFilterField(field);
     const actual = normalize(actualValue, definition.type, Boolean(definition.caseInsensitive));
