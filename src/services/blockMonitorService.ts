@@ -242,6 +242,7 @@ export function createBlockMonitorService() {
                     } finally {
                         processingFinalizedBlocks = false;
                     }
+                    }
                 }
             } catch (error) {
                 console.error(
