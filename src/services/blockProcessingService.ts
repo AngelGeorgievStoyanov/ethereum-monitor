@@ -94,14 +94,14 @@ export async function processFetchedBlock(
         block.timestamp,
         includeUnmatched,
     );
-    const erc20 = await processErc20Transfers(
+    const erc20 = await processErc20Transfers({
         receipts,
         transactionsByHash,
-        activeTxFilters,
+        txFilters: activeTxFilters,
         blockNumber,
-        block.timestamp,
+        blockTimestamp: block.timestamp,
         includeUnmatched,
-    );
+    });
     const filterMatchingDurationMs = Date.now() - filterMatchingStartedAt;
 
     return {
