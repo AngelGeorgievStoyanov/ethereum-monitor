@@ -26,12 +26,19 @@ function matchesBlock(
         stored.parentHash.toLowerCase() === current.parentHash.toLowerCase();
 }
 
-async function runManualRescanInternal(
-    fromBlock: number,
-    state: ScannerState,
-    getActiveTxFilters: () => ActiveTxFilter[],
-    onProgress?: (currentBlock: number, blocksProcessed: number) => Promise<void>,
-): Promise<{ fromBlock: number; toBlock: number; blocksProcessed: number }> {
+interface RunManualRescanOptions {
+    fromBlock: number;
+    state: ScannerState;
+    getActiveTxFilters: () => ActiveTxFilter[];
+    onProgress?: (currentBlock: number, blocksProcessed: number) => Promise<void>;
+}
+
+async function runManualRescanInternal({
+    fromBlock,
+    state,
+    getActiveTxFilters,
+    onProgress,
+}: RunManualRescanOptions): Promise<{ fromBlock: number; toBlock: number; blocksProcessed: number }> {
     if (!(await isScannerLockHeld())) {
         throw new Error('Manual rescan requires this instance to own the scanner lock');
     }
@@ -105,16 +112,11 @@ async function runManualRescanInternal(
     return { fromBlock, toBlock: checkpoint, blocksProcessed };
 }
 
-export async function runManualRescan(
-    fromBlock: number,
-    state: ScannerState,
-    getActiveTxFilters: () => ActiveTxFilter[],
-    onProgress?: (currentBlock: number, blocksProcessed: number) => Promise<void>,
-): Promise<{ fromBlock: number; toBlock: number; blocksProcessed: number }> {
+export async function runManualRescan(options: RunManualRescanOptions): Promise<{ fromBlock: number; toBlock: number; blocksProcessed: number }> {
     if (rescanInProgress) throw new Error('Another manual rescan is already running in this process');
     rescanInProgress = true;
     try {
-        return await runManualRescanInternal(fromBlock, state, getActiveTxFilters, onProgress);
+        return await runManualRescanInternal(options);
     } finally {
         rescanInProgress = false;
     }
