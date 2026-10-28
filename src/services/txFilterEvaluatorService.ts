@@ -14,6 +14,7 @@ export interface TxFilterGroupRule {
 
 export interface ActiveTxFilter {
     id: number;
+    description: string;
     isActive: boolean;
     activeFromBlock: number | null;
     rule: TxFilterGroupRule;
