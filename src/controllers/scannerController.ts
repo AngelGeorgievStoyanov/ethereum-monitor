@@ -132,14 +132,14 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
         if (!state) throw new Error('Scanner state is not initialized');
 
         await job.update({ status: 'RUNNING', currentBlock: fromBlock, startedAt: new Date() });
-        const result = await runManualRescan(
+        const result = await runManualRescan({
             fromBlock,
             state,
-            () => getTxFilterService().getTxFilters(),
-            async (currentBlock, blocksProcessed) => {
+            getActiveTxFilters: () => getTxFilterService().getTxFilters(),
+            onProgress: async (currentBlock, blocksProcessed) => {
                 await job.update({ currentBlock, blocksProcessed });
             },
-        );
+        });
         await job.update({
             status: 'COMPLETED',
             currentBlock: result.toBlock,
