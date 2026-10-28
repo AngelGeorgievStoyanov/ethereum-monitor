@@ -4,6 +4,7 @@ import ScannerState from '../models/scannerState';
 import TxFilter from '../models/txFilter';
 import { env } from '../config/env';
 import { FILTER_MUTATION_ADVISORY_LOCK_KEY, SCANNER_ID } from '../constants/scanner.constants';
+import { TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
 import {
     createTxFilter as insertTxFilter,
     deleteTxFilterById,
@@ -90,22 +91,21 @@ export function createTxFilterService() {
         const task = reloadQueue
             .catch(() => undefined)
             .then(async () => {
-                const retryDelaysMs = [1000, 2000, 5000];
-                for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+                for (let attempt = 0; attempt <= TX_FILTER_RELOAD_RETRY_DELAYS_MS.length; attempt += 1) {
                     try {
                         await loadTxFilters();
                         return true;
                     } catch (error) {
-                        if (attempt === retryDelaysMs.length) {
+                        if (attempt === TX_FILTER_RELOAD_RETRY_DELAYS_MS.length) {
                             console.error(
                                 `[Scanner] Failed to reload tx filters after ${attempt + 1} attempt(s): ${formatError(error)}`,
                             );
                             return false;
                         }
                         console.error(
-                            `[Scanner] Failed to reload tx filters (attempt ${attempt + 1}/${retryDelaysMs.length + 1}); retrying: ${formatError(error)}`,
+                            `[Scanner] Failed to reload tx filters (attempt ${attempt + 1}/${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1}); retrying: ${formatError(error)}`,
                         );
-                        await sleep(retryDelaysMs[attempt]);
+                        await sleep(TX_FILTER_RELOAD_RETRY_DELAYS_MS[attempt]);
                     }
                 }
                 return false;
