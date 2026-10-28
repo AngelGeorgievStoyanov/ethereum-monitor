@@ -63,6 +63,7 @@ export function createTxFilterService() {
             }
             next.set(filter.id, {
                 id: filter.id,
+                description: filter.description,
                 isActive: filter.isActive,
                 activeFromBlock: filter.activeFromBlock,
                 rule,
