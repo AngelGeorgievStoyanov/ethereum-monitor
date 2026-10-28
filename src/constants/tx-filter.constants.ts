@@ -1,0 +1,1 @@
+export const TX_FILTER_RELOAD_RETRY_DELAYS_MS = [1000, 2000, 5000] as const;
