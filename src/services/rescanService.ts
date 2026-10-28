@@ -1,4 +1,5 @@
 import Block from '../models/block';
+import { RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS } from '../constants/rescan.constants';
 import ScannerState from '../models/scannerState';
 import { processBlock } from './blockProcessingService';
 import { getBlockWithConsensus } from './blockConsensusService';
@@ -103,7 +104,7 @@ async function runManualRescanInternal({
         blocksProcessed += 1;
         recordRescanBlockProcessed();
         if (onProgress) await onProgress(blockNumber, blocksProcessed);
-        if (blocksProcessed % 100 === 0) {
+        if (blocksProcessed % RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS === 0) {
             console.log(`[Rescan] Progress: processed ${blocksProcessed} block(s), current=${blockNumber}, range=${fromBlock}-${checkpoint}`);
         }
     }
