@@ -50,6 +50,45 @@ export function releaseManualRescanReservation(): void {
     manualRescanReserved = false;
 }
 
+async function logFinalizedRegressionDiagnostics(
+    checkpoint: number,
+    primaryFinalized: number,
+): Promise<void> {
+    try {
+        const providerResults = await ethereumProvider.getFinalizedFromAllEndpoints();
+        const hasConsensus =
+            ethereumProvider.getEndpointCount() > 1 &&
+            providerResults.length === ethereumProvider.getEndpointCount() &&
+            providerResults.length > 0 &&
+            providerResults.every(
+                (result) =>
+                    result.error === null &&
+                    result.blockNumber === providerResults[0].blockNumber &&
+                    result.blockHash?.toLowerCase() === providerResults[0].blockHash?.toLowerCase(),
+            );
+        let diagnosticConsensus = 'NO';
+        if (ethereumProvider.getEndpointCount() === 1) {
+            diagnosticConsensus = 'NOT_APPLICABLE_SINGLE_PROVIDER';
+        } else if (hasConsensus) {
+            diagnosticConsensus = 'YES';
+        }
+        const providerSummary = providerResults
+            .map((result) =>
+                result.error
+                    ? `P${result.endpointIndex}=ERROR(${result.error})`
+                    : `P${result.endpointIndex}=${result.blockNumber}(hash=${result.blockHash})`,
+            )
+            .join('; ');
+        console.warn(
+            `[Finalized] Regression diagnostics: checkpoint=${checkpoint}, primaryFinalized=${primaryFinalized}; diagnosticConsensus=${diagnosticConsensus}; ${providerSummary}`,
+        );
+    } catch (error) {
+        console.error(
+            `[Finalized] Failed to collect non-blocking regression diagnostics: ${formatError(error)}`,
+        );
+    }
+}
+
 export function createBlockMonitorService() {
     const txFilterService = getTxFilterService();
     let scannerStarted = false;
@@ -156,33 +195,12 @@ export function createBlockMonitorService() {
                         if (!finalized) throw new Error('Unable to resolve the latest finalized block');
     
                         if (finalized.number < state.lastProcessedBlock) {
-                            const providerResults = await ethereumProvider.getFinalizedFromAllEndpoints();
-                            const hasConsensus =
-                                ethereumProvider.getEndpointCount() > 1 &&
-                                providerResults.length === ethereumProvider.getEndpointCount() &&
-                                providerResults.length > 0 &&
-                                providerResults.every(
-                                    (result) =>
-                                        result.error === null &&
-                                        result.blockNumber === providerResults[0].blockNumber &&
-                                        result.blockHash?.toLowerCase() === providerResults[0].blockHash?.toLowerCase(),
-                                );
-                            let diagnosticConsensus = 'NO';
-                            if (ethereumProvider.getEndpointCount() === 1) {
-                                diagnosticConsensus = 'NOT_APPLICABLE_SINGLE_PROVIDER';
-                            } else if (hasConsensus) {
-                                diagnosticConsensus = 'YES';
-                            }
-                            const providerSummary = providerResults
-                                .map((result) =>
-                                    result.error
-                                        ? `P${result.endpointIndex}=ERROR(${result.error})`
-                                        : `P${result.endpointIndex}=${result.blockNumber}(hash=${result.blockHash})`,
-                                )
-                                .join('; ');
+                            const checkpoint = state.lastProcessedBlock;
+                            const primaryFinalized = finalized.number;
                             console.warn(
-                                `[Finalized] Regression detected: checkpoint=${state.lastProcessedBlock}, primaryFinalized=${finalized.number}; diagnosticConsensus=${diagnosticConsensus}; ${providerSummary}`,
+                                `[Finalized] Regression detected: checkpoint=${checkpoint}, primaryFinalized=${primaryFinalized}; collecting non-blocking RPC diagnostics`,
                             );
+                            void logFinalizedRegressionDiagnostics(checkpoint, primaryFinalized);
                         }
     
                         if (waitingForFilters) {
