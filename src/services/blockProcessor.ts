@@ -1,4 +1,5 @@
-import ScannerState from '../models/scannerState';
+import type { ScannerRuntimeState } from '../types/scanner-state.types';
+import { refreshScannerState } from './scannerStateService';
 import {
     REORG_RECOVERY_STABLE_BLOCKS,
     SCANNER_MAX_PARALLEL_BLOCKS,
@@ -72,7 +73,7 @@ function validateBatchConnectivity(
 }
 
 export async function processFinalizedBlocks(
-    state: ScannerState,
+    state: ScannerRuntimeState,
     finalizedBlockNumber: number,
     getActiveTxFilters: () => import('./txFilterEvaluatorService').ActiveTxFilter[],
 ): Promise<void> {
@@ -195,7 +196,7 @@ export async function processFinalizedBlocks(
                         state.lastProcessedBlock,
                         error.blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
                     );
-                    await state.reload();
+                    await refreshScannerState(state);
                     console.warn(
                         `[Reorg] Block/receipt consistency failure at block ${error.blockNumber}; recovery scheduled from checkpoint ${state.lastProcessedBlock}`,
                     );
