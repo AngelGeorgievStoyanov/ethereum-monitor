@@ -5,15 +5,7 @@ import TxFilter from '../models/txFilter';
 import TxMatch from '../models/txMatch';
 import Block from '../models/block';
 import ScannerState from '../models/scannerState';
-
-export interface TxFilterRecord {
-    id: number;
-    description: string;
-    from: string | null;
-    to: string | null;
-    isActive: boolean;
-    activeFromBlock: number | null;
-}
+import type { TxFilterRecord } from '../types/tx-filter.types';
 
 function toTxFilterRecord(filter: TxFilter): TxFilterRecord {
     return {
