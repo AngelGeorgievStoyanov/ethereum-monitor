@@ -7,14 +7,11 @@ import {
     findTransactionsPage,
     findOrCreateTransfer,
 } from '../repositories/transactionRepository';
-import {
-    mapTransactionCreationData,
-} from '../mappers/transactionContextMapper';
+import { mapTransactionCreationData } from '../mappers/transactionContextMapper';
 import type { TransferContextMetadata } from '../types/transaction.types';
 import { mapTransactionPageResponse } from '../mappers/transactionResponseMapper';
 
 export type TransferMetadata = TransferContextMetadata;
-
 
 export interface CreateTransactionFromEthereumDataOptions {
     tx: TransactionResponse;

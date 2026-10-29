@@ -18,7 +18,10 @@ import {
 } from '../repositories/txFilterRuleRepository';
 import { getNextFilterStartBlock } from './txFilterActivationService';
 import { mapTxFilterListResponse, mapTxFilterResponse } from '../mappers/txFilterMapper';
-import { mapTxFilterSyncFailureResponse, type TxFilterMutationOperation } from '../mappers/txFilterResponseMapper';
+import {
+    mapTxFilterSyncFailureResponse,
+    type TxFilterMutationOperation,
+} from '../mappers/txFilterResponseMapper';
 import type { ActiveTxFilter, TxFilterGroupRule } from '../types/tx-filter.types';
 import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
@@ -50,9 +53,15 @@ function legacyRule(txFilter: LegacyTxFilterFields): TxFilterGroupRule | null {
 export function createTxFilterService() {
     let refreshDynamicConfig: (() => Promise<boolean>) | undefined;
     let activeTxFiltersCache: ActiveTxFilter[] = [];
-    function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void { refreshDynamicConfig = handler; }
-    async function refreshAfterMutation(result: unknown, operation: TxFilterMutationOperation): Promise<void> {
-        if (!refreshDynamicConfig || !(await refreshDynamicConfig())) throw new TxFilterSyncError(operation, result);
+    function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void {
+        refreshDynamicConfig = handler;
+    }
+    async function refreshAfterMutation(
+        result: unknown,
+        operation: TxFilterMutationOperation,
+    ): Promise<void> {
+        if (!refreshDynamicConfig || !(await refreshDynamicConfig()))
+            throw new TxFilterSyncError(operation, result);
     }
     async function loadActiveTxFilters(): Promise<ActiveTxFilter[]> {
         const activeFilters = await findActiveTxFilters();
@@ -63,11 +72,18 @@ export function createTxFilterService() {
             const rule = rulesByFilterId.get(filter.id) ?? legacyRule(filter);
             if (!rule) continue;
             if (filter.activeFromBlock === null || filter.activeFromBlock === undefined) {
-                if (missingFiltersStartBlock === undefined) missingFiltersStartBlock = await getNextFilterStartBlock();
+                if (missingFiltersStartBlock === undefined)
+                    missingFiltersStartBlock = await getNextFilterStartBlock();
                 await assignActiveFilterStartBlock(filter.id, missingFiltersStartBlock);
                 filter.activeFromBlock = missingFiltersStartBlock;
             }
-            next.push({ id: filter.id, description: filter.description, isActive: filter.isActive, activeFromBlock: filter.activeFromBlock, rule });
+            next.push({
+                id: filter.id,
+                description: filter.description,
+                isActive: filter.isActive,
+                activeFromBlock: filter.activeFromBlock,
+                rule,
+            });
         }
         activeTxFiltersCache = next;
         return next;
@@ -142,7 +158,6 @@ export function createTxFilterService() {
         if (updates.rule) validateTxFilterGroup(updates.rule);
 
         const updated = await withTxFilterMutationLock(async (transaction) => {
-
             const current = await findTxFilterForUpdate(id, transaction);
             if (!current) return null;
 
@@ -203,11 +218,23 @@ export function createTxFilterService() {
         const deleted = await withTxFilterMutationLock(async (transaction) => {
             return deleteTxFilterById(id, transaction);
         });
-        if (deleted > 0) await refreshAfterMutation({ message: 'Transaction filter deleted', deleted: true }, 'deleted');
+        if (deleted > 0)
+            await refreshAfterMutation(
+                { message: 'Transaction filter deleted', deleted: true },
+                'deleted',
+            );
         return deleted;
     }
 
-    return { loadActiveTxFilters, setDynamicConfigRefreshHandler, getTxFilters, getAllTxFilters, createTxFilter, updateTxFilter, removeTxFilter };
+    return {
+        loadActiveTxFilters,
+        setDynamicConfigRefreshHandler,
+        getTxFilters,
+        getAllTxFilters,
+        createTxFilter,
+        updateTxFilter,
+        removeTxFilter,
+    };
 }
 
 let txFilterServiceInstance: ReturnType<typeof createTxFilterService> | undefined;

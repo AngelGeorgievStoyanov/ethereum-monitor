@@ -30,7 +30,9 @@ export async function findActiveScannerRescanJob(): Promise<ScannerRescanJobSumm
     return job ? toSummary(job) : null;
 }
 
-export async function findScannerRescanJobById(id: string): Promise<ScannerRescanJobSummary | null> {
+export async function findScannerRescanJobById(
+    id: string,
+): Promise<ScannerRescanJobSummary | null> {
     const job = await ScannerRescanJob.findByPk(id);
     return job ? toSummary(job) : null;
 }
@@ -66,10 +68,12 @@ export async function createScannerRescanJob(input: {
 
 export async function updateScannerRescanJob(
     id: string,
-    updates: Partial<Pick<
-        ScannerRescanJobSummary,
-        'status' | 'currentBlock' | 'blocksProcessed' | 'error' | 'startedAt' | 'completedAt'
-    >>,
+    updates: Partial<
+        Pick<
+            ScannerRescanJobSummary,
+            'status' | 'currentBlock' | 'blocksProcessed' | 'error' | 'startedAt' | 'completedAt'
+        >
+    >,
 ): Promise<ScannerRescanJobSummary | null> {
     const job = await ScannerRescanJob.findByPk(id);
     if (!job) return null;

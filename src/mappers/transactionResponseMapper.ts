@@ -55,9 +55,7 @@ function mapTransactionResponse(
     };
 }
 
-export function mapTransactionPageResponse(
-    page: StoredTransactionPage,
-): TransactionPageResponse {
+export function mapTransactionPageResponse(page: StoredTransactionPage): TransactionPageResponse {
     return {
         items: page.items.map(mapTransactionResponse),
         pagination: page.pagination,

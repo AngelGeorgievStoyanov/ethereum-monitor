@@ -1,7 +1,10 @@
 import { Op } from 'sequelize';
 import Block from '../models/block';
 
-export async function countCanonicalBlocksInRange(fromBlock: number, toBlock: number): Promise<number> {
+export async function countCanonicalBlocksInRange(
+    fromBlock: number,
+    toBlock: number,
+): Promise<number> {
     return Block.count({
         where: {
             status: 'CANONICAL',

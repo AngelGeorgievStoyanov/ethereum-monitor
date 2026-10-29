@@ -87,7 +87,9 @@ export async function persistProcessedBlockBatchTransaction({
         }
 
         for (let index = 1; index < blocks.length; index += 1) {
-            if (blocks[index].parentHash.toLowerCase() !== blocks[index - 1].blockHash.toLowerCase()) {
+            if (
+                blocks[index].parentHash.toLowerCase() !== blocks[index - 1].blockHash.toLowerCase()
+            ) {
                 throw new BlockChainDiscontinuityError(
                     blocks[index].blockNumber,
                     `Block chain discontinuity between ${blocks[index - 1].blockNumber} and ${blocks[index].blockNumber}`,
@@ -102,7 +104,8 @@ export async function persistProcessedBlockBatchTransaction({
             });
             if (
                 previousCanonicalBlock &&
-                blocks[0].parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()
+                blocks[0].parentHash.toLowerCase() !==
+                    previousCanonicalBlock.blockHash.toLowerCase()
             ) {
                 throw new BlockChainDiscontinuityError(
                     blocks[0].blockNumber,

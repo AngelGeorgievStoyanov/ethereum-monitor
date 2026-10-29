@@ -1,4 +1,7 @@
-import { TX_FILTER_CACHE_REFRESH_INTERVAL_MS, TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
+import {
+    TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
+    TX_FILTER_RELOAD_RETRY_DELAYS_MS,
+} from '../constants/tx-filter.constants';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
@@ -14,10 +17,15 @@ export function createDynamicConfigService() {
 
     async function loadTxFilters(): Promise<void> {
         const loadedFilters = await txFilterService.loadActiveTxFilters();
-        const next = new Map<number, ActiveTxFilter>(loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]));
-        const signature = (map: Map<number, ActiveTxFilter>) => JSON.stringify(Array.from(map.entries()).sort(([a], [b]) => a - b));
+        const next = new Map<number, ActiveTxFilter>(
+            loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]),
+        );
+        const signature = (map: Map<number, ActiveTxFilter>) =>
+            JSON.stringify(Array.from(map.entries()).sort(([a], [b]) => a - b));
         if (signature(activeTxFilters) === signature(next)) {
-            console.log(`[DynamicConfig] Transaction filter cache unchanged (${activeTxFilters.size} active filter(s))`);
+            console.log(
+                `[DynamicConfig] Transaction filter cache unchanged (${activeTxFilters.size} active filter(s))`,
+            );
             initialized = true;
             return;
         }
@@ -27,34 +35,52 @@ export function createDynamicConfigService() {
     }
     async function refreshWithRetry(): Promise<boolean> {
         pendingReloadCount += 1;
-        const task = reloadQueue.catch(() => false).then(async () => {
-            for (let attempt = 0; attempt <= TX_FILTER_RELOAD_RETRY_DELAYS_MS.length; attempt += 1) {
-                try { await loadTxFilters(); return true; }
-                catch (error) {
-                    if (attempt === TX_FILTER_RELOAD_RETRY_DELAYS_MS.length) {
-                        console.error(`[DynamicConfig] Failed to refresh transaction filters after ${attempt + 1} attempt(s): ${formatError(error)}`);
-                        return false;
+        const task = reloadQueue
+            .catch(() => false)
+            .then(async () => {
+                for (
+                    let attempt = 0;
+                    attempt <= TX_FILTER_RELOAD_RETRY_DELAYS_MS.length;
+                    attempt += 1
+                ) {
+                    try {
+                        await loadTxFilters();
+                        return true;
+                    } catch (error) {
+                        if (attempt === TX_FILTER_RELOAD_RETRY_DELAYS_MS.length) {
+                            console.error(
+                                `[DynamicConfig] Failed to refresh transaction filters after ${attempt + 1} attempt(s): ${formatError(error)}`,
+                            );
+                            return false;
+                        }
+                        console.error(
+                            `[DynamicConfig] Refresh failed (attempt ${attempt + 1}/${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1}); retrying: ${formatError(error)}`,
+                        );
+                        await sleep(TX_FILTER_RELOAD_RETRY_DELAYS_MS[attempt]);
                     }
-                    console.error(`[DynamicConfig] Refresh failed (attempt ${attempt + 1}/${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1}); retrying: ${formatError(error)}`);
-                    await sleep(TX_FILTER_RELOAD_RETRY_DELAYS_MS[attempt]);
                 }
-            }
-            return false;
+                return false;
+            });
+        const settled = task.finally(() => {
+            pendingReloadCount -= 1;
         });
-        const settled = task.finally(() => { pendingReloadCount -= 1; });
         reloadQueue = settled;
         return settled;
     }
     async function init(): Promise<void> {
         if (!(await refreshWithRetry())) {
-            throw new Error('Unable to load required dynamic configuration; scanner startup is blocked');
+            throw new Error(
+                'Unable to load required dynamic configuration; scanner startup is blocked',
+            );
         }
         if (refreshTimer) return;
         refreshTimer = setInterval(() => {
             if (pendingReloadCount === 0) void refreshWithRetry();
         }, TX_FILTER_CACHE_REFRESH_INTERVAL_MS);
         refreshTimer.unref?.();
-        console.log(`[DynamicConfig] Refresh scheduled every ${TX_FILTER_CACHE_REFRESH_INTERVAL_MS}ms`);
+        console.log(
+            `[DynamicConfig] Refresh scheduled every ${TX_FILTER_CACHE_REFRESH_INTERVAL_MS}ms`,
+        );
     }
     function stopRefreshTimer(): void {
         if (!refreshTimer) return;

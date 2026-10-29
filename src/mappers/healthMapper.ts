@@ -5,9 +5,7 @@ export interface HealthReadinessResponse {
     checks: HealthReadinessResult['checks'];
 }
 
-export function mapHealthReadinessResponse(
-    result: HealthReadinessResult,
-): HealthReadinessResponse {
+export function mapHealthReadinessResponse(result: HealthReadinessResult): HealthReadinessResponse {
     return {
         status: result.ready ? 'ready' : 'not_ready',
         checks: result.checks,

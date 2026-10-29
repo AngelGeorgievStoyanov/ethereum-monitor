@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { deleteStoredTransaction, listStoredTransactions } from '../services/transactionService';
 import { sendHttpError } from '../utils/httpError';
-import { validateTransactionIdInput, validateTransactionPaginationInput } from '../validators/transactionValidator';
+import {
+    validateTransactionIdInput,
+    validateTransactionPaginationInput,
+} from '../validators/transactionValidator';
 
 export async function getAllStoredTransactions(req: Request, res: Response): Promise<void> {
     let page: number;

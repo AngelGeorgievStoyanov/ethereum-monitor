@@ -20,7 +20,10 @@ import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { isScannerLockHeld } from './scannerLockService';
 import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
-import { findScannerStatusState, unblockScannerReorgRecovery } from '../repositories/scannerStateRepository';
+import {
+    findScannerStatusState,
+    unblockScannerReorgRecovery,
+} from '../repositories/scannerStateRepository';
 import { mapReorgRecoveryRetryResponse } from '../mappers/scannerControlMapper';
 import {
     recordReorgAncestorFound,
@@ -64,7 +67,10 @@ function logSingleProviderReorgMode(): void {
     singleProviderReorgWarningLogged = true;
 }
 
-function sameBlock(stored: { blockHash: string; parentHash: string }, current: { blockHash: string; parentHash: string }): boolean {
+function sameBlock(
+    stored: { blockHash: string; parentHash: string },
+    current: { blockHash: string; parentHash: string },
+): boolean {
     return (
         stored.blockHash.toLowerCase() === current.blockHash.toLowerCase() &&
         stored.parentHash.toLowerCase() === current.parentHash.toLowerCase()
@@ -307,7 +313,9 @@ async function markVerificationRecoveryBlocked(
     }
     if (error instanceof ConsensusUnavailableError) recordReorgConsensusFailure();
     if (!(await isScannerLockHeld()))
-        throw new Error('Scanner lock ownership was lost before persisting block-verification-blocked recovery state');
+        throw new Error(
+            'Scanner lock ownership was lost before persisting block-verification-blocked recovery state',
+        );
     const reasonPrefix =
         error instanceof ConsensusUnavailableError
             ? 'CONSENSUS_UNAVAILABLE'
@@ -337,7 +345,9 @@ async function markReceiptConsistencyRecoveryBlocked(
     }
 
     if (!(await isScannerLockHeld()))
-        throw new Error('Scanner lock ownership was lost before persisting receipt-consistency-blocked recovery');
+        throw new Error(
+            'Scanner lock ownership was lost before persisting receipt-consistency-blocked recovery',
+        );
     await markReorgRecoveryBlocked({
         scannerStateId: state.id,
         reason: `RECEIPT_CONSISTENCY:block=${error.blockNumber}:${error.message}`,
@@ -385,7 +395,9 @@ async function markRecoverySafetyBlocked(
         return;
     }
     if (!(await isScannerLockHeld()))
-        throw new Error('Scanner lock ownership was lost before persisting safety-blocked recovery state');
+        throw new Error(
+            'Scanner lock ownership was lost before persisting safety-blocked recovery state',
+        );
     await markReorgRecoveryBlocked({
         scannerStateId: state.id,
         reason: `SAFETY:${error.message}`,

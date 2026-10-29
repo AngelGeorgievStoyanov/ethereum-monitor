@@ -9,7 +9,6 @@ import {
 import { isScannerLockHeld } from './scannerLockService';
 import type { TransferBatchCandidate } from '../types/transfer-batch.types';
 
-
 export async function createTransactionsFromEthereumDataBatch(
     candidates: readonly TransferBatchCandidate[],
     transaction?: import('sequelize').Transaction,

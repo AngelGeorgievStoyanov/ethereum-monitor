@@ -125,12 +125,8 @@ export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
         const startedAt = Date.now();
         try {
-            const {
-                block,
-                receipts,
-                getBlockDurationMs,
-                getBlockReceiptsDurationMs,
-            } = await ethereumProvider.getBlockAndReceipts(blockNumber);
+            const { block, receipts, getBlockDurationMs, getBlockReceiptsDurationMs } =
+                await ethereumProvider.getBlockAndReceipts(blockNumber);
             validateBlockReceipts(blockNumber, block, receipts);
 
             return {

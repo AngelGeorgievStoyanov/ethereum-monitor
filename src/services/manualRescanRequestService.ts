@@ -47,8 +47,9 @@ function rejected(
     return { kind: 'rejected', reason, body };
 }
 
-async function requestManualRescanOperation(requestedFromBlock: number): Promise<ManualRescanRequestResult> {
-
+async function requestManualRescanOperation(
+    requestedFromBlock: number,
+): Promise<ManualRescanRequestResult> {
     const scannerControl = await getScannerControlState();
     if (!scannerControl.paused || scannerControl.mode !== 'manual') {
         return rejected('conflict', {

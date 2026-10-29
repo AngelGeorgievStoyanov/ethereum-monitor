@@ -24,12 +24,7 @@ export interface ScannerStatusState {
 }
 
 export type ScannerRescanJobStatus =
-    | 'QUEUED'
-    | 'RUNNING'
-    | 'COMPLETED'
-    | 'RECOVERY_STARTED'
-    | 'FAILED'
-    | 'INTERRUPTED';
+    'QUEUED' | 'RUNNING' | 'COMPLETED' | 'RECOVERY_STARTED' | 'FAILED' | 'INTERRUPTED';
 
 export interface ScannerRescanJobSummary {
     id: string;

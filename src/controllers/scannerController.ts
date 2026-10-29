@@ -24,7 +24,9 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
 export const pauseScanner = async (req: Request, res: Response): Promise<void> => {
     try {
         const input = validateScannerPauseInput(req.body);
-        res.json(await requestScannerPauseResponse(input.mode, input.atBlock, input.durationMinutes));
+        res.json(
+            await requestScannerPauseResponse(input.mode, input.atBlock, input.durationMinutes),
+        );
     } catch (error) {
         sendHttpError(res, 'Unable to request scanner pause', error);
     }
@@ -77,7 +79,8 @@ export const retryBlockedReorgRecovery = async (_req: Request, res: Response): P
         }
         if (result.kind === 'state-changed') {
             res.status(409).json({
-                message: 'Reorg recovery state changed before it could be unblocked. Refresh status and retry.',
+                message:
+                    'Reorg recovery state changed before it could be unblocked. Refresh status and retry.',
             });
             return;
         }

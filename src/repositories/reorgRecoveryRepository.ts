@@ -83,8 +83,7 @@ export async function rollbackToCommonAncestor(input: {
         }
 
         if (state.reorgRecoveryTargetBlock === null) {
-            state.reorgRecoveryTargetBlock =
-                input.expectedCheckpoint + input.stableBlocks;
+            state.reorgRecoveryTargetBlock = input.expectedCheckpoint + input.stableBlocks;
         }
         state.lastProcessedBlock = input.ancestorBlockNumber;
         state.reorgRecoveryActive = true;
@@ -130,10 +129,7 @@ export async function markReorgRecoveryBlocked(input: {
     });
 }
 
-async function findLockedScannerState(
-    id: string,
-    transaction: Transaction,
-) {
+async function findLockedScannerState(id: string, transaction: Transaction) {
     const state = await ScannerState.findByPk(id, {
         transaction,
         lock: transaction.LOCK.UPDATE,

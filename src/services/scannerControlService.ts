@@ -3,7 +3,10 @@ import {
     findScannerControlRecord,
     updateScannerControlRecord,
 } from '../repositories/scannerStateRepository';
-import { mapScannerControlResponse, mapScannerResumeResponse } from '../mappers/scannerControlMapper';
+import {
+    mapScannerControlResponse,
+    mapScannerResumeResponse,
+} from '../mappers/scannerControlMapper';
 import type {
     ScannerControlRecord,
     ScannerControlState,
@@ -28,9 +31,9 @@ async function loadControlRecord(): Promise<ScannerControlRecord> {
 function isTemporaryPauseExpired(record: ScannerControlRecord): boolean {
     return Boolean(
         record.paused &&
-            record.mode === 'temporary' &&
-            record.pauseUntilDate &&
-            Date.now() >= record.pauseUntilDate.getTime(),
+        record.mode === 'temporary' &&
+        record.pauseUntilDate &&
+        Date.now() >= record.pauseUntilDate.getTime(),
     );
 }
 
@@ -61,9 +64,7 @@ export async function requestScannerPause(
 ): Promise<void> {
     const paused = atBlock === null;
     const pauseUntil =
-        paused && mode === 'temporary'
-            ? new Date(Date.now() + durationMinutes * 60 * 1000)
-            : null;
+        paused && mode === 'temporary' ? new Date(Date.now() + durationMinutes * 60 * 1000) : null;
 
     await updateScannerControlRecord(SCANNER_ID, {
         scannerPauseTargetBlock: atBlock,

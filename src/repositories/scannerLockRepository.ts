@@ -2,10 +2,7 @@ import sequelize from '../database';
 import { SCANNER_ADVISORY_LOCK_KEY } from '../constants/scanner.constants';
 
 interface PgConnection {
-    query(
-        sql: string,
-        values?: unknown[],
-    ): Promise<{ rows?: Array<{ locked?: boolean }> }>;
+    query(sql: string, values?: unknown[]): Promise<{ rows?: Array<{ locked?: boolean }> }>;
 }
 
 interface ConnectionManager {

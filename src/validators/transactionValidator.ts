@@ -18,7 +18,8 @@ export function validateTransactionPaginationInput(query: {
     limit?: unknown;
 }): TransactionPaginationInput {
     const page = query.page === undefined ? DEFAULT_PAGE : parsePositiveQueryInteger(query.page);
-    const limit = query.limit === undefined ? DEFAULT_LIMIT : parsePositiveQueryInteger(query.limit);
+    const limit =
+        query.limit === undefined ? DEFAULT_LIMIT : parsePositiveQueryInteger(query.limit);
 
     if (page === undefined || limit === undefined || limit > MAX_LIMIT) {
         throw new HttpError(

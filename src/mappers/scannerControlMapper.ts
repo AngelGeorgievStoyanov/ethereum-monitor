@@ -1,4 +1,8 @@
-import type { ScannerControlState, ScannerPauseMode, ScannerStatusState } from '../types/scanner-status.types';
+import type {
+    ScannerControlState,
+    ScannerPauseMode,
+    ScannerStatusState,
+} from '../types/scanner-status.types';
 
 export interface ScannerPauseResponse {
     message: string;
@@ -23,7 +27,9 @@ export function mapScannerControlResponse(
     return { message, ...state };
 }
 
-export function mapReorgRecoveryRetryResponse(state: ScannerStatusState): ReorgRecoveryRetryResponse {
+export function mapReorgRecoveryRetryResponse(
+    state: ScannerStatusState,
+): ReorgRecoveryRetryResponse {
     return {
         message: 'Reorg recovery unblocked. Resume the scanner if it is paused.',
         reorgRecoveryActive: state.reorgRecoveryActive,

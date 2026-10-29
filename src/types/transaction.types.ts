@@ -89,18 +89,25 @@ export interface StoredTransactionPage {
     pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
-export type TransactionResponseDto = Omit<StoredTransactionRecord, 'timestamp' | 'createdAt' | 'updatedAt'> & {
+export type TransactionResponseDto = Omit<
+    StoredTransactionRecord,
+    'timestamp' | 'createdAt' | 'updatedAt'
+> & {
     timestamp: string | null;
     createdAt: string;
     updatedAt: string;
-    matches: Array<Omit<StoredTransactionMatchRecord, 'createdAt' | 'updatedAt' | 'txFilter'> & {
-        createdAt: string;
-        updatedAt: string;
-        txFilter: (Omit<StoredTxFilterRecord, 'createdAt' | 'updatedAt'> & {
+    matches: Array<
+        Omit<StoredTransactionMatchRecord, 'createdAt' | 'updatedAt' | 'txFilter'> & {
             createdAt: string;
             updatedAt: string;
-        }) | null;
-    }>;
+            txFilter:
+                | (Omit<StoredTxFilterRecord, 'createdAt' | 'updatedAt'> & {
+                      createdAt: string;
+                      updatedAt: string;
+                  })
+                | null;
+        }
+    >;
 };
 
 export interface TransactionPageResponse {

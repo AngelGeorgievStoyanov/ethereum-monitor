@@ -52,11 +52,7 @@ function recordEndpointSuccess(endpoint: RpcEndpoint, startedAt: number): void {
     endpoint.metrics.totalDurationMs += Date.now() - startedAt;
 }
 
-function recordEndpointFailure(
-    endpoint: RpcEndpoint,
-    startedAt: number,
-    error?: unknown,
-): void {
+function recordEndpointFailure(endpoint: RpcEndpoint, startedAt: number, error?: unknown): void {
     endpoint.metrics.failures += 1;
     endpoint.metrics.totalDurationMs += Date.now() - startedAt;
     if (error !== undefined) {
@@ -95,7 +91,7 @@ export function createRpcClient() {
             nextEndpointIndex = (nextEndpointIndex + 1) % endpoints.length;
 
             const startedAt = Date.now();
-            recordEndpointAttempt(endpoint)
+            recordEndpointAttempt(endpoint);
 
             try {
                 const result = await withTimeout(
@@ -132,7 +128,7 @@ export function createRpcClient() {
         // Consensus requests are deliberately sequential to avoid increasing RPC pressure.
         for (const endpoint of endpoints) {
             const startedAt = Date.now();
-            recordEndpointAttempt(endpoint)
+            recordEndpointAttempt(endpoint);
             try {
                 const block = await withTimeout(
                     endpoint.provider.getBlock(blockNumber),
@@ -166,7 +162,7 @@ export function createRpcClient() {
         // Diagnostic only: inspect each endpoint once without waiting for consensus or blocking scanning.
         for (const endpoint of endpoints) {
             const startedAt = Date.now();
-            recordEndpointAttempt(endpoint)
+            recordEndpointAttempt(endpoint);
             try {
                 const block = await withTimeout(
                     endpoint.provider.getBlock('finalized'),

@@ -1,4 +1,7 @@
-import { SCANNER_DEFAULT_PAUSE_DURATION_MINUTES, SCANNER_MAX_PAUSE_DURATION_MINUTES } from '../constants/scanner.constants';
+import {
+    SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
+    SCANNER_MAX_PAUSE_DURATION_MINUTES,
+} from '../constants/scanner.constants';
 import type { ScannerPauseMode } from '../types/scanner-status.types';
 import { HttpError } from '../utils/httpError';
 

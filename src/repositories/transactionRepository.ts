@@ -166,7 +166,11 @@ export async function createTransfersBatch(
             }
         }
 
-        const filterIds = [...new Set(itemsToPersist.flatMap((item) => item.matchingTxFilters.map((filter) => filter.id)))];
+        const filterIds = [
+            ...new Set(
+                itemsToPersist.flatMap((item) => item.matchingTxFilters.map((filter) => filter.id)),
+            ),
+        ];
         if (filterIds.length === 0 && !reconcileMatches) return;
 
         // Filter descriptions are part of the active in-memory cache; avoid querying TxFilter for each batch.
@@ -231,7 +235,11 @@ export async function createTransfersBatch(
                 if (!storedTransaction) continue;
                 matchingFilterIdsByTxId.set(
                     storedTransaction.id,
-                    new Set(item.matchingTxFilters.map((filter) => filter.id).filter((id) => descriptionsById.has(id))),
+                    new Set(
+                        item.matchingTxFilters
+                            .map((filter) => filter.id)
+                            .filter((id) => descriptionsById.has(id)),
+                    ),
                 );
             }
 

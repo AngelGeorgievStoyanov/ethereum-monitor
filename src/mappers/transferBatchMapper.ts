@@ -12,6 +12,9 @@ export function mapTransferBatchItems(
             candidate.blockTimestamp,
             candidate.transfer,
         ),
-        matchingTxFilters: candidate.matchingTxFilters.map(({ id, description }) => ({ id, description })),
+        matchingTxFilters: candidate.matchingTxFilters.map(({ id, description }) => ({
+            id,
+            description,
+        })),
     }));
 }
