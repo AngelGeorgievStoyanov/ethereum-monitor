@@ -1,20 +1,50 @@
 # Ethereum Monitor
 
-Monitors native ETH transfers and ERC-20 transfer events on Ethereum Mainnet. Matching transfers are stored in PostgreSQL.
+Monitors native ETH transfers and ERC-20 transfer events on an EVM-compatible network. Matching transfers are stored in PostgreSQL.
 
 ## Setup
 
-Requirements: Node.js 24, npm, PostgreSQL, and an Ethereum Mainnet RPC endpoint.
+Requirements: Node.js 24, npm, PostgreSQL, and an RPC endpoint for the network you want to monitor.
 
 1. Run `npm install`.
 2. Create a `.env` file:
 
     ```env
-    DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/ethereum_monitor
+    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=ethereum-mainnet
+    DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432
     RPC_URL_1=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
     ```
 
-3. Run `npm run dev`. The application creates the configured database if it does not exist, then creates any missing tables. The PostgreSQL user in `DATABASE_URL` must be allowed to create databases.
+3. Run `npm run dev`.
+
+### Network and database name
+
+`BLOCKCHAIN_NETWORK_AND_DATABASE_NAME` is the single setting used for both the PostgreSQL database name and `SCANNER_ID`.
+
+At startup, the application checks whether a PostgreSQL database with this name exists. If it does not, the application creates it, then connects to it and creates any missing tables.
+
+For example, with:
+
+```env
+BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=ethereum-mainnet
+DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432
+```
+
+the application creates and uses the `ethereum-mainnet` database, and sets `SCANNER_ID` to `ethereum-mainnet`.
+
+To use a separate database for Sepolia, change the name to:
+
+```env
+BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=ethereum-sepolia
+```
+
+The application then creates and uses `ethereum-sepolia` if it does not already exist, and uses `ethereum-sepolia` as `SCANNER_ID`. Configure `RPC_URL_1`, and any additional RPC URLs, for that same network. Changing the name does not automatically change the RPC endpoint or migrate/copy data from the previous database.
+
+The PostgreSQL user in `DATABASE_URL` must be allowed to connect to the `postgres` administrative database and create databases. The name setting must contain 1-63 letters, numbers, hyphens, or underscores.
+
+For production, run `npm run build` and `npm start`. The API listens on port `8000`.
+
+The application creates missing tables at startup. It does not migrate existing table schemas; schema changes must be applied separately.
 
 For production, run `npm run build` and `npm start`. The API listens on port `8000`.
 
@@ -82,9 +112,10 @@ All routes use the `/api` prefix.
 
 ## Configuration
 
-- `DATABASE_URL`: PostgreSQL connection URL.
-- `RPC_URL_1`: required RPC endpoint.
-- `RPC_URL_2`, `RPC_URL_3`, etc.: optional fallback and verification endpoints.
+- `BLOCKCHAIN_NETWORK_AND_DATABASE_NAME`: required; database name and scanner ID.
+- `DATABASE_URL`: PostgreSQL server connection URL. Do not include a database name in the path.
+- `RPC_URL_1`: required RPC endpoint for the configured network.
+- `RPC_URL_2`, `RPC_URL_3`, etc.: optional fallback and verification endpoints for the same network.
 - `START_BLOCK`: optional initial block; used only when no checkpoint exists. Normal RPC requests time out after `RPC_ENDPOINT_TIMEOUT_MS` and can fail over to another configured endpoint.
 
 Native ETH transfers are unique by transaction hash and block hash. ERC-20 transfers also include the log index. This preserves separate records when a transaction appears on a replacement block. Internal trace transfers are not processed.

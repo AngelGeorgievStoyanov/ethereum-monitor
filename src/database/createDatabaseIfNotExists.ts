@@ -3,18 +3,12 @@ import { env } from '../config/env';
 
 function getDatabaseDetails(): { databaseName: string; adminDatabaseUrl: string } {
     const databaseUrl = new URL(env.databaseUrl);
-    const databaseName = decodeURIComponent(databaseUrl.pathname.replace(/^\/+/, ''));
-
-    if (!databaseName) {
-        throw new Error('DATABASE_URL must include a PostgreSQL database name');
-    }
-
-    const adminDatabaseUrl = new URL(databaseUrl);
-    adminDatabaseUrl.pathname = '/postgres';
+    const databaseName = env.blockchainNetworkAndDatabaseName;
+    databaseUrl.pathname = '/postgres';
 
     return {
         databaseName,
-        adminDatabaseUrl: adminDatabaseUrl.toString(),
+        adminDatabaseUrl: databaseUrl.toString(),
     };
 }
 

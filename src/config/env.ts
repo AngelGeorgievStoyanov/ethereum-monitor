@@ -14,7 +14,7 @@ function parseOptionalBlock(name: string): number | undefined {
 
 const rpcUrls = Object.entries(process.env)
     .flatMap(([name, value]) => {
-        const match = /^RPC_URL_(\d+)$/.exec(name);
+        const match = /^RPC_URL_(\\d+)$/.exec(name);
         return match && value?.trim() ? [{ index: Number(match[1]), url: value.trim() }] : [];
     })
     .sort((left, right) => left.index - right.index)
@@ -25,7 +25,21 @@ if (!databaseUrl) {
     throw new Error('DATABASE_URL must be configured for PostgreSQL');
 }
 
+const blockchainNetworkAndDatabaseName =
+    process.env.BLOCKCHAIN_NETWORK_AND_DATABASE_NAME?.trim();
+
+if (!blockchainNetworkAndDatabaseName) {
+    throw new Error('BLOCKCHAIN_NETWORK_AND_DATABASE_NAME must be configured');
+}
+
+if (!/^[a-zA-Z0-9_-]{1,63}$/.test(blockchainNetworkAndDatabaseName)) {
+    throw new Error(
+        'BLOCKCHAIN_NETWORK_AND_DATABASE_NAME must contain 1-63 letters, numbers, hyphens, or underscores',
+    );
+}
+
 export const env = {
+    blockchainNetworkAndDatabaseName,
     databaseUrl,
     rpcUrls,
     startBlock: parseOptionalBlock('START_BLOCK'),
