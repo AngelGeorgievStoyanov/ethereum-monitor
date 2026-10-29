@@ -1,4 +1,5 @@
 import ScannerState from '../models/scannerState';
+import type { ScannerStatusState } from '../types/scanner-status.types';
 
 export function findScannerState(id: string) {
     return ScannerState.findByPk(id);
@@ -22,16 +23,6 @@ export async function updateScannerCheckpoint(id: string, lastProcessedBlock: nu
     if (updatedRows !== 1) {
         throw new Error(`Unable to update scanner checkpoint for "${id}"`);
     }
-}
-
-export interface ScannerStatusState {
-    lastProcessedBlock: number;
-    reorgRecoveryActive: boolean;
-    reorgRecoveryBlocked: boolean;
-    reorgRecoveryBlockReason: string | null;
-    reorgRecoveryStableBlocks: number;
-    reorgRecoveryStartBlock: number | null;
-    reorgRecoveryTargetBlock: number | null;
 }
 
 export async function findScannerStatusState(id: string): Promise<ScannerStatusState | null> {
