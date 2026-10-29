@@ -74,9 +74,11 @@ export const deleteTxFilter = async (
     req: Request<{ id: string }>,
     res: Response,
 ): Promise<void> => {
-    const id = parsePositiveId(req.params.id);
-    if (id === undefined) {
-        res.status(400).json({ message: 'Invalid transaction filter ID' });
+    let id: number;
+    try {
+        id = validateTxFilterIdInput(req.params.id);
+    } catch (error) {
+        sendHttpError(res, 'Invalid transaction filter ID', error);
         return;
     }
 
