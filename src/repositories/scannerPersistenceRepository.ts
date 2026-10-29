@@ -1,4 +1,4 @@
-import { Op, Transaction as SequelizeTransaction } from 'sequelize';
+import { Op } from 'sequelize';
 import sequelize from '../database';
 import ScannerState from '../models/scannerState';
 import Block from '../models/block';
