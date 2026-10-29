@@ -16,7 +16,7 @@ import { ConsensusUnavailableError } from './blockConsensusService';
 import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
-import { ActiveTxFilter } from './txFilterEvaluatorService';
+import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { isScannerLockHeld } from './scannerLockService';
 import {
     recordReorgAncestorFound,
