@@ -15,6 +15,7 @@ import { getScannerStatusResponse } from '../services/scannerStatusService';
 import { getRescanJobStatus as loadRescanJobStatus } from '../services/scannerRescanJobService';
 import { retryBlockedReorgRecovery as retryReorgRecovery } from '../services/reorgRecoveryService';
 import { requestManualRescan } from '../services/manualRescanRequestService';
+import { validateManualRescanFromBlock } from '../validators/manualRescanValidator';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -45,7 +46,8 @@ export const resumeScannerController = async (_req: Request, res: Response): Pro
 
 export const rescanScannerController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const result = await requestManualRescan(req.body?.fromBlock);
+        const fromBlock = validateManualRescanFromBlock(req.body?.fromBlock);
+        const result = await requestManualRescan(fromBlock);
         res.status(result.statusCode).json(result.body);
     } catch (error) {
         sendHttpError(res, 'Unable to start manual rescan', error);
