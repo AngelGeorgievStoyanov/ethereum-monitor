@@ -62,7 +62,7 @@ export async function requestManualRescan(requestedFromBlock: number): Promise<M
         });
     }
     if (isScannerProcessingBlocks()) {
-        return result(409, {
+        return rejected('conflict', {
             message:
                 'The scanner is still finishing block processing. Retry the rescan after it becomes idle.',
         });
@@ -79,7 +79,7 @@ export async function requestManualRescan(requestedFromBlock: number): Promise<M
             });
         }
         if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
-            return result(409, {
+            return rejected('conflict', {
                 message: 'Cannot start a rescan while reorg recovery is active or blocked.',
             });
         }
@@ -90,7 +90,7 @@ export async function requestManualRescan(requestedFromBlock: number): Promise<M
             state.lastProcessedBlock,
         );
         if (canonicalBlocks !== expectedBlocks) {
-            return result(409, {
+            return rejected('conflict', {
                 message:
                     'Cannot start rescan because canonical block history is missing in the requested range.',
                 fromBlock: requestedFromBlock,
@@ -102,14 +102,14 @@ export async function requestManualRescan(requestedFromBlock: number): Promise<M
 
         const activeJob = await findActiveScannerRescanJob();
         if (activeJob) {
-            return result(409, {
+            return rejected('conflict', {
                 message: 'A rescan job is already running.',
                 operationId: activeJob.id,
             });
         }
 
         if (!tryReserveManualRescan()) {
-            return result(409, {
+            return rejected('conflict', {
                 message:
                     'The scanner is processing blocks or another rescan is reserved. Retry when it is idle.',
             });
