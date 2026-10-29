@@ -1,4 +1,5 @@
-import { JsonRpcProvider } from 'ethers';
+import { JsonRpcProvider, toQuantity } from 'ethers';
+import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { RPC_ENDPOINT_TIMEOUT_MS } from '../constants/ethereum-rpc.constants';
 import { env } from '../config/env';
 import { formatError } from '../utils/formatError';
@@ -180,8 +181,38 @@ export function createRpcClient() {
         return results;
     }
 
+    async function getBlockAndReceipts(blockNumber: number) {
+        let getBlockDurationMs = 0;
+        let getBlockReceiptsDurationMs = 0;
+
+        const result = await execute(`getBlockAndReceipts(${blockNumber})`, async (provider) => {
+            const getBlockStartedAt = Date.now();
+            const block = await provider.getBlock(blockNumber, true);
+            getBlockDurationMs = Date.now() - getBlockStartedAt;
+
+            if (!block) {
+                throw new Error(`Unable to load block ${blockNumber}`);
+            }
+
+            const getReceiptsStartedAt = Date.now();
+            const response: unknown = await provider.send('eth_getBlockReceipts', [
+                toQuantity(blockNumber),
+            ]);
+            getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
+
+            if (!Array.isArray(response)) {
+                throw new Error('eth_getBlockReceipts returned a non-array response');
+            }
+
+            return { block, receipts: response as RpcTransactionReceipt[] };
+        });
+
+        return { ...result, getBlockDurationMs, getBlockReceiptsDurationMs };
+    }
+
     return {
         execute,
+        getBlockAndReceipts,
         getBlockFromAllEndpoints,
         getFinalizedFromAllEndpoints,
         getBlock(blockTag: string | number, includeTransactions = false) {
