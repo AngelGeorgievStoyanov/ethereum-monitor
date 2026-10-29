@@ -31,8 +31,8 @@ export class TxFilterSyncError extends Error {
 }
 
 interface LegacyTxFilterFields {
-    from: string | null;
-    to: string | null;
+    from?: string | null;
+    to?: string | null;
 }
 
 function legacyRule(txFilter: LegacyTxFilterFields): TxFilterGroupRule | null {
