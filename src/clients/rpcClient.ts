@@ -187,10 +187,7 @@ export function createRpcClient() {
                 }
             } catch (error) {
                 const message = formatError(error);
-                endpoint.metrics.failures += 1;
-                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
-                endpoint.metrics.lastFailureAt = new Date().toISOString();
-                if (isRetryableEndpointError(error)) endpoint.metrics.retryableFailures += 1;
+                recordEndpointFailure(endpoint, startedAt, error);
                 results.push({
                     endpointIndex: endpoint.index,
                     blockNumber: null,
