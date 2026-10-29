@@ -90,3 +90,20 @@ export async function updateScannerControlRecord(
         throw new Error(`Unable to update scanner control state for "${id}"`);
     }
 }
+
+export async function unblockScannerReorgRecovery(id: string): Promise<boolean> {
+    const [updatedRows] = await ScannerState.update(
+        {
+            reorgRecoveryBlocked: false,
+            reorgRecoveryBlockReason: null,
+        },
+        {
+            where: {
+                id,
+                reorgRecoveryActive: true,
+                reorgRecoveryBlocked: true,
+            },
+        },
+    );
+    return updatedRows === 1;
+}
