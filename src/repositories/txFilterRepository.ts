@@ -6,19 +6,45 @@ import TxMatch from '../models/txMatch';
 import Block from '../models/block';
 import ScannerState from '../models/scannerState';
 
-export function findAllTxFilters() {
-    return TxFilter.findAll({ order: [['id', 'ASC']] });
+export interface TxFilterRecord {
+    id: number;
+    description: string;
+    from: string | null;
+    to: string | null;
+    isActive: boolean;
+    activeFromBlock: number | null;
 }
 
-export function findActiveTxFilters() {
-    return TxFilter.findAll({ where: { isActive: true }, order: [['id', 'ASC']] });
+function toTxFilterRecord(filter: TxFilter): TxFilterRecord {
+    return {
+        id: filter.id,
+        description: filter.description,
+        from: filter.from,
+        to: filter.to,
+        isActive: filter.isActive,
+        activeFromBlock: filter.activeFromBlock,
+    };
 }
 
-export function findTxFilterById(id: number) {
-    return TxFilter.findByPk(id);
+export async function findAllTxFilters(): Promise<TxFilterRecord[]> {
+    const filters = await TxFilter.findAll({ order: [['id', 'ASC']] });
+    return filters.map(toTxFilterRecord);
 }
 
-export function createTxFilter(
+export async function findActiveTxFilters(): Promise<TxFilterRecord[]> {
+    const filters = await TxFilter.findAll({
+        where: { isActive: true },
+        order: [['id', 'ASC']],
+    });
+    return filters.map(toTxFilterRecord);
+}
+
+export async function findTxFilterById(id: number): Promise<TxFilterRecord | null> {
+    const filter = await TxFilter.findByPk(id);
+    return filter ? toTxFilterRecord(filter) : null;
+}
+
+export async function createTxFilter(
     data: {
         description: string;
         from: string | null;
@@ -27,8 +53,9 @@ export function createTxFilter(
         activeFromBlock: number | null;
     },
     transaction?: SequelizeTransaction,
-) {
-    return TxFilter.create(data, transaction ? { transaction } : undefined);
+): Promise<TxFilterRecord> {
+    const filter = await TxFilter.create(data, transaction ? { transaction } : undefined);
+    return toTxFilterRecord(filter);
 }
 
 export async function updateTxFilter(
@@ -52,7 +79,7 @@ export async function updateTxFilter(
     if (updates.activeFromBlock !== undefined) txFilter.activeFromBlock = updates.activeFromBlock;
 
     await txFilter.save(transaction ? { transaction } : undefined);
-    return txFilter;
+    return toTxFilterRecord(txFilter);
 }
 
 export async function deleteTxFilterById(id: number, transaction?: SequelizeTransaction) {
@@ -85,8 +112,12 @@ export async function deleteTxFilterById(id: number, transaction?: SequelizeTran
     return sequelize.transaction(remove);
 }
 
-export function findTxFilterForUpdate(id: number, transaction: SequelizeTransaction) {
-    return TxFilter.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+export async function findTxFilterForUpdate(
+    id: number,
+    transaction: SequelizeTransaction,
+): Promise<TxFilterRecord | null> {
+    const filter = await TxFilter.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+    return filter ? toTxFilterRecord(filter) : null;
 }
 
 export async function findInitialConfiguredStartBlock(
