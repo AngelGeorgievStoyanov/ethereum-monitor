@@ -1,6 +1,7 @@
 import {
     MAX_REORG_LOOKBACK_BLOCKS,
     REORG_RECOVERY_STABLE_BLOCKS,
+    SCANNER_ID,
 } from '../constants/scanner.constants';
 import type { ScannerRuntimeState } from '../types/scanner-state.types';
 import { refreshScannerState } from './scannerStateService';
@@ -19,7 +20,6 @@ import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcSer
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { isScannerLockHeld } from './scannerLockService';
-import { SCANNER_ID } from '../constants/scanner.constants';
 import { findScannerStatusState, unblockScannerReorgRecovery } from '../repositories/scannerStateRepository';
 import { mapReorgRecoveryRetryResponse } from '../mappers/scannerControlMapper';
 import {
