@@ -1,5 +1,6 @@
 import { TxFilterGroupRule } from '../types/tx-filter.types';
 import { HttpError } from '../utils/httpError';
+import { parsePositiveId } from '../utils/parsePositiveId';
 
 export interface CreateTxFilterInput {
     description: string;
@@ -78,4 +79,10 @@ export function validateUpdateTxFilterInput(body: unknown): UpdateTxFilterInput 
         ...(isActive !== undefined ? { isActive: isActive as boolean } : {}),
         ...(rule !== undefined ? { rule: rule === null ? null : (rule as TxFilterGroupRule) } : {}),
     };
+}
+
+export function validateTxFilterIdInput(value: unknown): number {
+    const id = typeof value === 'string' ? parsePositiveId(value) : undefined;
+    if (id === undefined) throw new HttpError(400, 'Invalid transaction filter ID');
+    return id;
 }
