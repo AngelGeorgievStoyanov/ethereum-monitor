@@ -1,28 +1,12 @@
 import { evaluateTxFilterOperator } from './txFilterOperatorService';
 
-export interface TxFilterConditionRule {
-    field: string;
-    operator: string;
-    value: unknown;
-}
-
-export interface TxFilterGroupRule {
-    logic: 'AND' | 'OR';
-    conditions: TxFilterConditionRule[];
-    groups: TxFilterGroupRule[];
-}
-
-export interface ActiveTxFilter {
-    id: number;
-    description: string;
-    isActive: boolean;
-    activeFromBlock: number | null;
-    rule: TxFilterGroupRule;
-}
-
-export interface TransactionFilterContext {
-    [field: string]: unknown;
-}
+export {
+    ActiveTxFilter,
+    TransactionFilterContext,
+    TxFilterConditionRule,
+    TxFilterGroupRule,
+} from '../types/tx-filter.types';
+import { TransactionFilterContext, TxFilterGroupRule } from '../types/tx-filter.types';
 
 export function evaluateTxFilterGroup(
     group: TxFilterGroupRule,
