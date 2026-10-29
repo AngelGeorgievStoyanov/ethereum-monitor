@@ -92,11 +92,7 @@ export const retryBlockedReorgRecovery = async (_req: Request, res: Response): P
             return;
         }
         res.json(
-            mapReorgRecoveryRetryResponse({
-                active: state.reorgRecoveryActive,
-                startBlock: state.reorgRecoveryStartBlock,
-                targetBlock: state.reorgRecoveryTargetBlock,
-            }),
+            mapReorgRecoveryRetryResponse(state),
         );
     } catch (error) {
         sendHttpError(res, 'Unable to retry reorg recovery', error);
