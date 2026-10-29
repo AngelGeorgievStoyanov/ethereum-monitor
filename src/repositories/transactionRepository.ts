@@ -126,7 +126,7 @@ export async function createTransfersBatch(
         const descriptionsById = new Map<number, string>(
             filters
                 .filter((filter) => typeof filter.description === 'string')
-                .map((filter) => [filter.id, filter.description] as const),
+                .map((filter) => [filter.id as number, filter.description as string] as const),
         );
         const matches: Array<{
             txId: number;
