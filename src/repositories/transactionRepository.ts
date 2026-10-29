@@ -8,13 +8,9 @@ import type {
     StoredTransactionPageRecord,
     StoredTransactionRecord,
     TransactionPersistenceData,
+    TransferBatchItem,
 } from '../types/transaction.types';
 import TxMatch from '../models/txMatch';
-
-export interface TransferBatchItem {
-    data: TransactionPersistenceData;
-    matchingTxFilters: Array<{ id: number; description: string }>;
-}
 
 function toStoredTransactionRecord(model: Transaction): StoredTransactionRecord {
     const data = model.toJSON() as StoredTransactionRecord;
