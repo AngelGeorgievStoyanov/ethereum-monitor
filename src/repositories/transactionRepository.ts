@@ -7,6 +7,7 @@ import type {
     StoredTransactionPage,
     StoredTransactionPageRecord,
     StoredTransactionRecord,
+    TransactionPersistenceData,
     TransferBatchItem,
 } from '../types/transaction.types';
 import TxMatch from '../models/txMatch';
@@ -66,6 +67,8 @@ function getTransferIdentity(data: {
         ? `${data.txHash.toLowerCase()}:erc20:${data.logIndex}:${blockHash}`
         : `${data.txHash.toLowerCase()}:${data.transferType}:${blockHash}`;
 }
+
+export type { TransferBatchItem } from '../types/transaction.types';
 
 export async function createTransfersBatch(
     items: readonly TransferBatchItem[],
@@ -286,7 +289,7 @@ export async function createTransfersBatch(
 }
 
 export async function findOrCreateTransfer(
-    data: TransactionCreationAttributes,
+    data: TransactionPersistenceData,
 ): Promise<StoredTransactionRecord> {
     const [transaction] = await Transaction.findOrCreate({
         where: {
