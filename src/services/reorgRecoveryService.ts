@@ -2,7 +2,8 @@ import {
     MAX_REORG_LOOKBACK_BLOCKS,
     REORG_RECOVERY_STABLE_BLOCKS,
 } from '../constants/scanner.constants';
-import ScannerState from '../models/scannerState';
+import type { ScannerRuntimeState } from '../types/scanner-state.types';
+import { refreshScannerState } from './scannerStateService';
 import {
     findCanonicalBlock,
     hasCanonicalBlocks,
@@ -60,7 +61,7 @@ export async function markReorgRecoveryPending(
     await persistReorgRecoveryPending(scannerStateId, checkpoint, targetBlock);
 }
 
-async function findAncestorAndRollback(state: ScannerState): Promise<void> {
+async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void> {
     if (!(await isScannerLockHeld()))
         throw new Error('Cannot search for or roll back a reorg without owning the scanner lock');
     const originalCheckpoint = state.reorgRecoveryStartBlock;
@@ -105,7 +106,7 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
 
-    await state.reload();
+    await refreshScannerState(state);
     recordReorgAncestorFound(ancestorDepth);
     console.warn(
         `[Reorg] Common ancestor=${ancestor.blockNumber}; marked ${rollback.orphanedBlockCount} block(s) as reorged; checkpoint rolled back to ${rollback.checkpoint}`,
@@ -113,11 +114,11 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
 }
 
 async function processReorgRecoveryInternal(
-    state: ScannerState,
+    state: ScannerRuntimeState,
     finalizedBlockNumber: number,
     getActiveTxFilters: () => ActiveTxFilter[],
 ): Promise<boolean> {
-    await state.reload();
+    await refreshScannerState(state);
     if (!(await isScannerLockHeld())) {
         console.warn('[Reorg] Scanner lock is not held; recovery will wait for ownership');
         return true;
@@ -167,7 +168,7 @@ async function processReorgRecoveryInternal(
         );
         recordReorgDetected();
         await markReorgRecoveryPending(state.id, state.lastProcessedBlock);
-        await state.reload();
+        await refreshScannerState(state);
         await findAncestorAndRollback(state);
     }
 
@@ -203,7 +204,7 @@ async function processReorgRecoveryInternal(
                 state.lastProcessedBlock,
                 blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
             );
-            await state.reload();
+            await refreshScannerState(state);
             await findAncestorAndRollback(state);
             continue;
         }
@@ -248,7 +249,7 @@ async function processReorgRecoveryInternal(
             },
         });
         if (committedCheckpoint !== blockNumber) {
-            await state.reload();
+            await refreshScannerState(state);
             continue;
         }
 
@@ -275,7 +276,7 @@ async function processReorgRecoveryInternal(
 }
 
 async function markVerificationRecoveryBlocked(
-    state: ScannerState,
+    state: ScannerRuntimeState,
     error: BlockVerificationUnavailableError,
 ): Promise<void> {
     if (!(await isScannerLockHeld())) {
@@ -298,14 +299,14 @@ async function markVerificationRecoveryBlocked(
         preserveStartBlock: true,
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
-    await state.reload();
+    await refreshScannerState(state);
     console.error(
         `[Reorg] CRITICAL: recovery is blocked because block verification failed; block=${error.blockNumber}; operation=${error.operation}; reason=${error.message}. Explicit operator retry is required.`,
     );
 }
 
 async function markReceiptConsistencyRecoveryBlocked(
-    state: ScannerState,
+    state: ScannerRuntimeState,
     error: BlockReceiptConsistencyError,
 ): Promise<void> {
     if (!(await isScannerLockHeld())) {
@@ -323,14 +324,14 @@ async function markReceiptConsistencyRecoveryBlocked(
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
 
-    await state.reload();
+    await refreshScannerState(state);
     console.error(
         `[Reorg] CRITICAL: recovery blocked after receipt inconsistency at block ${error.blockNumber}. Automatic retries stopped; check RPC provider consistency before explicitly retrying recovery.`,
     );
 }
 
 export async function processReorgRecovery(
-    state: ScannerState,
+    state: ScannerRuntimeState,
     finalizedBlockNumber: number,
     getActiveTxFilters: () => ActiveTxFilter[],
 ): Promise<boolean> {
@@ -354,7 +355,7 @@ export async function processReorgRecovery(
 }
 
 async function markRecoverySafetyBlocked(
-    state: ScannerState,
+    state: ScannerRuntimeState,
     error: ReorgRecoverySafetyError,
 ): Promise<void> {
     if (!(await isScannerLockHeld())) {
@@ -370,7 +371,7 @@ async function markRecoverySafetyBlocked(
         reason: `SAFETY:${error.message}`,
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
-    await state.reload();
+    await refreshScannerState(state);
     console.error(
         `[Reorg] CRITICAL: recovery blocked for safety; ${error.message}. Explicit operator intervention is required.`,
     );
