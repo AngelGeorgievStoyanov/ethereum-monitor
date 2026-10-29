@@ -5,12 +5,13 @@ import {
     resumeScanner,
 } from '../services/scannerControlService';
 
+import { SCANNER_ID } from '../constants/scanner.constants';
+import { sendHttpError } from '../utils/httpError';
+import { validateScannerPauseInput } from '../validators/scannerControlValidator';
 import {
-    SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
-    SCANNER_ID,
-    SCANNER_MAX_PAUSE_DURATION_MINUTES,
-} from '../constants/scanner.constants';
-import { HttpError, sendHttpError } from '../utils/httpError';
+    mapScannerControlResponse,
+    mapReorgRecoveryRetryResponse,
+} from '../mappers/scannerControlMapper';
 import { getScannerStatusResponse } from '../services/scannerStatusService';
 import { findScannerRescanJobById } from '../repositories/scannerRescanJobRepository';
 import {
@@ -28,52 +29,10 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
 };
 
 export const pauseScanner = async (req: Request, res: Response): Promise<void> => {
-    const mode = req.body?.mode ?? 'temporary';
-    const atBlock = req.body?.atBlock;
-    const durationMinutes = req.body?.durationMinutes;
-
-    if (mode !== 'manual' && mode !== 'temporary') {
-        sendHttpError(
-            res,
-            'Invalid scanner pause mode',
-            new HttpError(400, 'mode must be "manual" or "temporary"'),
-        );
-        return;
-    }
-    if (atBlock !== undefined && (!Number.isSafeInteger(atBlock) || atBlock < 0)) {
-        sendHttpError(
-            res,
-            'Invalid scanner pause block',
-            new HttpError(400, 'atBlock must be a non-negative integer'),
-        );
-        return;
-    }
-    if (
-        durationMinutes !== undefined &&
-        (!Number.isSafeInteger(durationMinutes) ||
-            durationMinutes < 1 ||
-            durationMinutes > SCANNER_MAX_PAUSE_DURATION_MINUTES)
-    ) {
-        sendHttpError(
-            res,
-            'Invalid scanner pause duration',
-            new HttpError(
-                400,
-                `durationMinutes must be an integer between 1 and ${SCANNER_MAX_PAUSE_DURATION_MINUTES}`,
-            ),
-        );
-        return;
-    }
-
     try {
-        await requestScannerPause(
-            mode,
-            atBlock ?? null,
-            mode === 'temporary'
-                ? (durationMinutes ?? SCANNER_DEFAULT_PAUSE_DURATION_MINUTES)
-                : SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
-        );
-        res.json({ message: 'Scanner pause requested', ...(await getScannerControlState()) });
+        const input = validateScannerPauseInput(req.body);
+        await requestScannerPause(input.mode, input.atBlock, input.durationMinutes);
+        res.json(mapScannerControlResponse('Scanner pause requested', await getScannerControlState()));
     } catch (error) {
         sendHttpError(res, 'Unable to request scanner pause', error);
     }
@@ -131,13 +90,13 @@ export const retryBlockedReorgRecovery = async (_req: Request, res: Response): P
             });
             return;
         }
-        res.json({
-            message: 'Reorg recovery unblocked. Resume the scanner if it is paused.',
-            reorgRecoveryActive: state.reorgRecoveryActive,
-            reorgRecoveryBlocked: false,
-            reorgRecoveryStartBlock: state.reorgRecoveryStartBlock,
-            reorgRecoveryTargetBlock: state.reorgRecoveryTargetBlock,
-        });
+        res.json(
+            mapReorgRecoveryRetryResponse({
+                active: state.reorgRecoveryActive,
+                startBlock: state.reorgRecoveryStartBlock,
+                targetBlock: state.reorgRecoveryTargetBlock,
+            }),
+        );
     } catch (error) {
         sendHttpError(res, 'Unable to retry reorg recovery', error);
     }
