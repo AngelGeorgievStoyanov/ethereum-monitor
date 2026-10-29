@@ -122,9 +122,10 @@ export async function createTransfersBatch(
         if (filterIds.length === 0 && !reconcileMatches) return;
 
         // Filter descriptions are part of the active in-memory cache; avoid querying TxFilter for each batch.
-        const descriptionsById = new Map(
-            getTxFilterService()
-                .getTxFilters()
+        const filters = await getTxFilterService().getAllTxFilters();
+        const descriptionsById = new Map<number, string>(
+            filters
+                .filter((filter) => typeof filter.description === 'string')
                 .map((filter) => [filter.id, filter.description] as const),
         );
         const matches: Array<{
@@ -204,7 +205,11 @@ export async function createTransfersBatch(
                 const description = isMatching ? descriptionsById.get(match.txFilterId) : undefined;
                 const matchStatus = isMatching ? 'ACTIVE' : 'NOT_MATCHED';
                 const key = `${matchStatus}:${match.txFilterId}:${description ?? ''}`;
-                const group = updatesByGroup.get(key) ?? {
+                const group: {
+                    ids: number[];
+                    matchStatus: 'ACTIVE' | 'NOT_MATCHED';
+                    txFilterDescription?: string;
+                } = updatesByGroup.get(key) ?? {
                     ids: [],
                     matchStatus,
                     ...(description !== undefined ? { txFilterDescription: description } : {}),
@@ -280,10 +285,13 @@ export async function findOrCreateInternalTransfer(data: TransactionCreationAttr
 export async function createTxMatches(txId: number, txFilterIds: number[]) {
     if (txFilterIds.length === 0) return;
 
-    const descriptionsById = new Map(
-        getTxFilterService()
-            .getTxFilters()
-            .filter((filter) => txFilterIds.includes(filter.id))
+    const filters = await getTxFilterService().getAllTxFilters();
+    const descriptionsById = new Map<number, string>(
+        filters
+            .filter(
+                (filter) =>
+                    txFilterIds.includes(filter.id) && typeof filter.description === 'string',
+            )
             .map((filter) => [filter.id, filter.description] as const),
     );
 
