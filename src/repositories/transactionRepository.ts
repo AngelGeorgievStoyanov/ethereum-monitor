@@ -2,12 +2,75 @@ import { Op, Transaction as SequelizeTransaction } from 'sequelize';
 import sequelize from '../database';
 import Transaction, { TransactionCreationAttributes } from '../models/transaction';
 import TxFilter from '../models/txFilter';
-import { getTxFilterService } from '../services/txFilterService';
+import type {
+    StoredTransactionMatchRecord,
+    StoredTransactionPage,
+    StoredTransactionPageRecord,
+    StoredTransactionRecord,
+    StoredTxFilterRecord,
+} from '../types/transaction.types';
 import TxMatch from '../models/txMatch';
 
 export interface TransferBatchItem {
     data: TransactionCreationAttributes;
-    matchingTxFilterIds: number[];
+    matchingTxFilters: Array<{ id: number; description: string }>;
+}
+
+function toStoredTransactionRecord(model: Transaction): StoredTransactionRecord {
+    const data = model.toJSON() as StoredTransactionRecord;
+    return {
+        id: data.id,
+        txHash: data.txHash,
+        transferType: data.transferType,
+        tokenAddress: data.tokenAddress ?? null,
+        logIndex: data.logIndex,
+        nonce: data.nonce,
+        blockHash: data.blockHash,
+        blockNumber: data.blockNumber,
+        transactionIndex: data.transactionIndex,
+        from: data.from,
+        to: data.to ?? null,
+        value: data.value,
+        internalCount: data.internalCount,
+        chainStatus: data.chainStatus,
+        recordStatus: data.recordStatus,
+        transactionType: data.transactionType ?? null,
+        timestamp: data.timestamp ?? null,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+    };
+}
+
+function toStoredTxFilterRecord(filter: StoredTxFilterRecord): StoredTxFilterRecord {
+    return {
+        id: filter.id,
+        description: filter.description,
+        from: filter.from ?? null,
+        to: filter.to ?? null,
+        isActive: filter.isActive,
+        activeFromBlock: filter.activeFromBlock,
+        createdAt: filter.createdAt,
+        updatedAt: filter.updatedAt,
+    };
+}
+
+function toStoredTransactionPageRecord(model: Transaction): StoredTransactionPageRecord {
+    const data = model.toJSON() as StoredTransactionRecord & {
+        matches?: StoredTransactionMatchRecord[];
+    };
+    return {
+        ...toStoredTransactionRecord(model),
+        matches: (data.matches ?? []).map((match) => ({
+            id: match.id,
+            txId: match.txId,
+            txFilterId: match.txFilterId,
+            txFilterDescription: match.txFilterDescription,
+            matchStatus: match.matchStatus,
+            createdAt: match.createdAt,
+            updatedAt: match.updatedAt,
+            txFilter: match.txFilter ? toStoredTxFilterRecord(match.txFilter) : null,
+        })),
+    };
 }
 
 function getTransferIdentity(data: {
@@ -56,7 +119,7 @@ export async function createTransfersBatch(
         const itemsToPersist = reconcileMatches
             ? items.filter(
                   (item) =>
-                      item.matchingTxFilterIds.length > 0 ||
+                      item.matchingTxFilters.length > 0 ||
                       existingIdentities.has(getTransferIdentity(item.data)),
               )
             : items;
@@ -118,14 +181,14 @@ export async function createTransfersBatch(
             }
         }
 
-        const filterIds = [...new Set(itemsToPersist.flatMap((item) => item.matchingTxFilterIds))];
+        const filterIds = [...new Set(itemsToPersist.flatMap((item) => item.matchingTxFilters.map((filter) => filter.id)))];
         if (filterIds.length === 0 && !reconcileMatches) return;
 
         // Filter descriptions are part of the active in-memory cache; avoid querying TxFilter for each batch.
         const descriptionsById = new Map<number, string>(
-            getTxFilterService()
-                .getTxFilters()
-                .map((filter) => [filter.id, filter.description] as const),
+            itemsToPersist.flatMap((item) =>
+                item.matchingTxFilters.map((filter) => [filter.id, filter.description] as const),
+            ),
         );
         const matches: Array<{
             txId: number;
@@ -141,13 +204,11 @@ export async function createTransfersBatch(
                 );
             }
 
-            for (const filterId of item.matchingTxFilterIds) {
-                const description = descriptionsById.get(filterId);
-                if (description === undefined) continue;
+            for (const filter of item.matchingTxFilters) {
                 matches.push({
                     txId: storedTransaction.id,
-                    txFilterId: filterId,
-                    txFilterDescription: description,
+                    txFilterId: filter.id,
+                    txFilterDescription: filter.description,
                 });
             }
         }
@@ -185,7 +246,7 @@ export async function createTransfersBatch(
                 if (!storedTransaction) continue;
                 matchingFilterIdsByTxId.set(
                     storedTransaction.id,
-                    new Set(item.matchingTxFilterIds.filter((id) => descriptionsById.has(id))),
+                    new Set(item.matchingTxFilters.map((filter) => filter.id).filter((id) => descriptionsById.has(id))),
                 );
             }
 
@@ -242,7 +303,9 @@ export async function createTransfersBatch(
     await sequelize.transaction(persist);
 }
 
-export async function findOrCreateTransfer(data: TransactionCreationAttributes) {
+export async function findOrCreateTransfer(
+    data: TransactionCreationAttributes,
+): Promise<StoredTransactionRecord> {
     const [transaction] = await Transaction.findOrCreate({
         where: {
             txHash: data.txHash,
@@ -253,10 +316,12 @@ export async function findOrCreateTransfer(data: TransactionCreationAttributes) 
         defaults: data,
     });
 
-    return transaction;
+    return toStoredTransactionRecord(transaction);
 }
 
-export async function findOrCreateInternalTransfer(data: TransactionCreationAttributes) {
+export async function findOrCreateInternalTransfer(
+    data: TransactionCreationAttributes,
+): Promise<StoredTransactionRecord> {
     const where = {
         txHash: data.txHash,
         transferType: 'internal' as const,
@@ -271,40 +336,38 @@ export async function findOrCreateInternalTransfer(data: TransactionCreationAttr
     if (existing) {
         await existing.increment('internalCount');
         await existing.reload();
-        return existing;
+        return toStoredTransactionRecord(existing);
     }
 
-    return Transaction.create({
+    const transaction = await Transaction.create({
         ...data,
         transferType: 'internal',
         internalCount: 1,
     });
+    return toStoredTransactionRecord(transaction);
 }
 
-export async function createTxMatches(txId: number, txFilterIds: number[]) {
-    if (txFilterIds.length === 0) return;
+export async function createTxMatches(
+    txId: number,
+    txFilters: readonly { id: number; description: string }[],
+): Promise<void> {
+    if (txFilters.length === 0) return;
 
-    const filters = await getTxFilterService().getAllTxFilters();
-    const descriptionsById = new Map<number, string>(
-        filters
-            .filter(
-                (filter) =>
-                    txFilterIds.includes(filter.id) && typeof filter.description === 'string',
-            )
-            .map((filter) => [filter.id, filter.description] as const),
-    );
-
+    const matchesByFilterId = new Map(txFilters.map((filter) => [filter.id, filter.description]));
     await TxMatch.bulkCreate(
-        [...descriptionsById.entries()].map(([txFilterId, description]) => ({
+        [...matchesByFilterId.entries()].map(([txFilterId, txFilterDescription]) => ({
             txId,
             txFilterId,
-            txFilterDescription: description,
+            txFilterDescription,
         })),
         { ignoreDuplicates: true },
     );
 }
 
-export async function findTransactionsPage(page: number, limit: number) {
+export async function findTransactionsPage(
+    page: number,
+    limit: number,
+): Promise<StoredTransactionPage> {
     const result = await Transaction.findAndCountAll({
         include: [
             {
@@ -324,7 +387,7 @@ export async function findTransactionsPage(page: number, limit: number) {
     });
 
     return {
-        items: result.rows,
+        items: result.rows.map(toStoredTransactionPageRecord),
         pagination: {
             page,
             limit,
