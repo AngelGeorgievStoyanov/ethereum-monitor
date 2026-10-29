@@ -1,8 +1,6 @@
-import sequelize from '../database';
 import TxFilter from '../models/txFilter';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
-import { FILTER_MUTATION_ADVISORY_LOCK_KEY } from '../constants/tx-filter.constants';
 import {
     createTxFilter as insertTxFilter,
     deleteTxFilterById,
@@ -12,6 +10,7 @@ import {
     findTxFilterForUpdate,
     findInitialConfiguredStartBlock,
     assignActiveFilterStartBlock,
+    withTxFilterMutationLock,
 } from '../repositories/txFilterRepository';
 import {
     findRuleForFilter,
@@ -22,7 +21,6 @@ import { getNextFilterStartBlock } from './txFilterActivationService';
 import type { ActiveTxFilter, TxFilterGroupRule } from '../types/tx-filter.types';
 import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
-import { Transaction as SequelizeTransaction } from 'sequelize';
 
 export class TxFilterSyncError extends Error {
     constructor(public readonly result: unknown) {
@@ -85,12 +83,7 @@ export function createTxFilterService() {
         }
         if (data.rule) validateTxFilterGroup(data.rule);
 
-        const filter = await sequelize.transaction(async (transaction) => {
-            // Serialize filter creation so concurrent requests cannot both claim the initial backfill range.
-            await sequelize.query('SELECT pg_advisory_xact_lock(:key)', {
-                replacements: { key: FILTER_MUTATION_ADVISORY_LOCK_KEY },
-                transaction,
-            });
+        const filter = await withTxFilterMutationLock(async (transaction) => {
             const initialStartBlock = data.isActive
                 ? await findInitialConfiguredStartBlock(env.startBlock, SCANNER_ID, transaction)
                 : undefined;
@@ -128,11 +121,7 @@ export function createTxFilterService() {
     ) {
         if (updates.rule) validateTxFilterGroup(updates.rule);
 
-        const updated = await sequelize.transaction(async (transaction) => {
-            await sequelize.query('SELECT pg_advisory_xact_lock(:key)', {
-                replacements: { key: FILTER_MUTATION_ADVISORY_LOCK_KEY },
-                transaction,
-            });
+        const updated = await withTxFilterMutationLock(async (transaction) => {
 
             const current = await findTxFilterForUpdate(id, transaction);
             if (!current) return null;
@@ -191,11 +180,7 @@ export function createTxFilterService() {
     }
 
     async function removeTxFilter(id: number) {
-        const deleted = await sequelize.transaction(async (transaction) => {
-            await sequelize.query('SELECT pg_advisory_xact_lock(:key)', {
-                replacements: { key: FILTER_MUTATION_ADVISORY_LOCK_KEY },
-                transaction,
-            });
+        const deleted = await withTxFilterMutationLock(async (transaction) => {
             return deleteTxFilterById(id, transaction);
         });
         if (deleted > 0) await refreshAfterMutation({ message: 'Transaction filter deleted', deleted: true });
