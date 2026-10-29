@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { getTxFilterService, TxFilterSyncError } from '../services/txFilterService';
 import { sendHttpError } from '../utils/httpError';
-import { mapTxFilterSyncFailureResponse } from '../mappers/txFilterResponseMapper';
 import {
     validateCreateTxFilterInput,
     validateUpdateTxFilterInput,
@@ -25,7 +24,7 @@ export const createTxFilter = async (req: Request, res: Response): Promise<void>
         res.status(201).json(txFilter);
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
-            res.status(202).json(mapTxFilterSyncFailureResponse('created', error.result));
+            res.status(202).json(error.response);
             return;
         }
         sendHttpError(res, 'Error creating transaction filter', error);
@@ -55,7 +54,7 @@ export const updateTxFilter = async (
         res.json(txFilter);
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
-            res.status(202).json(mapTxFilterSyncFailureResponse('updated', error.result));
+            res.status(202).json(error.response);
             return;
         }
         sendHttpError(res, 'Error updating transaction filter', error);
@@ -83,7 +82,7 @@ export const deleteTxFilter = async (
         res.json({ message: 'Transaction filter deleted' });
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
-            res.status(202).json(mapTxFilterSyncFailureResponse('deleted', error.result));
+            res.status(202).json(error.response);
             return;
         }
         sendHttpError(res, 'Error deleting transaction filter', error);
