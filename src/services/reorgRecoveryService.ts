@@ -15,7 +15,7 @@ import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingS
 import { BlockVerificationUnavailableError } from '../errors/blockVerificationUnavailableError';
 import { ConsensusUnavailableError } from './blockConsensusService';
 import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
-import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcService';
+import { BlockReceiptConsistencyError, evmRpcClient } from './evmBlockDataService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { isScannerLockHeld } from './scannerLockService';
@@ -60,7 +60,7 @@ class ReorgRecoverySafetyError extends Error {
 let singleProviderReorgWarningLogged = false;
 
 function logSingleProviderReorgMode(): void {
-    if (ethereumProvider.getEndpointCount() !== 1 || singleProviderReorgWarningLogged) return;
+    if (evmRpcClient.getEndpointCount() !== 1 || singleProviderReorgWarningLogged) return;
     console.warn(
         '[Reorg] WARNING: Only one RPC provider is configured. Independent consensus is unavailable; provider P1 is the source of truth for reorg detection and recovery. Consensus verification is disabled.',
     );
@@ -166,7 +166,7 @@ async function processReorgRecoveryInternal(
 
         // Cheaply check the checkpoint with the selected provider during normal scanning.
         // If it disagrees, the verification service selects single-provider verification or strict consensus.
-        const currentCheckpoint = await ethereumProvider.getBlock(state.lastProcessedBlock);
+        const currentCheckpoint = await evmRpcClient.getBlock(state.lastProcessedBlock);
         if (!currentCheckpoint)
             throw new Error(`Unable to read checkpoint block ${state.lastProcessedBlock}`);
         const primaryMatches = sameBlock(storedCheckpoint, {
@@ -181,7 +181,7 @@ async function processReorgRecoveryInternal(
         );
         if (sameBlock(storedCheckpoint, verifiedCheckpoint)) {
             console.warn(
-                ethereumProvider.getEndpointCount() === 1
+                evmRpcClient.getEndpointCount() === 1
                     ? `[Reorg] Provider P1's follow-up read matches stored history at checkpoint ${state.lastProcessedBlock}; continuing normal scan`
                     : `[Reorg] Primary provider disagreed at checkpoint ${state.lastProcessedBlock}, but configured providers agree with stored history; continuing normal scan`,
             );
