@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
 import { getTxFilterService, TxFilterSyncError } from '../services/txFilterService';
 import { sendHttpError } from '../utils/httpError';
-import { parsePositiveId } from '../utils/parsePositiveId';
 import { TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
 import {
     validateCreateTxFilterInput,
     validateUpdateTxFilterInput,
+    validateTxFilterIdInput,
 } from '../validators/txFilterValidator';
 
 const txFilterService = getTxFilterService();
@@ -40,9 +40,11 @@ export const updateTxFilter = async (
     req: Request<{ id: string }>,
     res: Response,
 ): Promise<void> => {
-    const id = parsePositiveId(req.params.id);
-    if (id === undefined) {
-        res.status(400).json({ message: 'Invalid transaction filter ID' });
+    let id: number;
+    try {
+        id = validateTxFilterIdInput(req.params.id);
+    } catch (error) {
+        sendHttpError(res, 'Invalid transaction filter ID', error);
         return;
     }
 
