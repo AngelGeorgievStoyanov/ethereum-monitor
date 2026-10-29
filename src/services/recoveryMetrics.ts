@@ -1,14 +1,4 @@
-interface RecoveryMetrics {
-    reorgCount: number;
-    reorgDepthLast: number;
-    reorgDepthMax: number;
-    reorgRecoveryDurationMsLast: number;
-    reorgConsensusFailuresTotal: number;
-    reorgBlocksReprocessedTotal: number;
-    rescanRunsTotal: number;
-    rescanBlocksProcessedTotal: number;
-    rescanFailuresTotal: number;
-}
+import type { RecoveryMetrics } from '../types/scanner-status.types';
 
 const metrics: RecoveryMetrics = {
     reorgCount: 0,
