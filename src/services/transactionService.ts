@@ -1,6 +1,7 @@
 import { TransactionResponse } from 'ethers';
-import { ActiveTxFilter } from './txFilterEvaluatorService';
+import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
+import type { TransferBatchCandidate } from '../types/transfer-batch.types';
 import {
     createTxMatches,
     deleteTransactionById,
@@ -9,19 +10,12 @@ import {
 } from '../repositories/transactionRepository';
 import {
     mapTransactionCreationData,
-    TransferContextMetadata,
 } from '../mappers/transactionContextMapper';
+import type { TransferContextMetadata } from '../types/transaction.types';
 import { mapTransactionPageResponse } from '../mappers/transactionResponseMapper';
 
 export type TransferMetadata = TransferContextMetadata;
 
-export interface TransferBatchCandidate {
-    tx: TransactionResponse;
-    receipt: RpcTransactionReceipt;
-    blockTimestamp: number;
-    transfer: TransferMetadata;
-    matchingTxFilters: ActiveTxFilter[];
-}
 
 export interface CreateTransactionFromEthereumDataOptions {
     tx: TransactionResponse;
