@@ -4,6 +4,7 @@ import ScannerState from '../models/scannerState';
 import Block from '../models/block';
 import Transaction from '../models/transaction';
 import { createTransfersBatch, TransferBatchItem } from './transactionRepository';
+import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
 
 export interface ProcessedBlockRecord {
     blockNumber: number;
@@ -86,7 +87,8 @@ export async function persistProcessedBlockBatchTransaction({
 
         for (let index = 1; index < blocks.length; index += 1) {
             if (blocks[index].parentHash.toLowerCase() !== blocks[index - 1].blockHash.toLowerCase()) {
-                throw new Error(
+                throw new BlockChainDiscontinuityError(
+                    blocks[index].blockNumber,
                     `Block chain discontinuity between ${blocks[index - 1].blockNumber} and ${blocks[index].blockNumber}`,
                 );
             }
@@ -101,7 +103,8 @@ export async function persistProcessedBlockBatchTransaction({
                 previousCanonicalBlock &&
                 blocks[0].parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()
             ) {
-                throw new Error(
+                throw new BlockChainDiscontinuityError(
+                    blocks[0].blockNumber,
                     `Block ${blocks[0].blockNumber} parent hash does not match canonical block ${expectedCheckpoint}; reorg recovery is required`,
                 );
             }
