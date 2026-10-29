@@ -1,13 +1,11 @@
 import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
-import { Op } from 'sequelize';
 import {
     getScannerControlState,
     requestScannerPause,
     resumeScanner,
 } from '../services/scannerControlService';
 import ScannerState from '../models/scannerState';
-import Block from '../models/block';
 import {
     SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
     SCANNER_ID,
@@ -22,10 +20,17 @@ import {
 import { getTxFilterService } from '../services/txFilterService';
 import { runManualRescan, RescanReorgDetectedError } from '../services/rescanService';
 import { recordRescanFailure } from '../services/recoveryMetrics';
-import ScannerRescanJob from '../models/scannerRescanJob';
 import { formatError } from '../utils/formatError';
 import { isScannerLockHeld } from '../services/scannerLockService';
 import { getScannerStatusResponse } from '../services/scannerStatusService';
+import { countCanonicalBlocksInRange } from '../repositories/blockRepository';
+import {
+    createScannerRescanJob,
+    findActiveScannerRescanJob,
+    findScannerRescanJobById,
+    updateScannerRescanJob,
+} from '../repositories/scannerRescanJobRepository';
+import type { ScannerRescanJobSummary } from '../types/scanner-status.types';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -97,20 +102,19 @@ export const resumeScannerController = async (_req: Request, res: Response): Pro
 };
 
 async function executeRescanJob(jobId: string, fromBlock: number, toBlock: number): Promise<void> {
-    let job: ScannerRescanJob | null = null;
+    let job: ScannerRescanJobSummary | null = null;
 
     try {
-        job = await ScannerRescanJob.findByPk(jobId);
+        job = await findScannerRescanJobById(jobId);
         if (!job) {
             console.error(`[Rescan] Job ${jobId} was not found before execution`);
             return;
         }
-        const activeJob = job;
 
         const state = await ScannerState.findByPk(SCANNER_ID);
         if (!state) throw new Error('Scanner state is not initialized');
 
-        await activeJob.update({
+        await updateScannerRescanJob(jobId, {
             status: 'RUNNING',
             currentBlock: fromBlock,
             startedAt: new Date(),
@@ -137,7 +141,7 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
     } catch (error) {
         const message = formatError(error);
         if (error instanceof RescanReorgDetectedError && job) {
-            await job.update({
+            await updateScannerRescanJob(jobId, {
                 status: 'RECOVERY_STARTED',
                 error: message,
                 completedAt: new Date(),
@@ -157,7 +161,7 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
 
         recordRescanFailure();
         try {
-            if (!job) job = await ScannerRescanJob.findByPk(jobId);
+            if (!job) job = await findScannerRescanJobById(jobId);
             if (job) {
                 await job.update({
                     status: 'FAILED',
@@ -232,12 +236,7 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
         }
 
         const expectedBlocks = state.lastProcessedBlock - fromBlock + 1;
-        const canonicalBlocks = await Block.count({
-            where: {
-                status: 'CANONICAL',
-                blockNumber: { [Op.gte]: fromBlock, [Op.lte]: state.lastProcessedBlock },
-            },
-        });
+        const canonicalBlocks = await countCanonicalBlocksInRange(fromBlock, state.lastProcessedBlock);
         if (canonicalBlocks !== expectedBlocks) {
             res.status(409).json({
                 message:
@@ -250,9 +249,7 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             return;
         }
 
-        const activeJob = await ScannerRescanJob.findOne({
-            where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } },
-        });
+        const activeJob = await findActiveScannerRescanJob();
         if (activeJob) {
             res.status(409).json({
                 message: 'A rescan job is already running.',
@@ -271,16 +268,10 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
         reservedForThisRequest = true;
 
         const operationId = randomUUID();
-        await ScannerRescanJob.create({
+        await createScannerRescanJob({
             id: operationId,
             fromBlock,
             toBlock: state.lastProcessedBlock,
-            currentBlock: fromBlock,
-            blocksProcessed: 0,
-            status: 'QUEUED',
-            error: null,
-            startedAt: null,
-            completedAt: null,
         });
 
         void executeRescanJob(operationId, fromBlock, state.lastProcessedBlock).catch((error) => {
@@ -307,7 +298,7 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
 export const getRescanJobStatus = async (req: Request, res: Response): Promise<void> => {
     try {
         const operationId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        const job = await ScannerRescanJob.findByPk(operationId);
+        const job = await findScannerRescanJobById(operationId);
         if (!job) {
             res.status(404).json({ message: 'Rescan operation not found' });
             return;
