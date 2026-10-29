@@ -1,6 +1,4 @@
 import sequelize from '../database';
-import Block from '../models/block';
-import ScannerState from '../models/scannerState';
 import TxFilter from '../models/txFilter';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
@@ -11,6 +9,9 @@ import {
     findActiveTxFilters,
     findAllTxFilters,
     updateTxFilter as persistTxFilter,
+    findTxFilterForUpdate,
+    findInitialConfiguredStartBlock,
+    assignActiveFilterStartBlock,
 } from '../repositories/txFilterRepository';
 import {
     findRuleForFilter,
@@ -55,8 +56,8 @@ export function createTxFilterService() {
             if (!rule) continue;
             if (filter.activeFromBlock === null || filter.activeFromBlock === undefined) {
                 if (missingFiltersStartBlock === undefined) missingFiltersStartBlock = await getNextFilterStartBlock();
+                await assignActiveFilterStartBlock(filter.id, missingFiltersStartBlock);
                 filter.activeFromBlock = missingFiltersStartBlock;
-                await filter.save();
             }
             next.push({ id: filter.id, description: filter.description, isActive: filter.isActive, activeFromBlock: filter.activeFromBlock, rule });
         }
@@ -70,30 +71,6 @@ export function createTxFilterService() {
             ...filter.toJSON(),
             rule: rulesByFilterId.get(filter.id) ?? legacyRule(filter),
         }));
-    }
-
-    async function getInitialConfiguredStartBlock(
-        transaction: SequelizeTransaction,
-    ): Promise<number | undefined> {
-        if (env.startBlock === undefined) return undefined;
-
-        const existingActiveFilter = await TxFilter.findOne({
-            where: { isActive: true },
-            transaction,
-        });
-        if (existingActiveFilter) return undefined;
-
-        const state = await ScannerState.findByPk(SCANNER_ID, { transaction });
-        if (state && state.lastProcessedBlock !== env.startBlock - 1) return undefined;
-
-        const existingCanonicalBlock = await Block.findOne({
-            where: { status: 'CANONICAL' },
-            attributes: ['id'],
-            transaction,
-        });
-        if (existingCanonicalBlock) return undefined;
-
-        return env.startBlock;
     }
 
     async function createTxFilter(data: {
@@ -115,7 +92,7 @@ export function createTxFilterService() {
                 transaction,
             });
             const initialStartBlock = data.isActive
-                ? await getInitialConfiguredStartBlock(transaction)
+                ? await findInitialConfiguredStartBlock(env.startBlock, SCANNER_ID, transaction)
                 : undefined;
             const activeFromBlock = data.isActive
                 ? (initialStartBlock ?? (await getNextFilterStartBlock()))
@@ -157,10 +134,7 @@ export function createTxFilterService() {
                 transaction,
             });
 
-            const current = await TxFilter.findByPk(id, {
-                transaction,
-                lock: transaction.LOCK.UPDATE,
-            });
+            const current = await findTxFilterForUpdate(id, transaction);
             if (!current) return null;
 
             const existingRule = updates.rule === undefined ? await findRuleForFilter(id) : null;
