@@ -6,7 +6,6 @@ import {
 import type { ScannerRuntimeState } from '../types/scanner-state.types';
 import { refreshScannerState } from './scannerStateService';
 import {
-    findCanonicalBlock,
     hasCanonicalBlocks,
     markReorgRecoveryBlocked,
     markReorgRecoveryPending as persistReorgRecoveryPending,
@@ -20,6 +19,7 @@ import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcSer
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { isScannerLockHeld } from './scannerLockService';
+import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import { findScannerStatusState, unblockScannerReorgRecovery } from '../repositories/scannerStateRepository';
 import { mapReorgRecoveryRetryResponse } from '../mappers/scannerControlMapper';
 import {
@@ -96,7 +96,7 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
         const blockNumber = originalCheckpoint - depth;
         if (blockNumber < 0) break;
 
-        const storedBlock = await findCanonicalBlock(blockNumber);
+        const storedBlock = await findCanonicalBlockIdentity(blockNumber);
         if (!storedBlock) {
             throw new ReorgRecoverySafetyError(
                 `Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`,
@@ -150,7 +150,7 @@ async function processReorgRecoveryInternal(
     if (state.reorgRecoveryActive && state.reorgRecoveryStartBlock !== null) {
         await findAncestorAndRollback(state);
     } else if (!state.reorgRecoveryActive) {
-        const storedCheckpoint = await findCanonicalBlock(state.lastProcessedBlock);
+        const storedCheckpoint = await findCanonicalBlockIdentity(state.lastProcessedBlock);
         if (!storedCheckpoint) {
             if (!(await hasCanonicalBlocks())) return false; // Fresh scanner baseline: no block has been persisted yet.
             throw new ReorgRecoverySafetyError(
@@ -209,7 +209,7 @@ async function processReorgRecoveryInternal(
 
         const blockNumber = state.lastProcessedBlock + 1;
         const verifiedBlock = await getReorgVerifiedBlock(blockNumber, 'reorg recovery');
-        const previousCanonicalBlock = await findCanonicalBlock(state.lastProcessedBlock);
+        const previousCanonicalBlock = await findCanonicalBlockIdentity(state.lastProcessedBlock);
         if (
             previousCanonicalBlock &&
             verifiedBlock.parentHash.toLowerCase() !==

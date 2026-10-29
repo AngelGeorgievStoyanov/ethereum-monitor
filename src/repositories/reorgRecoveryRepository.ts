@@ -5,24 +5,6 @@ import StoredTransaction from '../models/transaction';
 import TxMatch from '../models/txMatch';
 import ScannerState from '../models/scannerState';
 
-export interface CanonicalBlockRecord {
-    blockNumber: number;
-    blockHash: string;
-    parentHash: string;
-}
-
-export async function findCanonicalBlock(
-    blockNumber: number,
-): Promise<CanonicalBlockRecord | null> {
-    const block = await Block.findOne({
-        where: { blockNumber, status: 'CANONICAL' },
-        attributes: ['blockNumber', 'blockHash', 'parentHash'],
-    });
-    return block
-        ? { blockNumber: block.blockNumber, blockHash: block.blockHash, parentHash: block.parentHash }
-        : null;
-}
-
 export async function hasCanonicalBlocks(): Promise<boolean> {
     return (await Block.count({ where: { status: 'CANONICAL' } })) > 0;
 }
