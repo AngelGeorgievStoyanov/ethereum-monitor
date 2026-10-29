@@ -49,3 +49,44 @@ export async function findScannerStatusState(id: string): Promise<ScannerStatusS
         reorgRecoveryTargetBlock: state.reorgRecoveryTargetBlock,
     };
 }
+
+export async function findScannerControlRecord(id: string) {
+    const state = await ScannerState.findByPk(id, {
+        attributes: [
+            'scannerPaused',
+            'scannerPauseMode',
+            'scannerPauseRequestedAtBlock',
+            'scannerPauseUntil',
+            'scannerPauseTargetBlock',
+            'scannerPauseDurationMinutes',
+        ],
+    });
+    if (!state) return null;
+
+    return {
+        paused: state.scannerPaused,
+        mode: state.scannerPauseMode,
+        pauseRequestedAtBlock: state.scannerPauseRequestedAtBlock,
+        pauseUntil: state.scannerPauseUntil?.getTime() ?? null,
+        pauseUntilDate: state.scannerPauseUntil,
+        pauseTargetBlock: state.scannerPauseTargetBlock,
+        pauseDurationMinutes: state.scannerPauseDurationMinutes,
+    };
+}
+
+export async function updateScannerControlRecord(
+    id: string,
+    updates: {
+        scannerPaused?: boolean;
+        scannerPauseMode?: 'manual' | 'temporary' | null;
+        scannerPauseRequestedAtBlock?: number | null;
+        scannerPauseUntil?: Date | null;
+        scannerPauseTargetBlock?: number | null;
+        scannerPauseDurationMinutes?: number;
+    },
+): Promise<void> {
+    const [updatedRows] = await ScannerState.update(updates, { where: { id } });
+    if (updatedRows !== 1) {
+        throw new Error(`Unable to update scanner control state for "${id}"`);
+    }
+}
