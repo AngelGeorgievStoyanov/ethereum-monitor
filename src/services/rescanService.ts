@@ -1,6 +1,6 @@
 import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import { RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS } from '../constants/rescan.constants';
-import ScannerState from '../models/scannerState';
+import { findScannerRescanState } from '../repositories/scannerStateRepository';
 import { processBlock } from './blockProcessingService';
 import { getBlockWithConsensus } from './blockConsensusService';
 import { reconcileBlockCandidates } from './scannerPersistenceService';
@@ -35,14 +35,14 @@ function matchesBlock(
 
 interface RunManualRescanOptions {
     fromBlock: number;
-    state: ScannerState;
+    scannerStateId: string;
     getActiveTxFilters: () => ActiveTxFilter[];
     onProgress?: (currentBlock: number, blocksProcessed: number) => Promise<void>;
 }
 
 async function runManualRescanInternal({
     fromBlock,
-    state,
+    scannerStateId,
     getActiveTxFilters,
     onProgress,
 }: RunManualRescanOptions): Promise<{
@@ -53,8 +53,9 @@ async function runManualRescanInternal({
     if (!(await isScannerLockHeld())) {
         throw new Error('Manual rescan requires this instance to own the scanner lock');
     }
-    await state.reload();
-    const checkpoint = state.lastProcessedBlock;
+    const initialState = await findScannerRescanState(scannerStateId);
+    if (!initialState) throw new Error('Scanner state is not initialized');
+    const checkpoint = initialState.lastProcessedBlock;
 
     if (!Number.isSafeInteger(fromBlock) || fromBlock < 0) {
         throw new Error('fromBlock must be a non-negative integer');
@@ -64,7 +65,7 @@ async function runManualRescanInternal({
             `fromBlock ${fromBlock} is greater than the last processed checkpoint ${checkpoint}`,
         );
     }
-    if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
+    if (initialState.reorgRecoveryActive || initialState.reorgRecoveryBlocked) {
         throw new Error('Manual rescan cannot start while reorg recovery is active or blocked');
     }
 
@@ -82,13 +83,14 @@ async function runManualRescanInternal({
                 `Manual rescan stopped before block ${blockNumber}: scanner lock ownership was lost`,
             );
         }
-        await state.reload();
-        if (state.lastProcessedBlock !== checkpoint) {
+        const currentState = await findScannerRescanState(scannerStateId);
+        if (!currentState) throw new Error('Scanner state is not initialized');
+        if (currentState.lastProcessedBlock !== checkpoint) {
             throw new Error(
-                `Scanner checkpoint changed during rescan: expected ${checkpoint}, found ${state.lastProcessedBlock}`,
+                `Scanner checkpoint changed during rescan: expected ${checkpoint}, found ${currentState.lastProcessedBlock}`,
             );
         }
-        if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
+        if (currentState.reorgRecoveryActive || currentState.reorgRecoveryBlocked) {
             throw new Error(
                 'Manual rescan stopped because reorg recovery became active or blocked',
             );
@@ -104,7 +106,7 @@ async function runManualRescanInternal({
         const consensusBlock = await getBlockWithConsensus(blockNumber, 'manual rescan');
         if (!matchesBlock(storedBlock, consensusBlock)) {
             recordReorgDetected();
-            await markReorgRecoveryPending(state, checkpoint);
+            await markReorgRecoveryPending(scannerStateId, checkpoint);
             throw new RescanReorgDetectedError(
                 `Chain mismatch found at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
             );
@@ -127,7 +129,7 @@ async function runManualRescanInternal({
                 `Manual rescan stopped before saving block ${blockNumber}: scanner lock ownership was lost`,
             );
         }
-        await reconcileBlockCandidates(prepared.candidates, state.id, checkpoint);
+        await reconcileBlockCandidates(prepared.candidates, scannerStateId, checkpoint);
         blocksProcessed += 1;
         recordRescanBlockProcessed();
         if (onProgress) await onProgress(blockNumber, blocksProcessed);
