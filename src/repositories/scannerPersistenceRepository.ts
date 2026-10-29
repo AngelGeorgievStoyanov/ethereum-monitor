@@ -1,0 +1,138 @@
+import { Op, Transaction as SequelizeTransaction } from 'sequelize';
+import sequelize from '../database';
+import ScannerState from '../models/scannerState';
+import Block from '../models/block';
+import Transaction from '../models/transaction';
+import { createTransfersBatch, TransferBatchItem } from './transactionRepository';
+
+export interface ProcessedBlockRecord {
+    blockNumber: number;
+    blockHash: string;
+    parentHash: string;
+}
+
+export interface ReorgRecoveryProgress {
+    active: boolean;
+    stableBlocks: number;
+    startBlock: number | null;
+    targetBlock: number | null;
+}
+
+export interface PersistProcessedBlockBatchOptions {
+    transferItems: readonly TransferBatchItem[];
+    blocks: readonly ProcessedBlockRecord[];
+    scannerStateId: string;
+    expectedCheckpoint: number;
+    newCheckpoint: number;
+    recoveryProgress?: ReorgRecoveryProgress;
+    assertScannerLockHeld: () => Promise<boolean>;
+}
+
+export async function reconcileBlockTransferItems(
+    transferItems: readonly TransferBatchItem[],
+    scannerStateId: string,
+    expectedCheckpoint: number,
+    assertScannerLockHeld: () => Promise<boolean>,
+): Promise<void> {
+    if (!(await assertScannerLockHeld())) {
+        throw new Error('Cannot reconcile rescan matches without owning the scanner lock');
+    }
+    await sequelize.transaction(async (transaction) => {
+        const state = await ScannerState.findByPk(scannerStateId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
+        if (!state) throw new Error(`Scanner state "${scannerStateId}" was not found`);
+        if (state.lastProcessedBlock !== expectedCheckpoint) {
+            throw new Error(
+                `Scanner checkpoint changed during rescan: expected ${expectedCheckpoint}, found ${state.lastProcessedBlock}`,
+            );
+        }
+        if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
+            throw new Error(
+                'Cannot reconcile rescan matches while reorg recovery is active or blocked',
+            );
+        }
+        if (!(await assertScannerLockHeld())) {
+            throw new Error('Scanner lock ownership was lost before reconciling rescan matches');
+        }
+        await createTransfersBatch(transferItems, transaction, true);
+    });
+}
+
+export async function persistProcessedBlockBatchTransaction({
+    transferItems,
+    blocks,
+    scannerStateId,
+    expectedCheckpoint,
+    newCheckpoint,
+    recoveryProgress,
+    assertScannerLockHeld,
+}: PersistProcessedBlockBatchOptions): Promise<number> {
+    return sequelize.transaction(async (transaction) => {
+        const state = await ScannerState.findByPk(scannerStateId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
+        if (!state) throw new Error(`Scanner state "${scannerStateId}" was not found`);
+
+        // Another replica may have committed this range while it was being fetched.
+        if (state.lastProcessedBlock !== expectedCheckpoint) return state.lastProcessedBlock;
+        if (!(await assertScannerLockHeld())) {
+            throw new Error(
+                'Scanner lock ownership was lost before persisting the processed block batch',
+            );
+        }
+
+        for (let index = 1; index < blocks.length; index += 1) {
+            if (blocks[index].parentHash.toLowerCase() !== blocks[index - 1].blockHash.toLowerCase()) {
+                throw new Error(
+                    `Block chain discontinuity between ${blocks[index - 1].blockNumber} and ${blocks[index].blockNumber}`,
+                );
+            }
+        }
+
+        if (blocks.length > 0) {
+            const previousCanonicalBlock = await Block.findOne({
+                where: { blockNumber: expectedCheckpoint, status: 'CANONICAL' },
+                transaction,
+            });
+            if (
+                previousCanonicalBlock &&
+                blocks[0].parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()
+            ) {
+                throw new Error(
+                    `Block ${blocks[0].blockNumber} parent hash does not match canonical block ${expectedCheckpoint}; reorg recovery is required`,
+                );
+            }
+            await Block.bulkCreate(
+                blocks.map((block) => ({ ...block, status: 'CANONICAL' })),
+                {
+                    updateOnDuplicate: ['blockNumber', 'parentHash', 'status'],
+                    transaction,
+                },
+            );
+        }
+
+        const isReorgRecovery = recoveryProgress !== undefined;
+        await createTransfersBatch(transferItems, transaction, isReorgRecovery);
+        if (isReorgRecovery && blocks.length > 0) {
+            await Transaction.update(
+                { recordStatus: 'NORMAL' },
+                {
+                    where: { blockHash: { [Op.in]: blocks.map((block) => block.blockHash) } },
+                    transaction,
+                },
+            );
+        }
+        state.lastProcessedBlock = newCheckpoint;
+        if (recoveryProgress) {
+            state.reorgRecoveryActive = recoveryProgress.active;
+            state.reorgRecoveryStableBlocks = recoveryProgress.stableBlocks;
+            state.reorgRecoveryStartBlock = recoveryProgress.startBlock;
+            state.reorgRecoveryTargetBlock = recoveryProgress.targetBlock;
+        }
+        await state.save({ transaction });
+        return newCheckpoint;
+    });
+}
