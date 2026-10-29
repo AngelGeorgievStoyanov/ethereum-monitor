@@ -12,8 +12,8 @@ import {
     mapScannerResumeResponse,
 } from '../mappers/scannerControlMapper';
 import { getScannerStatusResponse } from '../services/scannerStatusService';
-import { getRescanJobStatus } from '../services/scannerRescanJobService';
-import { retryBlockedReorgRecovery } from '../services/reorgRecoveryService';
+import { getRescanJobStatus as loadRescanJobStatus } from '../services/scannerRescanJobService';
+import { retryBlockedReorgRecovery as retryReorgRecovery } from '../services/reorgRecoveryService';
 import { requestManualRescan } from '../services/manualRescanRequestService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
@@ -55,7 +55,7 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
 export const getRescanJobStatus = async (req: Request, res: Response): Promise<void> => {
     try {
         const operationId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        const job = await getRescanJobStatus(operationId);
+        const job = await loadRescanJobStatus(operationId);
         if (!job) {
             res.status(404).json({ message: 'Rescan operation not found' });
             return;
@@ -68,7 +68,7 @@ export const getRescanJobStatus = async (req: Request, res: Response): Promise<v
 
 export const retryBlockedReorgRecovery = async (_req: Request, res: Response): Promise<void> => {
     try {
-        const result = await retryBlockedReorgRecovery();
+        const result = await retryReorgRecovery();
         if (result.kind === 'no-pending-recovery') {
             res.status(409).json({ message: 'No pending reorg recovery is available to retry.' });
             return;
