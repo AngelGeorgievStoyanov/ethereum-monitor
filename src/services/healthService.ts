@@ -1,5 +1,5 @@
 import sequelize from '../database';
-import { ethereumProvider } from './ethereumRpcService';
+import { evmRpcClient } from './evmBlockDataService';
 
 export interface HealthReadinessResult {
     ready: boolean;
@@ -12,7 +12,7 @@ export interface HealthReadinessResult {
 export async function getReadinessResult(): Promise<HealthReadinessResult> {
     const [databaseCheck, rpcCheck] = await Promise.allSettled([
         sequelize.authenticate(),
-        ethereumProvider.getBlock('finalized'),
+        evmRpcClient.getBlock('finalized'),
     ]);
 
     const database = databaseCheck.status === 'fulfilled';
