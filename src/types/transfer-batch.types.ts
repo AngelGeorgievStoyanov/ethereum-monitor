@@ -1,5 +1,5 @@
 import type { TransactionResponse } from 'ethers';
-import type { RpcTransactionReceipt } from './ethereum-rpc.types';
+import type { RpcTransactionReceipt } from './evm-rpc.types';
 import type { ActiveTxFilter } from './tx-filter.types';
 import type { TransferContextMetadata } from './transaction.types';
 
