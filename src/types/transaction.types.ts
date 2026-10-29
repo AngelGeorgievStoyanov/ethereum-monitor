@@ -3,6 +3,15 @@ export type StoredTransactionChainStatus = 'SUCCESS' | 'FAILED';
 export type StoredTransactionRecordStatus = 'NORMAL' | 'REORGED';
 export type StoredTransactionMatchStatus = 'ACTIVE' | 'NOT_MATCHED' | 'FILTER_DELETED' | 'REORGED';
 
+export interface TransferContextMetadata {
+    transferType: 'native' | 'erc20';
+    tokenAddress?: string | null;
+    logIndex: number;
+    from: string;
+    to: string;
+    value: string;
+}
+
 export interface TransactionPersistenceData {
     txHash: string;
     transferType: StoredTransferType;
