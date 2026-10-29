@@ -3,6 +3,7 @@ import {
     findScannerControlRecord,
     updateScannerControlRecord,
 } from '../repositories/scannerStateRepository';
+import { mapScannerControlResponse, mapScannerResumeResponse } from '../mappers/scannerControlMapper';
 import type {
     ScannerControlRecord,
     ScannerControlState,
@@ -131,4 +132,18 @@ export async function resumeScanner(): Promise<void> {
     if (wasPaused) {
         console.log('[Scanner] Persisted resume; catch-up will continue from the saved checkpoint');
     }
+}
+
+export async function requestScannerPauseResponse(
+    mode: ScannerPauseMode,
+    atBlock: number | null,
+    durationMinutes = SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
+) {
+    await requestScannerPause(mode, atBlock, durationMinutes);
+    return mapScannerControlResponse('Scanner pause requested', await getScannerControlState());
+}
+
+export async function resumeScannerResponse() {
+    await resumeScanner();
+    return mapScannerResumeResponse(await getScannerControlState());
 }
