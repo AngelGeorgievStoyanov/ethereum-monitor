@@ -43,6 +43,10 @@ type RpcEndpoint = {
     };
 };
 
+function recordEndpointAttempt(endpoint: RpcEndpoint): void {
+    endpoint.metrics.attempts += 1;
+}
+
 function recordEndpointSuccess(endpoint: RpcEndpoint, startedAt: number): void {
     endpoint.metrics.successes += 1;
     endpoint.metrics.totalDurationMs += Date.now() - startedAt;
