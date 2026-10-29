@@ -7,7 +7,7 @@ import {
 } from '../repositories/scannerPersistenceRepository';
 import { mapTransactionCreationData } from '../mappers/transactionContextMapper';
 import { isScannerLockHeld } from './scannerLockService';
-import type { TransferBatchCandidate } from './transactionService';
+import type { TransferBatchCandidate } from '../types/transfer-batch.types';
 
 function mapTransferBatchItems(candidates: readonly TransferBatchCandidate[]): TransferBatchItem[] {
     return candidates.map((candidate) => ({
