@@ -1,4 +1,3 @@
-import TxFilter from '../models/txFilter';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import {
@@ -31,7 +30,12 @@ export class TxFilterSyncError extends Error {
     }
 }
 
-function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
+interface LegacyTxFilterFields {
+    from: string | null;
+    to: string | null;
+}
+
+function legacyRule(txFilter: LegacyTxFilterFields): TxFilterGroupRule | null {
     const conditions = [];
     if (txFilter.from) conditions.push({ field: 'from', operator: 'eq', value: txFilter.from });
     if (txFilter.to) conditions.push({ field: 'to', operator: 'eq', value: txFilter.to });
