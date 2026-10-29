@@ -10,6 +10,7 @@ import { sendHttpError } from '../utils/httpError';
 import { validateScannerPauseInput } from '../validators/scannerControlValidator';
 import {
     mapScannerControlResponse,
+    mapScannerResumeResponse,
     mapReorgRecoveryRetryResponse,
 } from '../mappers/scannerControlMapper';
 import { getScannerStatusResponse } from '../services/scannerStatusService';
@@ -41,7 +42,7 @@ export const pauseScanner = async (req: Request, res: Response): Promise<void> =
 export const resumeScannerController = async (_req: Request, res: Response): Promise<void> => {
     try {
         await resumeScanner();
-        res.json({ message: 'Scanner resumed', ...(await getScannerControlState()) });
+        res.json(mapScannerResumeResponse(await getScannerControlState()));
     } catch (error) {
         sendHttpError(res, 'Unable to resume scanner', error);
     }
