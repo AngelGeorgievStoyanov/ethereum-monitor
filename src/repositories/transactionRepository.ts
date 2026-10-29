@@ -41,19 +41,6 @@ function toStoredTransactionRecord(model: Transaction): StoredTransactionRecord 
     };
 }
 
-function toStoredTxFilterRecord(filter: StoredTxFilterRecord): StoredTxFilterRecord {
-    return {
-        id: filter.id,
-        description: filter.description,
-        from: filter.from ?? null,
-        to: filter.to ?? null,
-        isActive: filter.isActive,
-        activeFromBlock: filter.activeFromBlock,
-        createdAt: filter.createdAt,
-        updatedAt: filter.updatedAt,
-    };
-}
-
 function toStoredTransactionPageRecord(model: Transaction): StoredTransactionPageRecord {
     const data = model.toJSON() as StoredTransactionRecord & {
         matches?: StoredTransactionMatchRecord[];
@@ -68,7 +55,7 @@ function toStoredTransactionPageRecord(model: Transaction): StoredTransactionPag
             matchStatus: match.matchStatus,
             createdAt: match.createdAt,
             updatedAt: match.updatedAt,
-            txFilter: match.txFilter ? toStoredTxFilterRecord(match.txFilter) : null,
+            txFilter: match.txFilter,
         })),
     };
 }
