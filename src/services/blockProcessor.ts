@@ -12,10 +12,8 @@ import { BlockReceiptConsistencyError } from './ethereumRpcService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { recordReorgDetected } from './recoveryMetrics';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
-import {
-    CanonicalBlockIdentity,
-    findCanonicalBlockIdentity,
-} from '../repositories/blockRepository';
+import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
+import type { CanonicalBlockIdentity } from '../repositories/blockRepository';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { isScannerLockHeld } from './scannerLockService';
