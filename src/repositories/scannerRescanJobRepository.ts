@@ -34,3 +34,15 @@ export async function findScannerRescanJobById(id: string): Promise<ScannerResca
     const job = await ScannerRescanJob.findByPk(id);
     return job ? toSummary(job) : null;
 }
+
+export async function markActiveScannerRescanJobsInterrupted(): Promise<number> {
+    const [updatedRows] = await ScannerRescanJob.update(
+        {
+            status: 'INTERRUPTED',
+            error: 'Scanner ownership was lost before the rescan operation completed',
+            completedAt: new Date(),
+        },
+        { where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } } },
+    );
+    return updatedRows;
+}
