@@ -4,7 +4,7 @@ import {
     updateScannerRescanJob,
 } from '../repositories/scannerRescanJobRepository';
 import { SCANNER_ID } from '../constants/scanner.constants';
-import { getTxFilterService } from './txFilterService';
+import { getDynamicConfigService } from './dynamicConfigService';
 import { runManualRescan, RescanReorgDetectedError } from './rescanService';
 import { recordRescanFailure } from './recoveryMetrics';
 import { formatError } from '../utils/formatError';
@@ -37,7 +37,7 @@ export async function executeRescanJob(
         const result = await runManualRescan({
             fromBlock,
             state,
-            getActiveTxFilters: () => getTxFilterService().getTxFilters(),
+            getActiveTxFilters: () => getDynamicConfigService().getTxFilters(),
             onProgress: async (currentBlock, blocksProcessed) => {
                 await updateScannerRescanJob(jobId, { currentBlock, blocksProcessed });
             },
