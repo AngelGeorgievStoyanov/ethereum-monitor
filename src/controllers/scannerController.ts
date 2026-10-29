@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { randomUUID } from 'crypto';
 import {
     getScannerControlState,
     requestScannerPause,
@@ -12,25 +11,13 @@ import {
     SCANNER_MAX_PAUSE_DURATION_MINUTES,
 } from '../constants/scanner.constants';
 import { HttpError, sendHttpError } from '../utils/httpError';
-import {
-    isScannerProcessingBlocks,
-    releaseManualRescanReservation,
-    tryReserveManualRescan,
-} from '../services/blockMonitorService';
-import { isScannerLockHeld } from '../services/scannerLockService';
 import { getScannerStatusResponse } from '../services/scannerStatusService';
-import { countCanonicalBlocksInRange } from '../repositories/blockRepository';
-import {
-    createScannerRescanJob,
-    findActiveScannerRescanJob,
-    findScannerRescanJobById,
-} from '../repositories/scannerRescanJobRepository';
+import { findScannerRescanJobById } from '../repositories/scannerRescanJobRepository';
 import {
     findScannerStatusState,
     unblockScannerReorgRecovery,
 } from '../repositories/scannerStateRepository';
-import { executeRescanJob } from '../services/scannerRescanJobService';
-import { formatError } from '../utils/formatError';
+import { requestManualRescan } from '../services/manualRescanRequestService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -102,111 +89,10 @@ export const resumeScannerController = async (_req: Request, res: Response): Pro
 };
 
 export const rescanScannerController = async (req: Request, res: Response): Promise<void> => {
-    const fromBlock = req.body?.fromBlock;
-    let reservedForThisRequest = false;
-    if (!Number.isSafeInteger(fromBlock) || fromBlock < 0) {
-        res.status(400).json({ message: 'fromBlock must be a non-negative integer' });
-        return;
-    }
-
-    const scannerControl = await getScannerControlState();
-    if (!scannerControl.paused || scannerControl.mode !== 'manual') {
-        res.status(409).json({
-            message:
-                'Pause the scanner with mode="manual" before starting a rescan; temporary pauses may expire during the operation.',
-        });
-        return;
-    }
-    if (!(await isScannerLockHeld())) {
-        res.status(409).json({
-            message:
-                'Manual rescan must be started on the instance that currently owns the scanner lock.',
-        });
-        return;
-    }
-    if (isScannerProcessingBlocks()) {
-        res.status(409).json({
-            message:
-                'The scanner is still finishing block processing. Retry the rescan after it becomes idle.',
-        });
-        return;
-    }
-
     try {
-        const state = await findScannerStatusState(SCANNER_ID);
-        if (!state) {
-            res.status(503).json({ message: 'Scanner state is not initialized' });
-            return;
-        }
-        if (fromBlock > state.lastProcessedBlock) {
-            res.status(400).json({
-                message: `fromBlock ${fromBlock} is greater than the last processed checkpoint ${state.lastProcessedBlock}`,
-            });
-            return;
-        }
-        if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
-            res.status(409).json({
-                message: 'Cannot start a rescan while reorg recovery is active or blocked.',
-            });
-            return;
-        }
-
-        const expectedBlocks = state.lastProcessedBlock - fromBlock + 1;
-        const canonicalBlocks = await countCanonicalBlocksInRange(fromBlock, state.lastProcessedBlock);
-        if (canonicalBlocks !== expectedBlocks) {
-            res.status(409).json({
-                message:
-                    'Cannot start rescan because canonical block history is missing in the requested range.',
-                fromBlock,
-                toBlock: state.lastProcessedBlock,
-                expectedBlocks,
-                canonicalBlocksFound: canonicalBlocks,
-            });
-            return;
-        }
-
-        const activeJob = await findActiveScannerRescanJob();
-        if (activeJob) {
-            res.status(409).json({
-                message: 'A rescan job is already running.',
-                operationId: activeJob.id,
-            });
-            return;
-        }
-
-        if (!tryReserveManualRescan()) {
-            res.status(409).json({
-                message:
-                    'The scanner is processing blocks or another rescan is reserved. Retry when it is idle.',
-            });
-            return;
-        }
-        reservedForThisRequest = true;
-
-        const operationId = randomUUID();
-        await createScannerRescanJob({
-            id: operationId,
-            fromBlock,
-            toBlock: state.lastProcessedBlock,
-        });
-
-        void executeRescanJob(operationId, fromBlock, state.lastProcessedBlock).catch((error) => {
-            releaseManualRescanReservation();
-            console.error(
-                `[Rescan] Job ${operationId} failed before its status could be updated: ${formatError(error)}`,
-            );
-        });
-        reservedForThisRequest = false;
-        res.status(202).json({
-            message: 'Manual rescan started',
-            operationId,
-            status: 'QUEUED',
-            fromBlock,
-            toBlock: state.lastProcessedBlock,
-            statusUrl: `/api/scanner/rescan/${operationId}`,
-        });
+        const result = await requestManualRescan(req.body?.fromBlock);
+        res.status(result.statusCode).json(result.body);
     } catch (error) {
-        if (reservedForThisRequest) releaseManualRescanReservation();
         sendHttpError(res, 'Unable to start manual rescan', error);
     }
 };
