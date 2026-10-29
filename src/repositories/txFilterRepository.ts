@@ -19,8 +19,8 @@ function toTxFilterRecord(filter: TxFilter): TxFilterRecord {
     return {
         id: filter.id,
         description: filter.description,
-        from: filter.from,
-        to: filter.to,
+        from: filter.from ?? null,
+        to: filter.to ?? null,
         isActive: filter.isActive,
         activeFromBlock: filter.activeFromBlock,
     };
