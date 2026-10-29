@@ -128,36 +128,13 @@ export async function fetchBlockData(blockNumber: number) {
         let getBlockReceiptsDurationMs = 0;
 
         try {
-            const { block, receipts } = await ethereumProvider.execute(
-                `fetchBlockData(${blockNumber})`,
-                async (provider) => {
-                    const getBlockStartedAt = Date.now();
-                    const block = await provider.getBlock(blockNumber, true);
-                    getBlockDurationMs = Date.now() - getBlockStartedAt;
-
-                    if (!block) {
-                        throw new Error(`Unable to load block ${blockNumber}`);
-                    }
-
-                    const getReceiptsStartedAt = Date.now();
-                    const response: unknown = await provider.send('eth_getBlockReceipts', [
-                        ethers.toQuantity(blockNumber),
-                    ]);
-                    getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
-
-                    if (!Array.isArray(response)) {
-                        throw new Error('eth_getBlockReceipts returned a non-array response');
-                    }
-
-                    const receipts = response as RpcTransactionReceipt[];
-                    validateBlockReceipts(blockNumber, block, receipts);
-
-                    return {
-                        block,
-                        receipts,
-                    };
-                },
-            );
+            const {
+                block,
+                receipts,
+                getBlockDurationMs,
+                getBlockReceiptsDurationMs,
+            } = await ethereumProvider.getBlockAndReceipts(blockNumber);
+            validateBlockReceipts(blockNumber, block, receipts);
 
             return {
                 block,
