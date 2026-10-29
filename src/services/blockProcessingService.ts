@@ -1,7 +1,7 @@
 import { TransactionResponse } from 'ethers';
-import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
+import { RpcTransactionReceipt } from '../types/evm-rpc.types';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
-import { fetchBlockData } from './ethereumRpcService';
+import { fetchBlockData } from './evmBlockDataService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
 import type { TransferBatchCandidate } from '../types/transfer-batch.types';
@@ -28,13 +28,13 @@ export interface PreparedBlockResult extends ProcessedBlockMetrics {
     candidates: TransferBatchCandidate[];
 }
 
-type ValidatedEthereumBlock = Awaited<ReturnType<typeof fetchBlockData>>['block'] & {
+type ValidatedEvmBlock = Awaited<ReturnType<typeof fetchBlockData>>['block'] & {
     hash: string;
     parentHash: string;
 };
 
 export interface FetchedBlockForProcessing {
-    block: ValidatedEthereumBlock;
+    block: ValidatedEvmBlock;
     receipts: RpcTransactionReceipt[];
     fetchDurationMs: number;
     getBlockDurationMs: number;
@@ -50,7 +50,7 @@ export async function fetchBlockForProcessing(
         throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);
     }
     return {
-        block: fetched.block as ValidatedEthereumBlock,
+        block: fetched.block as ValidatedEvmBlock,
         receipts: fetched.receipts,
         fetchDurationMs: fetched.durationMs,
         getBlockDurationMs: fetched.getBlockDurationMs,
