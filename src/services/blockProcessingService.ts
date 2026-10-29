@@ -1,10 +1,10 @@
 import { TransactionResponse } from 'ethers';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
-import { ActiveTxFilter } from './txFilterEvaluatorService';
+import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { fetchBlockData } from './ethereumRpcService';
 import { processNativeTransfers } from './nativeTransferService';
 import { processErc20Transfers } from './erc20TransferService';
-import type { TransferBatchCandidate } from './transactionService';
+import type { TransferBatchCandidate } from '../types/transfer-batch.types';
 
 export interface ProcessedBlockMetrics {
     transactionCount: number;
