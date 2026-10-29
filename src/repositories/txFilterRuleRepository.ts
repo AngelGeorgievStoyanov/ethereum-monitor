@@ -92,12 +92,19 @@ async function deleteRuleForFilter(txFilterId: number, transaction: Transaction)
     }
 }
 
-async function persistGroup(
-    txFilterId: number,
-    group: TxFilterGroupRule,
-    parentGroupId: number | null,
-    transaction: Transaction,
-): Promise<void> {
+interface PersistGroupOptions {
+    txFilterId: number;
+    group: TxFilterGroupRule;
+    parentGroupId: number | null;
+    transaction: Transaction;
+}
+
+async function persistGroup({
+    txFilterId,
+    group,
+    parentGroupId,
+    transaction,
+}: PersistGroupOptions): Promise<void> {
     const savedGroup = await TxFilterGroup.create(
         { txFilterId, parentGroupId, logic: group.logic },
         { transaction },
@@ -114,7 +121,12 @@ async function persistGroup(
         );
     }
     for (const child of group.groups) {
-        await persistGroup(txFilterId, child, savedGroup.id, transaction);
+        await persistGroup({
+            txFilterId,
+            group: child,
+            parentGroupId: savedGroup.id,
+            transaction,
+        });
     }
 }
 
@@ -125,7 +137,14 @@ export async function saveRuleForFilter(
 ): Promise<void> {
     const save = async (activeTransaction: Transaction) => {
         await deleteRuleForFilter(txFilterId, activeTransaction);
-        if (rule) await persistGroup(txFilterId, rule, null, activeTransaction);
+        if (rule) {
+            await persistGroup({
+                txFilterId,
+                group: rule,
+                parentGroupId: null,
+                transaction: activeTransaction,
+            });
+        }
     };
 
     if (transaction) {
