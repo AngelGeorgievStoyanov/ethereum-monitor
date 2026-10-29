@@ -6,12 +6,12 @@ import {
     CONSENSUS_MAX_RETRIES,
     CONSENSUS_RETRY_INTERVAL_MS,
 } from '../constants/scanner.constants';
-import { ethereumProvider } from './ethereumRpcService';
+import { evmRpcClient } from './evmBlockDataService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 
 function validateSingleProviderBlock(
-    block: Awaited<ReturnType<typeof ethereumProvider.getBlock>>,
+    block: Awaited<ReturnType<typeof evmRpcClient.getBlock>>,
     requestedBlockNumber: number,
 ): ConsensusBlock {
     if (!block) {
@@ -42,7 +42,7 @@ export async function getReorgVerifiedBlock(
     blockNumber: number,
     operation: string,
 ): Promise<ConsensusBlock> {
-    if (ethereumProvider.getEndpointCount() !== 1) {
+    if (evmRpcClient.getEndpointCount() !== 1) {
         return getBlockWithConsensus(blockNumber, operation);
     }
 
@@ -51,7 +51,7 @@ export async function getReorgVerifiedBlock(
 
     for (let retry = 0; retry <= CONSENSUS_MAX_RETRIES; retry += 1) {
         try {
-            const block = await ethereumProvider.getBlock(blockNumber);
+            const block = await evmRpcClient.getBlock(blockNumber);
             return validateSingleProviderBlock(block, blockNumber);
         } catch (error) {
             lastFailure = formatError(error);
