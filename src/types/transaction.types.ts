@@ -3,6 +3,25 @@ export type StoredTransactionChainStatus = 'SUCCESS' | 'FAILED';
 export type StoredTransactionRecordStatus = 'NORMAL' | 'REORGED';
 export type StoredTransactionMatchStatus = 'ACTIVE' | 'NOT_MATCHED' | 'FILTER_DELETED' | 'REORGED';
 
+export interface TransactionPersistenceData {
+    txHash: string;
+    transferType: StoredTransferType;
+    tokenAddress?: string | null;
+    logIndex: number;
+    nonce: number;
+    blockHash: string;
+    blockNumber: number;
+    transactionIndex: number;
+    from: string;
+    to?: string | null;
+    value: string;
+    internalCount?: number | null;
+    chainStatus: StoredTransactionChainStatus;
+    recordStatus?: StoredTransactionRecordStatus;
+    transactionType?: string;
+    timestamp?: Date;
+}
+
 export interface StoredTransactionRecord {
     id: number;
     txHash: string;
@@ -53,31 +72,21 @@ export interface StoredTransactionPageRecord extends StoredTransactionRecord {
 
 export interface StoredTransactionPage {
     items: StoredTransactionPageRecord[];
-    pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        totalPages: number;
-    };
+    pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
-export type TransactionResponseDto = Omit<
-    StoredTransactionRecord,
-    'timestamp' | 'createdAt' | 'updatedAt'
-> & {
+export type TransactionResponseDto = Omit<StoredTransactionRecord, 'timestamp' | 'createdAt' | 'updatedAt'> & {
     timestamp: string | null;
     createdAt: string;
     updatedAt: string;
-    matches: Array<
-        Omit<StoredTransactionMatchRecord, 'createdAt' | 'updatedAt' | 'txFilter'> & {
+    matches: Array<Omit<StoredTransactionMatchRecord, 'createdAt' | 'updatedAt' | 'txFilter'> & {
+        createdAt: string;
+        updatedAt: string;
+        txFilter: (Omit<StoredTxFilterRecord, 'createdAt' | 'updatedAt'> & {
             createdAt: string;
             updatedAt: string;
-            txFilter: (Omit<StoredTxFilterRecord, 'createdAt' | 'updatedAt'> & {
-                createdAt: string;
-                updatedAt: string;
-            }) | null;
-        }
-    >;
+        }) | null;
+    }>;
 };
 
 export interface TransactionPageResponse {
