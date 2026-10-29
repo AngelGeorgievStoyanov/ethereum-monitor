@@ -76,7 +76,7 @@ export function createTxFilterService() {
         const filters = await findAllTxFilters();
         const rulesByFilterId = await findRulesForFilters(filters.map((filter) => filter.id));
         return filters.map((filter) => ({
-            ...filter.toJSON(),
+            ...filter,
             rule: rulesByFilterId.get(filter.id) ?? legacyRule(filter),
         }));
     }
@@ -114,7 +114,7 @@ export function createTxFilterService() {
             return createdFilter;
         });
 
-        const result = { ...filter.toJSON(), rule: data.rule ?? legacyRule(filter) };
+        const result = { ...filter, rule: data.rule ?? legacyRule(filter) };
         await refreshAfterMutation(result);
         return result;
     }
@@ -184,7 +184,7 @@ export function createTxFilterService() {
         });
 
         if (!updated) return null;
-        const result = { ...updated.filter.toJSON(), rule: updated.rule };
+        const result = { ...updated.filter, rule: updated.rule };
         await refreshAfterMutation(result);
         return result;
     }
