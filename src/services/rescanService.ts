@@ -4,7 +4,7 @@ import ScannerState from '../models/scannerState';
 import { processBlock } from './blockProcessingService';
 import { getBlockWithConsensus } from './blockConsensusService';
 import { reconcileBlockCandidates } from './scannerPersistenceService';
-import { ActiveTxFilter } from './txFilterEvaluatorService';
+import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { isScannerLockHeld } from './scannerLockService';
 import {
