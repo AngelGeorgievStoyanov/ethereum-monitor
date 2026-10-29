@@ -21,3 +21,12 @@ export interface ActiveTxFilter {
 export interface TransactionFilterContext {
     [field: string]: unknown;
 }
+
+export interface TxFilterRecord {
+    id: number;
+    description: string;
+    from: string | null;
+    to: string | null;
+    isActive: boolean;
+    activeFromBlock: number | null;
+}
