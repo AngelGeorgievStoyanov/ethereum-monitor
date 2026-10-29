@@ -18,7 +18,7 @@ import {
     saveRuleForFilter,
 } from '../repositories/txFilterRuleRepository';
 import { getNextFilterStartBlock } from './txFilterActivationService';
-import { ActiveTxFilter, TxFilterGroupRule } from './txFilterEvaluatorService';
+import type { ActiveTxFilter, TxFilterGroupRule } from '../types/tx-filter.types';
 import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
 import { Transaction as SequelizeTransaction } from 'sequelize';
