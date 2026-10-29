@@ -51,7 +51,7 @@ function sameBlock(stored: { blockHash: string; parentHash: string }, current: {
 }
 
 export async function markReorgRecoveryPending(
-    state: ScannerState,
+    scannerStateId: string,
     checkpoint: number,
     targetBlock = checkpoint + REORG_RECOVERY_STABLE_BLOCKS,
 ): Promise<void> {
@@ -59,8 +59,7 @@ export async function markReorgRecoveryPending(
         throw new Error('Cannot mark reorg recovery pending without owning the scanner lock');
     if (!(await isScannerLockHeld()))
         throw new Error('Scanner lock ownership was lost before persisting reorg recovery state');
-    await persistReorgRecoveryPending(state.id, checkpoint, targetBlock);
-    await state.reload();
+    await persistReorgRecoveryPending(scannerStateId, checkpoint, targetBlock);
 }
 
 async function findAncestorAndRollback(state: ScannerState): Promise<void> {
@@ -169,7 +168,8 @@ async function processReorgRecoveryInternal(
             `[Reorg] Detected chain mismatch at block ${state.lastProcessedBlock}; storedHash=${storedCheckpoint.blockHash}; currentHash=${currentCheckpoint.hash}`,
         );
         recordReorgDetected();
-        await markReorgRecoveryPending(state, state.lastProcessedBlock);
+        await markReorgRecoveryPending(state.id, state.lastProcessedBlock);
+        await state.reload();
         await findAncestorAndRollback(state);
     }
 
@@ -201,7 +201,7 @@ async function processReorgRecoveryInternal(
             );
             recordReorgDetected();
             await markReorgRecoveryPending(
-                state,
+                state.id,
                 state.lastProcessedBlock,
                 blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
             );
@@ -296,6 +296,7 @@ async function markVerificationRecoveryBlocked(
         scannerStateId: state.id,
         reason: `${reasonPrefix}:${error.operation}:block=${error.blockNumber}`,
         initializeRecovery: true,
+        preserveStartBlock: true,
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
     await state.reload();
