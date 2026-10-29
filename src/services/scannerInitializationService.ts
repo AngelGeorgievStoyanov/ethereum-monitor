@@ -2,7 +2,7 @@ import type { ScannerRuntimeState } from '../types/scanner-state.types';
 import { createScannerState, findScannerState } from '../repositories/scannerStateRepository';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
-import { ethereumProvider } from './ethereumRpcService';
+import { evmRpcClient } from './evmBlockDataService';
 
 export class UnsafeScannerStartError extends Error {
     constructor(message: string) {
@@ -15,7 +15,7 @@ export async function initializeScannerState(): Promise<ScannerRuntimeState> {
     let state = await findScannerState(SCANNER_ID);
 
     if (!state) {
-        const finalized = await ethereumProvider.getBlock('finalized');
+        const finalized = await evmRpcClient.getBlock('finalized');
         if (!finalized) throw new Error('Unable to resolve the latest finalized block');
 
         let initialBlock: number;
@@ -26,7 +26,7 @@ export async function initializeScannerState(): Promise<ScannerRuntimeState> {
                 );
             }
 
-            const requestedStartBlock = await ethereumProvider.getBlock(env.startBlock);
+            const requestedStartBlock = await evmRpcClient.getBlock(env.startBlock);
             if (
                 !requestedStartBlock ||
                 requestedStartBlock.number !== env.startBlock ||
