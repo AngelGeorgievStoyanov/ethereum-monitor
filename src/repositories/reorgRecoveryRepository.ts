@@ -122,6 +122,7 @@ export async function markReorgRecoveryBlocked(input: {
     reason: string;
     initializeRecovery?: boolean;
     preserveStartBlock?: boolean;
+    stableBlocks: number;
 }): Promise<void> {
     await sequelize.transaction(async (transaction) => {
         const state = await findLockedScannerState(input.scannerStateId, transaction);
