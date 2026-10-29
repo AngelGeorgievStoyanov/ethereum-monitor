@@ -1,4 +1,4 @@
-import Block from '../models/block';
+import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import { RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS } from '../constants/rescan.constants';
 import ScannerState from '../models/scannerState';
 import { processBlock } from './blockProcessingService';
@@ -94,7 +94,7 @@ async function runManualRescanInternal({
             );
         }
 
-        const storedBlock = await Block.findOne({ where: { blockNumber, status: 'CANONICAL' } });
+        const storedBlock = await findCanonicalBlockIdentity(blockNumber);
         if (!storedBlock) {
             throw new Error(
                 `Cannot rescan block ${blockNumber}: canonical block history is missing`,
