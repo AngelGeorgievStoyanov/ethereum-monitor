@@ -5,7 +5,7 @@ import {
     requestScannerPause,
     resumeScanner,
 } from '../services/scannerControlService';
-import ScannerState from '../models/scannerState';
+
 import {
     SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
     SCANNER_ID,
@@ -31,7 +31,7 @@ import {
     updateScannerRescanJob,
 } from '../repositories/scannerRescanJobRepository';
 import type { ScannerRescanJobSummary } from '../types/scanner-status.types';
-import { findScannerStatusState, unblockScannerReorgRecovery } from '../repositories/scannerStateRepository';
+import { findScannerState, findScannerStatusState, unblockScannerReorgRecovery } from '../repositories/scannerStateRepository';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -112,7 +112,7 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
             return;
         }
 
-        const state = await ScannerState.findByPk(SCANNER_ID);
+        const state = await findScannerState(SCANNER_ID);
         if (!state) throw new Error('Scanner state is not initialized');
 
         await updateScannerRescanJob(jobId, {
