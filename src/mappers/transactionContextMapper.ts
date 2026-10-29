@@ -1,15 +1,7 @@
 import { TransactionResponse } from 'ethers';
-import type { TransactionPersistenceData } from '../types/transaction.types';
+import type { TransactionPersistenceData, TransferContextMetadata } from '../types/transaction.types';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 
-export interface TransferContextMetadata {
-    transferType: 'native' | 'erc20';
-    tokenAddress?: string | null;
-    logIndex: number;
-    from: string;
-    to: string;
-    value: string;
-}
 
 function getTransactionStatus(receipt: RpcTransactionReceipt): 'success' | 'failed' {
     return Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed';
