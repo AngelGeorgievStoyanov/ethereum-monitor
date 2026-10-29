@@ -1,4 +1,4 @@
-import { TxFilterGroupRule } from './txFilterEvaluatorService';
+import type { TxFilterGroupRule } from '../types/tx-filter.types';
 import { evaluateTxFilterOperator } from './txFilterOperatorService';
 import { ValidationError } from '../utils/validationError';
 
