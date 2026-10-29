@@ -1,4 +1,5 @@
 import { Transaction as SequelizeTransaction } from 'sequelize';
+import { FILTER_MUTATION_ADVISORY_LOCK_KEY } from '../constants/tx-filter.constants';
 import sequelize from '../database';
 import TxFilter from '../models/txFilter';
 import TxMatch from '../models/txMatch';
@@ -120,4 +121,16 @@ export async function assignActiveFilterStartBlock(
 ): Promise<void> {
     const filter = await updateTxFilter(id, { activeFromBlock });
     if (!filter) throw new Error(`Unable to set activation block for transaction filter ${id}`);
+}
+
+export async function withTxFilterMutationLock<T>(
+    operation: (transaction: SequelizeTransaction) => Promise<T>,
+): Promise<T> {
+    return sequelize.transaction(async (transaction) => {
+        await sequelize.query('SELECT pg_advisory_xact_lock(:key)', {
+            replacements: { key: FILTER_MUTATION_ADVISORY_LOCK_KEY },
+            transaction,
+        });
+        return operation(transaction);
+    });
 }
