@@ -15,6 +15,7 @@ import {
 import { findScannerStatusState } from '../repositories/scannerStateRepository';
 import { executeRescanJob } from './scannerRescanJobService';
 import { formatError } from '../utils/formatError';
+import { mapManualRescanResponse } from '../mappers/manualRescanMapper';
 
 export interface ManualRescanErrorResponse {
     message: string;
@@ -46,7 +47,7 @@ function rejected(
     return { kind: 'rejected', reason, body };
 }
 
-export async function requestManualRescan(requestedFromBlock: number): Promise<ManualRescanRequestResult> {
+async function requestManualRescanOperation(requestedFromBlock: number): Promise<ManualRescanRequestResult> {
 
     const scannerControl = await getScannerControlState();
     if (!scannerControl.paused || scannerControl.mode !== 'manual') {
@@ -143,4 +144,9 @@ export async function requestManualRescan(requestedFromBlock: number): Promise<M
         if (reservedForRequest) releaseManualRescanReservation();
         throw error;
     }
+}
+
+export async function requestManualRescan(requestedFromBlock: number) {
+    const result = await requestManualRescanOperation(requestedFromBlock);
+    return { ...result, response: mapManualRescanResponse(result) };
 }
