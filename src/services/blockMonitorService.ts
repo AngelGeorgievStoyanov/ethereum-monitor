@@ -6,7 +6,7 @@ import {
     SCANNER_STALL_CHECK_INTERVAL_MS,
     SCANNER_STALL_WARNING_INTERVAL_MS,
 } from '../constants/scanner.constants';
-import { ethereumProvider } from './ethereumRpcService';
+import { evmRpcClient } from './evmBlockDataService';
 import { getDynamicConfigService } from './dynamicConfigService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
@@ -51,10 +51,10 @@ async function logFinalizedRegressionDiagnostics(
     primaryFinalized: number,
 ): Promise<void> {
     try {
-        const providerResults = await ethereumProvider.getFinalizedFromAllEndpoints();
+        const providerResults = await evmRpcClient.getFinalizedFromAllEndpoints();
         const hasConsensus =
-            ethereumProvider.getEndpointCount() > 1 &&
-            providerResults.length === ethereumProvider.getEndpointCount() &&
+            evmRpcClient.getEndpointCount() > 1 &&
+            providerResults.length === evmRpcClient.getEndpointCount() &&
             providerResults.length > 0 &&
             providerResults.every(
                 (result) =>
@@ -63,7 +63,7 @@ async function logFinalizedRegressionDiagnostics(
                     result.blockHash?.toLowerCase() === providerResults[0].blockHash?.toLowerCase(),
             );
         let diagnosticConsensus = 'NO';
-        if (ethereumProvider.getEndpointCount() === 1) {
+        if (evmRpcClient.getEndpointCount() === 1) {
             diagnosticConsensus = 'NOT_APPLICABLE_SINGLE_PROVIDER';
         } else if (hasConsensus) {
             diagnosticConsensus = 'YES';
@@ -190,7 +190,7 @@ export function createBlockMonitorService() {
                         waitingForPause = true;
                     } else {
                         waitingForPause = false;
-                        const finalized = await ethereumProvider.getBlock('finalized');
+                        const finalized = await evmRpcClient.getBlock('finalized');
                         if (!finalized)
                             throw new Error('Unable to resolve the latest finalized block');
 
