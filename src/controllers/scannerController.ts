@@ -26,11 +26,11 @@ import {
     findScannerRescanJobById,
 } from '../repositories/scannerRescanJobRepository';
 import {
-    findScannerState,
     findScannerStatusState,
     unblockScannerReorgRecovery,
 } from '../repositories/scannerStateRepository';
 import { executeRescanJob } from '../services/scannerRescanJobService';
+import { formatError } from '../utils/formatError';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -133,12 +133,11 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
     }
 
     try {
-        const state = await ScannerState.findByPk(SCANNER_ID);
+        const state = await findScannerStatusState(SCANNER_ID);
         if (!state) {
             res.status(503).json({ message: 'Scanner state is not initialized' });
             return;
         }
-        await state.reload();
         if (fromBlock > state.lastProcessedBlock) {
             res.status(400).json({
                 message: `fromBlock ${fromBlock} is greater than the last processed checkpoint ${state.lastProcessedBlock}`,
