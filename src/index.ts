@@ -56,8 +56,7 @@ async function startServer() {
     await sequelize.sync();
     console.log('Database connected');
 
-    await dynamicConfigService.loadInitialConfig();
-    dynamicConfigService.startRefreshTimer();
+    await dynamicConfigService.init();
 
     void startScannerWithRetry();
 

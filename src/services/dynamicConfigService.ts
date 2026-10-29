@@ -45,14 +45,16 @@ export function createDynamicConfigService() {
         reloadQueue = settled;
         return settled;
     }
-    async function loadInitialConfig(): Promise<void> {
-        if (!(await refreshWithRetry())) throw new Error('Unable to load required dynamic configuration; scanner startup is blocked');
-    }
-    function startRefreshTimer(intervalMs = TX_FILTER_CACHE_REFRESH_INTERVAL_MS): void {
+    async function init(): Promise<void> {
+        if (!(await refreshWithRetry())) {
+            throw new Error('Unable to load required dynamic configuration; scanner startup is blocked');
+        }
         if (refreshTimer) return;
-        refreshTimer = setInterval(() => { if (pendingReloadCount === 0) void refreshWithRetry(); }, intervalMs);
+        refreshTimer = setInterval(() => {
+            if (pendingReloadCount === 0) void refreshWithRetry();
+        }, TX_FILTER_CACHE_REFRESH_INTERVAL_MS);
         refreshTimer.unref?.();
-        console.log(`[DynamicConfig] Refresh scheduled every ${intervalMs}ms`);
+        console.log(`[DynamicConfig] Refresh scheduled every ${TX_FILTER_CACHE_REFRESH_INTERVAL_MS}ms`);
     }
     function stopRefreshTimer(): void {
         if (!refreshTimer) return;
@@ -64,7 +66,7 @@ export function createDynamicConfigService() {
         return Array.from(activeTxFilters.values());
     }
     txFilterService.setDynamicConfigRefreshHandler(refreshWithRetry);
-    return { loadInitialConfig, refreshWithRetry, startRefreshTimer, stopRefreshTimer, getTxFilters };
+    return { init, refreshWithRetry, stopRefreshTimer, getTxFilters };
 }
 let dynamicConfigServiceInstance: ReturnType<typeof createDynamicConfigService> | undefined;
 export function getDynamicConfigService() {
