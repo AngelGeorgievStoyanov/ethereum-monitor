@@ -36,3 +36,7 @@ export function mapReorgRecoveryRetryResponse(input: {
         reorgRecoveryTargetBlock: input.targetBlock,
     };
 }
+
+export function mapScannerResumeResponse(state: ScannerControlState): ScannerPauseResponse {
+    return mapScannerControlResponse('Scanner resumed', state);
+}
