@@ -9,17 +9,16 @@ import {
     SCANNER_START_RETRY_BASE_DELAY_MS,
     SCANNER_START_RETRY_MAX_DELAY_MS,
 } from './constants/scanner.constants';
-import { TX_FILTER_CACHE_REFRESH_INTERVAL_MS } from './constants/tx-filter.constants';
 import { getEthereumService } from './services/ethereumService';
 import { UnsafeScannerStartError } from './services/scannerInitializationService';
-import { getTxFilterService } from './services/txFilterService';
+import { getDynamicConfigService } from './services/dynamicConfigService';
 import { formatError } from './utils/formatError';
 import { sleep } from './utils/sleep';
 
 const app = express();
 
 const ethereumService = getEthereumService();
-const txFilterService = getTxFilterService();
+const dynamicConfigService = getDynamicConfigService();
 
 app.use(express.json());
 app.use('/api', httpRouter);
@@ -57,8 +56,8 @@ async function startServer() {
     await sequelize.sync();
     console.log('Database connected');
 
-    await txFilterService.loadTxFilters();
-    txFilterService.startRefreshTimer(TX_FILTER_CACHE_REFRESH_INTERVAL_MS);
+    await dynamicConfigService.loadInitialConfig();
+    dynamicConfigService.startRefreshTimer();
 
     void startScannerWithRetry();
 
@@ -72,7 +71,7 @@ async function startServer() {
 }
 
 process.once('beforeExit', () => {
-    txFilterService.stopRefreshTimer();
+    dynamicConfigService.stopRefreshTimer();
 });
 
 startServer();

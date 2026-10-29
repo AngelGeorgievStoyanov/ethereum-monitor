@@ -9,7 +9,7 @@ import {
     SCANNER_STALL_WARNING_INTERVAL_MS,
 } from '../constants/scanner.constants';
 import { ethereumProvider } from './ethereumRpcService';
-import { getTxFilterService } from './txFilterService';
+import { getDynamicConfigService } from './dynamicConfigService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
@@ -94,7 +94,7 @@ async function logFinalizedRegressionDiagnostics(
 }
 
 export function createBlockMonitorService() {
-    const txFilterService = getTxFilterService();
+    const dynamicConfigService = getDynamicConfigService();
     let scannerStarted = false;
 
     async function start() {
@@ -145,7 +145,7 @@ export function createBlockMonitorService() {
                 lastStallWarningAt = now;
             }
         }, SCANNER_STALL_CHECK_INTERVAL_MS);
-        let waitingForFilters = txFilterService.getTxFilters().length === 0;
+        let waitingForFilters = dynamicConfigService.getTxFilters().length === 0;
         let waitingForPause = false;
         let cachedControlPaused = false;
         let lastControlStateCheckAt = 0;
@@ -169,13 +169,13 @@ export function createBlockMonitorService() {
 
                 if (needsStateReload) {
                     state = await initializeScannerState();
-                    waitingForFilters = txFilterService.getTxFilters().length === 0;
+                    waitingForFilters = dynamicConfigService.getTxFilters().length === 0;
                     waitingForPause = false;
                     needsStateReload = false;
                 }
 
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
-                const activeTxFilters = txFilterService.getTxFilters();
+                const activeTxFilters = dynamicConfigService.getTxFilters();
 
                 if (activeTxFilters.length === 0) {
                     if (!waitingForFilters) {
@@ -256,14 +256,14 @@ export function createBlockMonitorService() {
                             const recoveryHandled = await processReorgRecovery(
                                 state,
                                 finalizedCatchupTarget,
-                                () => txFilterService.getTxFilters(),
+                                () => dynamicConfigService.getTxFilters(),
                             );
                             if (recoveryHandled) {
                                 // Recovery can roll the checkpoint back and later replace its canonical hash.
                                 invalidateConfirmedBlockCache();
                             } else {
                                 await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
-                                    txFilterService.getTxFilters(),
+                                    dynamicConfigService.getTxFilters(),
                                 );
                             }
                         } finally {

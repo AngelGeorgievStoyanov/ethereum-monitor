@@ -6,7 +6,6 @@ import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import {
     FILTER_MUTATION_ADVISORY_LOCK_KEY,
-    TX_FILTER_RELOAD_RETRY_DELAYS_MS,
 } from '../constants/tx-filter.constants';
 import {
     createTxFilter as insertTxFilter,
@@ -24,8 +23,6 @@ import { getNextFilterStartBlock } from './txFilterActivationService';
 import { ActiveTxFilter, TxFilterGroupRule } from './txFilterEvaluatorService';
 import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
-import { sleep } from '../utils/sleep';
-import { formatError } from '../utils/formatError';
 import { Transaction as SequelizeTransaction } from 'sequelize';
 
 export class TxFilterSyncError extends Error {
@@ -45,106 +42,27 @@ function legacyRule(txFilter: TxFilter): TxFilterGroupRule | null {
 }
 
 export function createTxFilterService() {
-    let txFilters = new Map<number, ActiveTxFilter>();
-    let reloadQueue: Promise<void> = Promise.resolve();
-    let pendingReloadCount = 0;
-    let refreshTimer: ReturnType<typeof setInterval> | undefined;
-
-    async function loadTxFilters() {
+    let refreshDynamicConfig: (() => Promise<boolean>) | undefined;
+    function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void { refreshDynamicConfig = handler; }
+    async function refreshAfterMutation(result: unknown): Promise<void> {
+        if (!refreshDynamicConfig || !(await refreshDynamicConfig())) throw new TxFilterSyncError(result);
+    }
+    async function loadActiveTxFilters(): Promise<ActiveTxFilter[]> {
         const activeFilters = await findActiveTxFilters();
         const rulesByFilterId = await findRulesForFilters(activeFilters.map((filter) => filter.id));
-        const next = new Map<number, ActiveTxFilter>();
+        const next: ActiveTxFilter[] = [];
         let missingFiltersStartBlock: number | undefined;
         for (const filter of activeFilters) {
             const rule = rulesByFilterId.get(filter.id) ?? legacyRule(filter);
             if (!rule) continue;
             if (filter.activeFromBlock === null || filter.activeFromBlock === undefined) {
-                if (missingFiltersStartBlock === undefined) {
-                    missingFiltersStartBlock = await getNextFilterStartBlock();
-                }
+                if (missingFiltersStartBlock === undefined) missingFiltersStartBlock = await getNextFilterStartBlock();
                 filter.activeFromBlock = missingFiltersStartBlock;
                 await filter.save();
             }
-            next.set(filter.id, {
-                id: filter.id,
-                description: filter.description,
-                isActive: filter.isActive,
-                activeFromBlock: filter.activeFromBlock,
-                rule,
-            });
+            next.push({ id: filter.id, description: filter.description, isActive: filter.isActive, activeFromBlock: filter.activeFromBlock, rule });
         }
-        // Keep the last valid cache untouched until the full collection has loaded successfully.
-        const currentSignature = JSON.stringify(
-            Array.from(txFilters.entries()).sort(([leftId], [rightId]) => leftId - rightId),
-        );
-        const nextSignature = JSON.stringify(
-            Array.from(next.entries()).sort(([leftId], [rightId]) => leftId - rightId),
-        );
-        if (currentSignature === nextSignature) {
-            console.log(
-                `[Scanner] Transaction filter cache unchanged (${txFilters.size} active filter(s))`,
-            );
-            return;
-        }
-
-        txFilters = next;
-        console.log(`[Scanner] Loaded ${txFilters.size} active tx filter(s)`);
-    }
-
-    async function reloadTxFiltersWithRetry(): Promise<boolean> {
-        pendingReloadCount += 1;
-        const task = reloadQueue
-            .catch(() => undefined)
-            .then(async () => {
-                for (
-                    let attempt = 0;
-                    attempt <= TX_FILTER_RELOAD_RETRY_DELAYS_MS.length;
-                    attempt += 1
-                ) {
-                    try {
-                        await loadTxFilters();
-                        return true;
-                    } catch (error) {
-                        if (attempt === TX_FILTER_RELOAD_RETRY_DELAYS_MS.length) {
-                            console.error(
-                                `[Scanner] Failed to reload tx filters after ${attempt + 1} attempt(s): ${formatError(error)}`,
-                            );
-                            return false;
-                        }
-                        console.error(
-                            `[Scanner] Failed to reload tx filters (attempt ${attempt + 1}/${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1}); retrying: ${formatError(error)}`,
-                        );
-                        await sleep(TX_FILTER_RELOAD_RETRY_DELAYS_MS[attempt]);
-                    }
-                }
-                return false;
-            });
-        const settledTask = task.finally(() => {
-            pendingReloadCount -= 1;
-        });
-        reloadQueue = settledTask.then(
-            () => undefined,
-            () => undefined,
-        );
-        return settledTask;
-    }
-
-    function startRefreshTimer(intervalMs: number) {
-        if (refreshTimer) return;
-        refreshTimer = setInterval(() => {
-            // Do not queue periodic refreshes while a refresh is queued or running.
-            // Explicit refreshes after filter mutations still use the serialized queue.
-            if (pendingReloadCount > 0) return;
-            void reloadTxFiltersWithRetry();
-        }, intervalMs);
-        refreshTimer.unref?.();
-        console.log(`[Scanner] Transaction filter cache refresh scheduled every ${intervalMs}ms`);
-    }
-
-    function stopRefreshTimer() {
-        if (!refreshTimer) return;
-        clearInterval(refreshTimer);
-        refreshTimer = undefined;
+        return next;
     }
 
     async function getAllTxFilters() {
@@ -219,7 +137,7 @@ export function createTxFilterService() {
         });
 
         const result = { ...filter.toJSON(), rule: data.rule ?? legacyRule(filter) };
-        if (!(await reloadTxFiltersWithRetry())) throw new TxFilterSyncError(result);
+        await refreshAfterMutation(result);
         return result;
     }
 
@@ -296,7 +214,7 @@ export function createTxFilterService() {
 
         if (!updated) return null;
         const result = { ...updated.filter.toJSON(), rule: updated.rule };
-        if (!(await reloadTxFiltersWithRetry())) throw new TxFilterSyncError(result);
+        await refreshAfterMutation(result);
         return result;
     }
 
@@ -308,22 +226,11 @@ export function createTxFilterService() {
             });
             return deleteTxFilterById(id, transaction);
         });
-        if (deleted > 0 && !(await reloadTxFiltersWithRetry())) {
-            throw new TxFilterSyncError({ message: 'Transaction filter deleted', deleted: true });
-        }
+        if (deleted > 0) await refreshAfterMutation({ message: 'Transaction filter deleted', deleted: true });
         return deleted;
     }
 
-    return {
-        loadTxFilters,
-        startRefreshTimer,
-        stopRefreshTimer,
-        getAllTxFilters,
-        createTxFilter,
-        updateTxFilter,
-        removeTxFilter,
-        getTxFilters: () => Array.from(txFilters.values()),
-    };
+    return { loadActiveTxFilters, setDynamicConfigRefreshHandler, getAllTxFilters, createTxFilter, updateTxFilter, removeTxFilter };
 }
 
 let txFilterServiceInstance: ReturnType<typeof createTxFilterService> | undefined;
