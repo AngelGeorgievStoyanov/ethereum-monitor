@@ -1,5 +1,4 @@
 import ScannerState from '../models/scannerState';
-import Block from '../models/block';
 import {
     REORG_RECOVERY_STABLE_BLOCKS,
     SCANNER_MAX_PARALLEL_BLOCKS,
@@ -12,6 +11,7 @@ import { BlockReceiptConsistencyError } from './ethereumRpcService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { recordReorgDetected } from './recoveryMetrics';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
+import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { isScannerLockHeld } from './scannerLockService';
@@ -28,10 +28,7 @@ async function getConfirmedCheckpointBlock(checkpoint: number): Promise<Confirme
         return lastConfirmedBlock;
     }
 
-    const persistedBlock = await Block.findOne({
-        where: { blockNumber: checkpoint, status: 'CANONICAL' },
-        attributes: ['blockNumber', 'blockHash', 'parentHash'],
-    });
+    const persistedBlock = await findCanonicalBlockIdentity(checkpoint);
 
     if (persistedBlock) {
         lastConfirmedBlock = {
