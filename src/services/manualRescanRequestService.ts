@@ -1,0 +1,130 @@
+import { randomUUID } from 'crypto';
+import { SCANNER_ID } from '../constants/scanner.constants';
+import {
+    isScannerProcessingBlocks,
+    releaseManualRescanReservation,
+    tryReserveManualRescan,
+} from './blockMonitorService';
+import { isScannerLockHeld } from './scannerLockService';
+import { getScannerControlState } from './scannerControlService';
+import { countCanonicalBlocksInRange } from '../repositories/blockRepository';
+import {
+    createScannerRescanJob,
+    findActiveScannerRescanJob,
+} from '../repositories/scannerRescanJobRepository';
+import { findScannerStatusState } from '../repositories/scannerStateRepository';
+import { executeRescanJob } from './scannerRescanJobService';
+import { formatError } from '../utils/formatError';
+
+export interface ManualRescanRequestResult {
+    statusCode: number;
+    body: Record<string, unknown>;
+}
+
+function result(statusCode: number, body: Record<string, unknown>): ManualRescanRequestResult {
+    return { statusCode, body };
+}
+
+export async function requestManualRescan(fromBlock: unknown): Promise<ManualRescanRequestResult> {
+    if (!Number.isSafeInteger(fromBlock) || (fromBlock as number) < 0) {
+        return result(400, { message: 'fromBlock must be a non-negative integer' });
+    }
+    const requestedFromBlock = fromBlock as number;
+
+    const scannerControl = await getScannerControlState();
+    if (!scannerControl.paused || scannerControl.mode !== 'manual') {
+        return result(409, {
+            message:
+                'Pause the scanner with mode="manual" before starting a rescan; temporary pauses may expire during the operation.',
+        });
+    }
+    if (!(await isScannerLockHeld())) {
+        return result(409, {
+            message:
+                'Manual rescan must be started on the instance that currently owns the scanner lock.',
+        });
+    }
+    if (isScannerProcessingBlocks()) {
+        return result(409, {
+            message:
+                'The scanner is still finishing block processing. Retry the rescan after it becomes idle.',
+        });
+    }
+
+    let reservedForRequest = false;
+    try {
+        const state = await findScannerStatusState(SCANNER_ID);
+        if (!state) return result(503, { message: 'Scanner state is not initialized' });
+
+        if (requestedFromBlock > state.lastProcessedBlock) {
+            return result(400, {
+                message: `fromBlock ${requestedFromBlock} is greater than the last processed checkpoint ${state.lastProcessedBlock}`,
+            });
+        }
+        if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
+            return result(409, {
+                message: 'Cannot start a rescan while reorg recovery is active or blocked.',
+            });
+        }
+
+        const expectedBlocks = state.lastProcessedBlock - requestedFromBlock + 1;
+        const canonicalBlocks = await countCanonicalBlocksInRange(
+            requestedFromBlock,
+            state.lastProcessedBlock,
+        );
+        if (canonicalBlocks !== expectedBlocks) {
+            return result(409, {
+                message:
+                    'Cannot start rescan because canonical block history is missing in the requested range.',
+                fromBlock: requestedFromBlock,
+                toBlock: state.lastProcessedBlock,
+                expectedBlocks,
+                canonicalBlocksFound: canonicalBlocks,
+            });
+        }
+
+        const activeJob = await findActiveScannerRescanJob();
+        if (activeJob) {
+            return result(409, {
+                message: 'A rescan job is already running.',
+                operationId: activeJob.id,
+            });
+        }
+
+        if (!tryReserveManualRescan()) {
+            return result(409, {
+                message:
+                    'The scanner is processing blocks or another rescan is reserved. Retry when it is idle.',
+            });
+        }
+        reservedForRequest = true;
+
+        const operationId = randomUUID();
+        await createScannerRescanJob({
+            id: operationId,
+            fromBlock: requestedFromBlock,
+            toBlock: state.lastProcessedBlock,
+        });
+
+        void executeRescanJob(operationId, requestedFromBlock, state.lastProcessedBlock).catch(
+            (error) => {
+                releaseManualRescanReservation();
+                console.error(
+                    `[Rescan] Job ${operationId} failed before its status could be updated: ${formatError(error)}`,
+                );
+            },
+        );
+        reservedForRequest = false;
+        return result(202, {
+            message: 'Manual rescan started',
+            operationId,
+            status: 'QUEUED',
+            fromBlock: requestedFromBlock,
+            toBlock: state.lastProcessedBlock,
+            statusUrl: `/api/scanner/rescan/${operationId}`,
+        });
+    } catch (error) {
+        if (reservedForRequest) releaseManualRescanReservation();
+        throw error;
+    }
+}
