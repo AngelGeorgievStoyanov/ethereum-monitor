@@ -2,7 +2,7 @@ import { Op, Transaction } from 'sequelize';
 import sequelize from '../database';
 import TxFilterGroup from '../models/txFilterGroup';
 import TxFilterCondition from '../models/txFilterCondition';
-import { TxFilterGroupRule } from '../services/txFilterEvaluatorService';
+import { TxFilterGroupRule } from '../types/tx-filter.types';
 
 export async function findRulesForFilters(
     txFilterIds: number[],
