@@ -3,7 +3,7 @@ import type {
     TransactionPersistenceData,
     TransferContextMetadata,
 } from '../types/transaction.types';
-import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
+import { RpcTransactionReceipt } from '../types/evm-rpc.types';
 
 function getTransactionStatus(receipt: RpcTransactionReceipt): 'success' | 'failed' {
     return Number(BigInt(receipt.status ?? '0x0')) === 1 ? 'success' : 'failed';
