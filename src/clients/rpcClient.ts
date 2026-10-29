@@ -1,6 +1,6 @@
 import { JsonRpcProvider, toQuantity } from 'ethers';
-import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
-import { RPC_ENDPOINT_TIMEOUT_MS } from '../constants/ethereum-rpc.constants';
+import { RpcTransactionReceipt } from '../types/evm-rpc.types';
+import { RPC_ENDPOINT_TIMEOUT_MS } from '../constants/evm-rpc.constants';
 import { env } from '../config/env';
 import { formatError } from '../utils/formatError';
 
