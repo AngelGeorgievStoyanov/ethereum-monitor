@@ -1,25 +1,14 @@
-import { TransferBatchItem, createTransfersBatch } from '../repositories/transactionRepository';
+import { createTransfersBatch } from '../repositories/transactionRepository';
+import { mapTransferBatchItems } from '../mappers/transferBatchMapper';
 import {
     reconcileBlockTransferItems,
     persistProcessedBlockBatchTransaction,
     ProcessedBlockRecord,
     ReorgRecoveryProgress,
 } from '../repositories/scannerPersistenceRepository';
-import { mapTransactionCreationData } from '../mappers/transactionContextMapper';
 import { isScannerLockHeld } from './scannerLockService';
 import type { TransferBatchCandidate } from '../types/transfer-batch.types';
 
-function mapTransferBatchItems(candidates: readonly TransferBatchCandidate[]): TransferBatchItem[] {
-    return candidates.map((candidate) => ({
-        data: mapTransactionCreationData(
-            candidate.tx,
-            candidate.receipt,
-            candidate.blockTimestamp,
-            candidate.transfer,
-        ),
-        matchingTxFilters: candidate.matchingTxFilters.map(({ id, description }) => ({ id, description })),
-    }));
-}
 
 export async function createTransactionsFromEthereumDataBatch(
     candidates: readonly TransferBatchCandidate[],
