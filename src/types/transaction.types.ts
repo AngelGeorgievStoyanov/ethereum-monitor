@@ -12,6 +12,11 @@ export interface TransferContextMetadata {
     value: string;
 }
 
+export interface TransferBatchItem {
+    data: TransactionPersistenceData;
+    matchingTxFilters: Array<{ id: number; description: string }>;
+}
+
 export interface TransactionPersistenceData {
     txHash: string;
     transferType: StoredTransferType;
