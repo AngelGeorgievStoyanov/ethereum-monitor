@@ -17,7 +17,7 @@ function mapTransferBatchItems(candidates: readonly TransferBatchCandidate[]): T
             candidate.blockTimestamp,
             candidate.transfer,
         ),
-        matchingTxFilterIds: candidate.matchingTxFilters.map((filter) => filter.id),
+        matchingTxFilters: candidate.matchingTxFilters.map(({ id, description }) => ({ id, description })),
     }));
 }
 
