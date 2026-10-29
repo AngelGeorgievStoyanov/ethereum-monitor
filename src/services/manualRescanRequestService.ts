@@ -16,20 +16,41 @@ import { findScannerStatusState } from '../repositories/scannerStateRepository';
 import { executeRescanJob } from './scannerRescanJobService';
 import { formatError } from '../utils/formatError';
 
-export interface ManualRescanRequestResult {
-    statusCode: number;
-    body: Record<string, unknown>;
+export interface ManualRescanErrorResponse {
+    message: string;
+    fromBlock?: number;
+    toBlock?: number;
+    expectedBlocks?: number;
+    canonicalBlocksFound?: number;
+    operationId?: string;
 }
 
-function result(statusCode: number, body: Record<string, unknown>): ManualRescanRequestResult {
-    return { statusCode, body };
+export type ManualRescanRequestResult =
+    | {
+          kind: 'started';
+          operationId: string;
+          status: 'QUEUED';
+          fromBlock: number;
+          toBlock: number;
+      }
+    | {
+          kind: 'rejected';
+          reason: 'bad-request' | 'conflict' | 'unavailable';
+          body: ManualRescanErrorResponse;
+      };
+
+function rejected(
+    reason: Extract<ManualRescanRequestResult, { kind: 'rejected' }>['reason'],
+    body: ManualRescanErrorResponse,
+): ManualRescanRequestResult {
+    return { kind: 'rejected', reason, body };
 }
 
 export async function requestManualRescan(requestedFromBlock: number): Promise<ManualRescanRequestResult> {
 
     const scannerControl = await getScannerControlState();
     if (!scannerControl.paused || scannerControl.mode !== 'manual') {
-        return result(409, {
+        return rejected('conflict', {
             message:
                 'Pause the scanner with mode="manual" before starting a rescan; temporary pauses may expire during the operation.',
         });
@@ -50,10 +71,10 @@ export async function requestManualRescan(requestedFromBlock: number): Promise<M
     let reservedForRequest = false;
     try {
         const state = await findScannerStatusState(SCANNER_ID);
-        if (!state) return result(503, { message: 'Scanner state is not initialized' });
+        if (!state) return rejected('unavailable', { message: 'Scanner state is not initialized' });
 
         if (requestedFromBlock > state.lastProcessedBlock) {
-            return result(400, {
+            return rejected('bad-request', {
                 message: `fromBlock ${requestedFromBlock} is greater than the last processed checkpoint ${state.lastProcessedBlock}`,
             });
         }
@@ -111,14 +132,13 @@ export async function requestManualRescan(requestedFromBlock: number): Promise<M
             },
         );
         reservedForRequest = false;
-        return result(202, {
-            message: 'Manual rescan started',
+        return {
+            kind: 'started',
             operationId,
             status: 'QUEUED',
             fromBlock: requestedFromBlock,
             toBlock: state.lastProcessedBlock,
-            statusUrl: `/api/scanner/rescan/${operationId}`,
-        });
+        };
     } catch (error) {
         if (reservedForRequest) releaseManualRescanReservation();
         throw error;
