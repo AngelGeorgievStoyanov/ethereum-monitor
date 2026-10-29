@@ -25,11 +25,7 @@ function result(statusCode: number, body: Record<string, unknown>): ManualRescan
     return { statusCode, body };
 }
 
-export async function requestManualRescan(fromBlock: unknown): Promise<ManualRescanRequestResult> {
-    if (!Number.isSafeInteger(fromBlock) || (fromBlock as number) < 0) {
-        return result(400, { message: 'fromBlock must be a non-negative integer' });
-    }
-    const requestedFromBlock = fromBlock as number;
+export async function requestManualRescan(requestedFromBlock: number): Promise<ManualRescanRequestResult> {
 
     const scannerControl = await getScannerControlState();
     if (!scannerControl.paused || scannerControl.mode !== 'manual') {
