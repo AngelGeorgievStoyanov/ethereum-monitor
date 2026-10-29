@@ -1,17 +1,18 @@
 import { Op, Transaction as SequelizeTransaction } from 'sequelize';
 import sequelize from '../database';
-import Transaction, { TransactionCreationAttributes } from '../models/transaction';
+import Transaction from '../models/transaction';
 import TxFilter from '../models/txFilter';
 import type {
     StoredTransactionMatchRecord,
     StoredTransactionPage,
     StoredTransactionPageRecord,
     StoredTransactionRecord,
+    TransactionPersistenceData,
 } from '../types/transaction.types';
 import TxMatch from '../models/txMatch';
 
 export interface TransferBatchItem {
-    data: TransactionCreationAttributes;
+    data: TransactionPersistenceData;
     matchingTxFilters: Array<{ id: number; description: string }>;
 }
 
