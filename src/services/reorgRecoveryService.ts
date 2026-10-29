@@ -19,6 +19,9 @@ import { BlockReceiptConsistencyError, ethereumProvider } from './ethereumRpcSer
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { isScannerLockHeld } from './scannerLockService';
+import { SCANNER_ID } from '../constants/scanner.constants';
+import { findScannerStatusState, unblockScannerReorgRecovery } from '../repositories/scannerStateRepository';
+import { mapReorgRecoveryRetryResponse } from '../mappers/scannerControlMapper';
 import {
     recordReorgAncestorFound,
     recordReorgBlockReprocessed,
@@ -26,6 +29,23 @@ import {
     recordReorgDetected,
     recordReorgRecoveryCompleted,
 } from './recoveryMetrics';
+
+export type RetryBlockedReorgRecoveryResult =
+    | { kind: 'no-pending-recovery' }
+    | { kind: 'recovery-not-blocked' }
+    | { kind: 'state-changed' }
+    | { kind: 'unblocked'; response: ReturnType<typeof mapReorgRecoveryRetryResponse> };
+
+export async function retryBlockedReorgRecovery(): Promise<RetryBlockedReorgRecoveryResult> {
+    const state = await findScannerStatusState(SCANNER_ID);
+    if (!state || !state.reorgRecoveryActive) return { kind: 'no-pending-recovery' };
+    if (!state.reorgRecoveryBlocked) return { kind: 'recovery-not-blocked' };
+
+    const unblocked = await unblockScannerReorgRecovery(SCANNER_ID);
+    if (!unblocked) return { kind: 'state-changed' };
+
+    return { kind: 'unblocked', response: mapReorgRecoveryRetryResponse(state) };
+}
 
 class ReorgRecoverySafetyError extends Error {
     constructor(message: string) {
