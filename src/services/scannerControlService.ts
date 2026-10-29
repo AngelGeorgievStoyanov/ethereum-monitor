@@ -1,61 +1,56 @@
-import ScannerState from '../models/scannerState';
-import type { ScannerControlState, ScannerPauseMode } from '../types/scanner-status.types';
 import { SCANNER_DEFAULT_PAUSE_DURATION_MINUTES, SCANNER_ID } from '../constants/scanner.constants';
+import {
+    findScannerControlRecord,
+    updateScannerControlRecord,
+} from '../repositories/scannerStateRepository';
+import type {
+    ScannerControlRecord,
+    ScannerControlState,
+    ScannerPauseMode,
+} from '../types/scanner-status.types';
 
-function toControlState(state: ScannerState | null): ScannerControlState {
+function toControlState(record: ScannerControlRecord | null): ScannerControlState {
     return {
-        paused: state?.scannerPaused ?? false,
-        mode: state?.scannerPauseMode ?? null,
-        pauseRequestedAtBlock: state?.scannerPauseRequestedAtBlock ?? null,
-        pauseUntil: state?.scannerPauseUntil?.getTime() ?? null,
+        paused: record?.paused ?? false,
+        mode: record?.mode ?? null,
+        pauseRequestedAtBlock: record?.pauseRequestedAtBlock ?? null,
+        pauseUntil: record?.pauseUntil ?? null,
     };
 }
 
-async function loadControlRow(): Promise<ScannerState> {
-    const state = await ScannerState.findByPk(SCANNER_ID);
-    if (!state) throw new Error('Scanner state is not initialized yet');
-    return state;
+async function loadControlRecord(): Promise<ScannerControlRecord> {
+    const record = await findScannerControlRecord(SCANNER_ID);
+    if (!record) throw new Error('Scanner state is not initialized yet');
+    return record;
+}
+
+function isTemporaryPauseExpired(record: ScannerControlRecord): boolean {
+    return Boolean(
+        record.paused &&
+            record.mode === 'temporary' &&
+            record.pauseUntilDate &&
+            Date.now() >= record.pauseUntilDate.getTime(),
+    );
 }
 
 export async function isScannerPausePendingOrActive(): Promise<boolean> {
-    const state = await loadControlRow();
-    if (
-        state.scannerPaused &&
-        state.scannerPauseMode === 'temporary' &&
-        state.scannerPauseUntil &&
-        Date.now() >= state.scannerPauseUntil.getTime()
-    ) {
+    const record = await loadControlRecord();
+    if (isTemporaryPauseExpired(record)) {
         await resumeScanner();
         return false;
     }
-    return state.scannerPaused || state.scannerPauseTargetBlock !== null;
+    return record.paused || record.pauseTargetBlock !== null;
 }
 
 export async function getScannerControlState(): Promise<ScannerControlState> {
-    const state = await ScannerState.findByPk(SCANNER_ID);
-    if (!state) {
-        return {
-            paused: false,
-            mode: null,
-            pauseRequestedAtBlock: null,
-            pauseUntil: null,
-        };
-    }
-    if (
-        state.scannerPaused &&
-        state.scannerPauseMode === 'temporary' &&
-        state.scannerPauseUntil &&
-        Date.now() >= state.scannerPauseUntil.getTime()
-    ) {
+    const record = await findScannerControlRecord(SCANNER_ID);
+    if (!record) return toControlState(null);
+
+    if (isTemporaryPauseExpired(record)) {
         await resumeScanner();
-        return {
-            paused: false,
-            mode: null,
-            pauseRequestedAtBlock: null,
-            pauseUntil: null,
-        };
+        return toControlState(null);
     }
-    return toControlState(state);
+    return toControlState(record);
 }
 
 export async function requestScannerPause(
@@ -63,19 +58,23 @@ export async function requestScannerPause(
     atBlock: number | null,
     durationMinutes = SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
 ): Promise<void> {
-    const state = await loadControlRow();
-    state.scannerPauseTargetBlock = atBlock;
-    state.scannerPaused = atBlock === null;
-    state.scannerPauseMode = mode;
-    state.scannerPauseRequestedAtBlock = atBlock;
-    state.scannerPauseDurationMinutes = durationMinutes;
-    state.scannerPauseUntil =
-        state.scannerPaused && mode === 'temporary'
+    const paused = atBlock === null;
+    const pauseUntil =
+        paused && mode === 'temporary'
             ? new Date(Date.now() + durationMinutes * 60 * 1000)
             : null;
-    await state.save();
+
+    await updateScannerControlRecord(SCANNER_ID, {
+        scannerPauseTargetBlock: atBlock,
+        scannerPaused: paused,
+        scannerPauseMode: mode,
+        scannerPauseRequestedAtBlock: atBlock,
+        scannerPauseDurationMinutes: durationMinutes,
+        scannerPauseUntil: pauseUntil,
+    });
+
     console.log(
-        state.scannerPaused
+        paused
             ? `[Scanner] Persisted pause (${mode}); checkpoint will be preserved`
             : `[Scanner] Persisted pause request after block ${atBlock} (${mode})`,
     );
@@ -85,32 +84,30 @@ export async function shouldPauseBeforeBlock(
     nextBlock: number,
     lastProcessedBlock: number,
 ): Promise<boolean> {
-    const state = await loadControlRow();
-    if (
-        state.scannerPaused &&
-        state.scannerPauseMode === 'temporary' &&
-        state.scannerPauseUntil &&
-        Date.now() >= state.scannerPauseUntil.getTime()
-    ) {
+    const record = await loadControlRecord();
+    if (isTemporaryPauseExpired(record)) {
         await resumeScanner();
         return false;
     }
 
-    if (state.scannerPaused) return true;
+    if (record.paused) return true;
     if (
-        state.scannerPauseTargetBlock !== null &&
-        nextBlock > state.scannerPauseTargetBlock &&
-        lastProcessedBlock >= state.scannerPauseTargetBlock
+        record.pauseTargetBlock !== null &&
+        nextBlock > record.pauseTargetBlock &&
+        lastProcessedBlock >= record.pauseTargetBlock
     ) {
-        state.scannerPaused = true;
-        state.scannerPauseTargetBlock = null;
-        state.scannerPauseUntil =
-            state.scannerPauseMode === 'temporary'
-                ? new Date(Date.now() + state.scannerPauseDurationMinutes * 60 * 1000)
+        const pauseUntil =
+            record.mode === 'temporary'
+                ? new Date(Date.now() + record.pauseDurationMinutes * 60 * 1000)
                 : null;
-        await state.save();
-        const resumeMessage = state.scannerPauseUntil
-            ? `; auto-resume in ${state.scannerPauseDurationMinutes} minute(s)`
+        await updateScannerControlRecord(SCANNER_ID, {
+            scannerPaused: true,
+            scannerPauseTargetBlock: null,
+            scannerPauseUntil: pauseUntil,
+        });
+
+        const resumeMessage = pauseUntil
+            ? `; auto-resume in ${record.pauseDurationMinutes} minute(s)`
             : '; manual resume required';
         console.log(`[Scanner] Paused at checkpoint ${lastProcessedBlock}${resumeMessage}`);
         return true;
@@ -119,16 +116,18 @@ export async function shouldPauseBeforeBlock(
 }
 
 export async function resumeScanner(): Promise<void> {
-    const state = await ScannerState.findByPk(SCANNER_ID);
-    if (!state) return;
-    const wasPaused = state.scannerPaused || state.scannerPauseTargetBlock !== null;
-    state.scannerPaused = false;
-    state.scannerPauseMode = null;
-    state.scannerPauseRequestedAtBlock = null;
-    state.scannerPauseUntil = null;
-    state.scannerPauseTargetBlock = null;
-    state.scannerPauseDurationMinutes = SCANNER_DEFAULT_PAUSE_DURATION_MINUTES;
-    await state.save();
+    const record = await findScannerControlRecord(SCANNER_ID);
+    if (!record) return;
+
+    const wasPaused = record.paused || record.pauseTargetBlock !== null;
+    await updateScannerControlRecord(SCANNER_ID, {
+        scannerPaused: false,
+        scannerPauseMode: null,
+        scannerPauseRequestedAtBlock: null,
+        scannerPauseUntil: null,
+        scannerPauseTargetBlock: null,
+        scannerPauseDurationMinutes: SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
+    });
     if (wasPaused) {
         console.log('[Scanner] Persisted resume; catch-up will continue from the saved checkpoint');
     }
