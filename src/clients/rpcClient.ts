@@ -30,6 +30,37 @@ function isRetryableEndpointError(error: unknown): boolean {
     );
 }
 
+type RpcEndpoint = {
+    index: number;
+    provider: JsonRpcProvider;
+    metrics: {
+        attempts: number;
+        successes: number;
+        failures: number;
+        retryableFailures: number;
+        totalDurationMs: number;
+        lastFailureAt: string | null;
+    };
+};
+
+function recordEndpointSuccess(endpoint: RpcEndpoint, startedAt: number): void {
+    endpoint.metrics.successes += 1;
+    endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+}
+
+function recordEndpointFailure(
+    endpoint: RpcEndpoint,
+    startedAt: number,
+    error?: unknown,
+): void {
+    endpoint.metrics.failures += 1;
+    endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+    if (error !== undefined) {
+        endpoint.metrics.lastFailureAt = new Date().toISOString();
+        if (isRetryableEndpointError(error)) endpoint.metrics.retryableFailures += 1;
+    }
+}
+
 export function createRpcClient() {
     if (env.rpcUrls.length === 0) {
         throw new Error('No RPC endpoints configured. Add RPC_URL_1, RPC_URL_2, etc. to .env');
@@ -67,16 +98,12 @@ export function createRpcClient() {
                     operation(endpoint.provider),
                     RPC_ENDPOINT_TIMEOUT_MS,
                 );
-                endpoint.metrics.successes += 1;
-                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
+                recordEndpointSuccess(endpoint, startedAt);
                 return result;
             } catch (error) {
-                endpoint.metrics.failures += 1;
-                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
-                endpoint.metrics.lastFailureAt = new Date().toISOString();
+                recordEndpointFailure(endpoint, startedAt, error);
                 lastError = error;
                 if (!isRetryableEndpointError(error)) throw error;
-                endpoint.metrics.retryableFailures += 1;
 
                 console.warn(
                     `[RPC] Endpoint ${endpoint.index} failed temporarily during ${operationName}; ` +
@@ -107,9 +134,8 @@ export function createRpcClient() {
                     endpoint.provider.getBlock(blockNumber),
                     RPC_ENDPOINT_TIMEOUT_MS,
                 );
-                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
-                if (block) endpoint.metrics.successes += 1;
-                else endpoint.metrics.failures += 1;
+                if (block) recordEndpointSuccess(endpoint, startedAt);
+                else recordEndpointFailure(endpoint, startedAt);
                 results.push({
                     endpointIndex: endpoint.index,
                     block,
@@ -117,10 +143,7 @@ export function createRpcClient() {
                 });
             } catch (error) {
                 const message = formatError(error);
-                endpoint.metrics.failures += 1;
-                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
-                endpoint.metrics.lastFailureAt = new Date().toISOString();
-                if (isRetryableEndpointError(error)) endpoint.metrics.retryableFailures += 1;
+                recordEndpointFailure(endpoint, startedAt, error);
                 results.push({ endpointIndex: endpoint.index, block: null, error: message });
             }
         }
@@ -145,9 +168,8 @@ export function createRpcClient() {
                     endpoint.provider.getBlock('finalized'),
                     RPC_ENDPOINT_TIMEOUT_MS,
                 );
-                endpoint.metrics.totalDurationMs += Date.now() - startedAt;
                 if (block?.number !== undefined && block.hash) {
-                    endpoint.metrics.successes += 1;
+                    recordEndpointSuccess(endpoint, startedAt);
                     results.push({
                         endpointIndex: endpoint.index,
                         blockNumber: block.number,
@@ -155,7 +177,7 @@ export function createRpcClient() {
                         error: null,
                     });
                 } else {
-                    endpoint.metrics.failures += 1;
+                    recordEndpointFailure(endpoint, startedAt);
                     results.push({
                         endpointIndex: endpoint.index,
                         blockNumber: block?.number ?? null,
