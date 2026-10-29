@@ -5,20 +5,15 @@ import {
     resumeScanner,
 } from '../services/scannerControlService';
 
-import { SCANNER_ID } from '../constants/scanner.constants';
 import { sendHttpError } from '../utils/httpError';
 import { validateScannerPauseInput } from '../validators/scannerControlValidator';
 import {
     mapScannerControlResponse,
     mapScannerResumeResponse,
-    mapReorgRecoveryRetryResponse,
 } from '../mappers/scannerControlMapper';
 import { getScannerStatusResponse } from '../services/scannerStatusService';
-import { findScannerRescanJobById } from '../repositories/scannerRescanJobRepository';
-import {
-    findScannerStatusState,
-    unblockScannerReorgRecovery,
-} from '../repositories/scannerStateRepository';
+import { getRescanJobStatus } from '../services/scannerRescanJobService';
+import { retryBlockedReorgRecovery } from '../services/reorgRecoveryService';
 import { requestManualRescan } from '../services/manualRescanRequestService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
@@ -60,7 +55,7 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
 export const getRescanJobStatus = async (req: Request, res: Response): Promise<void> => {
     try {
         const operationId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        const job = await findScannerRescanJobById(operationId);
+        const job = await getRescanJobStatus(operationId);
         if (!job) {
             res.status(404).json({ message: 'Rescan operation not found' });
             return;
@@ -73,27 +68,24 @@ export const getRescanJobStatus = async (req: Request, res: Response): Promise<v
 
 export const retryBlockedReorgRecovery = async (_req: Request, res: Response): Promise<void> => {
     try {
-        const state = await findScannerStatusState(SCANNER_ID);
-        if (!state || !state.reorgRecoveryActive) {
+        const result = await retryBlockedReorgRecovery();
+        if (result.kind === 'no-pending-recovery') {
             res.status(409).json({ message: 'No pending reorg recovery is available to retry.' });
             return;
         }
-        if (!state.reorgRecoveryBlocked) {
+        if (result.kind === 'recovery-not-blocked') {
             res.status(409).json({
                 message: 'Reorg recovery is not blocked; no explicit retry is needed.',
             });
             return;
         }
-        const unblocked = await unblockScannerReorgRecovery(SCANNER_ID);
-        if (!unblocked) {
+        if (result.kind === 'state-changed') {
             res.status(409).json({
                 message: 'Reorg recovery state changed before it could be unblocked. Refresh status and retry.',
             });
             return;
         }
-        res.json(
-            mapReorgRecoveryRetryResponse(state),
-        );
+        res.json(result.response);
     } catch (error) {
         sendHttpError(res, 'Unable to retry reorg recovery', error);
     }
