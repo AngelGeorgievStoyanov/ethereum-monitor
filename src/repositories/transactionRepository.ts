@@ -122,11 +122,10 @@ export async function createTransfersBatch(
         if (filterIds.length === 0 && !reconcileMatches) return;
 
         // Filter descriptions are part of the active in-memory cache; avoid querying TxFilter for each batch.
-        const filters = await getTxFilterService().getAllTxFilters();
         const descriptionsById = new Map<number, string>(
-            filters
-                .filter((filter) => typeof filter.description === 'string')
-                .map((filter) => [filter.id as number, filter.description as string] as const),
+            getTxFilterService()
+                .getTxFilters()
+                .map((filter) => [filter.id, filter.description] as const),
         );
         const matches: Array<{
             txId: number;
