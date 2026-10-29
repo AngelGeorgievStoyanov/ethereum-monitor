@@ -24,9 +24,12 @@ import {
     createScannerRescanJob,
     findActiveScannerRescanJob,
     findScannerRescanJobById,
-    updateScannerRescanJob,
 } from '../repositories/scannerRescanJobRepository';
-import { findScannerState, findScannerStatusState, unblockScannerReorgRecovery } from '../repositories/scannerStateRepository';
+import {
+    findScannerState,
+    findScannerStatusState,
+    unblockScannerReorgRecovery,
+} from '../repositories/scannerStateRepository';
 import { executeRescanJob } from '../services/scannerRescanJobService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
