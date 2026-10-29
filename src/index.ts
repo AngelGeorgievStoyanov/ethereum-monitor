@@ -5,13 +5,13 @@ import './models/scannerRescanJob';
 import sequelize from './database';
 import httpRouter from './httpRouter';
 import { HTTP_HOST, HTTP_PORT } from './constants/http.constants';
-import { getEthereumService } from './services/ethereumService';
+import { getBlockMonitorService } from './services/blockMonitorServiceFactory';
 import { getDynamicConfigService } from './services/dynamicConfigService';
 import { formatError } from './utils/formatError';
 
 const app = express();
 
-const ethereumService = getEthereumService();
+const blockMonitorService = getBlockMonitorService();
 const dynamicConfigService = getDynamicConfigService();
 
 app.use(express.json());
@@ -23,7 +23,7 @@ async function startServer() {
 
     await dynamicConfigService.init();
 
-    void ethereumService.start().catch((error) => {
+    void blockMonitorService.start().catch((error) => {
         console.error(`[Scanner] Startup failed; stopping process: ${formatError(error)}`);
         process.exit(1);
     });
