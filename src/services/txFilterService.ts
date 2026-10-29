@@ -44,6 +44,7 @@ function legacyRule(txFilter: LegacyTxFilterFields): TxFilterGroupRule | null {
 
 export function createTxFilterService() {
     let refreshDynamicConfig: (() => Promise<boolean>) | undefined;
+    let activeTxFiltersCache: ActiveTxFilter[] = [];
     function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void { refreshDynamicConfig = handler; }
     async function refreshAfterMutation(result: unknown): Promise<void> {
         if (!refreshDynamicConfig || !(await refreshDynamicConfig())) throw new TxFilterSyncError(result);
@@ -63,7 +64,12 @@ export function createTxFilterService() {
             }
             next.push({ id: filter.id, description: filter.description, isActive: filter.isActive, activeFromBlock: filter.activeFromBlock, rule });
         }
+        activeTxFiltersCache = next;
         return next;
+    }
+
+    function getTxFilters(): ActiveTxFilter[] {
+        return activeTxFiltersCache;
     }
 
     async function getAllTxFilters() {
@@ -191,7 +197,7 @@ export function createTxFilterService() {
         return deleted;
     }
 
-    return { loadActiveTxFilters, setDynamicConfigRefreshHandler, getAllTxFilters, createTxFilter, updateTxFilter, removeTxFilter };
+    return { loadActiveTxFilters, setDynamicConfigRefreshHandler, getTxFilters, getAllTxFilters, createTxFilter, updateTxFilter, removeTxFilter };
 }
 
 let txFilterServiceInstance: ReturnType<typeof createTxFilterService> | undefined;
