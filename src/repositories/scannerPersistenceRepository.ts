@@ -3,7 +3,8 @@ import sequelize from '../database';
 import ScannerState from '../models/scannerState';
 import Block from '../models/block';
 import Transaction from '../models/transaction';
-import { createTransfersBatch, TransferBatchItem } from './transactionRepository';
+import { createTransfersBatch } from './transactionRepository';
+import type { TransferBatchItem } from '../types/transaction.types';
 import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
 
 export interface ProcessedBlockRecord {
