@@ -7,7 +7,6 @@ import type {
     StoredTransactionPage,
     StoredTransactionPageRecord,
     StoredTransactionRecord,
-    StoredTxFilterRecord,
 } from '../types/transaction.types';
 import TxMatch from '../models/txMatch';
 
