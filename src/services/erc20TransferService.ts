@@ -4,7 +4,7 @@ import { ERC20_TRANSFER_TOPIC } from '../constants/erc20-transfer.constants';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { matchesTxFilter } from '../utils/matchesTxFilter';
 import { mapTransactionFilterContext } from '../mappers/transactionContextMapper';
-import type { TransferBatchCandidate } from './transactionService';
+import type { TransferBatchCandidate } from '../types/transfer-batch.types';
 
 const ERC20_INTERFACE = new ethers.Interface([
     'function transfer(address to, uint256 value)',
