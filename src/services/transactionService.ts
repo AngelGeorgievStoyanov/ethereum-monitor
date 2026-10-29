@@ -1,6 +1,6 @@
 import { TransactionResponse } from 'ethers';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
-import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
+import { RpcTransactionReceipt } from '../types/evm-rpc.types';
 import {
     createTxMatches,
     deleteTransactionById,
