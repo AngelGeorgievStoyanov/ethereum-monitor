@@ -124,10 +124,10 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
             state,
             getActiveTxFilters: () => getTxFilterService().getTxFilters(),
             onProgress: async (currentBlock, blocksProcessed) => {
-                await activeJob.update({ currentBlock, blocksProcessed });
+                await updateScannerRescanJob(jobId, { currentBlock, blocksProcessed });
             },
         });
-        await activeJob.update({
+        await updateScannerRescanJob(jobId, {
             status: 'COMPLETED',
             currentBlock: result.toBlock,
             blocksProcessed: result.blocksProcessed,
@@ -163,7 +163,7 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
         try {
             if (!job) job = await findScannerRescanJobById(jobId);
             if (job) {
-                await job.update({
+                await updateScannerRescanJob(jobId, {
                     status: 'FAILED',
                     error: message.slice(0, 1000),
                     completedAt: new Date(),
