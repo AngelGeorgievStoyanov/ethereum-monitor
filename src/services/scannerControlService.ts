@@ -1,14 +1,6 @@
 import ScannerState from '../models/scannerState';
+import type { ScannerControlState, ScannerPauseMode } from '../types/scanner-status.types';
 import { SCANNER_DEFAULT_PAUSE_DURATION_MINUTES, SCANNER_ID } from '../constants/scanner.constants';
-
-export type ScannerPauseMode = 'manual' | 'temporary';
-
-export interface ScannerControlState {
-    paused: boolean;
-    mode: ScannerPauseMode | null;
-    pauseRequestedAtBlock: number | null;
-    pauseUntil: number | null;
-}
 
 function toControlState(state: ScannerState | null): ScannerControlState {
     return {
