@@ -7,6 +7,12 @@ export interface ScannerControlState {
     pauseUntil: number | null;
 }
 
+export interface ScannerControlRecord extends ScannerControlState {
+    pauseUntilDate: Date | null;
+    pauseTargetBlock: number | null;
+    pauseDurationMinutes: number;
+}
+
 export interface ScannerStatusState {
     lastProcessedBlock: number;
     reorgRecoveryActive: boolean;
