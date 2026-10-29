@@ -7,19 +7,18 @@ Monitors native ETH transfers and ERC-20 transfer events on Ethereum Mainnet. Ma
 Requirements: Node.js 24, npm, PostgreSQL, and an Ethereum Mainnet RPC endpoint.
 
 1. Run `npm install`.
-2. Create an empty database named `ethereum_monitor`.
-3. Create a `.env` file:
+2. Create a `.env` file:
 
     ```env
     DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/ethereum_monitor
     RPC_URL_1=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
     ```
 
-4. Run `npm run dev`.
+3. Run `npm run dev`. The application creates the configured database if it does not exist, then creates any missing tables. The PostgreSQL user in `DATABASE_URL` must be allowed to create databases.
 
 For production, run `npm run build` and `npm start`. The API listens on port `8000`.
 
-The app creates missing tables at startup but does not migrate existing schemas. Use a fresh database for a new setup.
+At startup, the app creates the configured database if needed and creates missing tables. It does not migrate existing table schemas; schema changes must be applied separately.
 
 ## Startup and filters
 
