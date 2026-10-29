@@ -4,7 +4,7 @@ import {
     CONSENSUS_MAX_RETRIES,
     CONSENSUS_RETRY_INTERVAL_MS,
 } from '../constants/scanner.constants';
-import { ethereumProvider } from './ethereumRpcService';
+import { evmRpcClient } from './evmBlockDataService';
 import { sleep } from '../utils/sleep';
 
 export interface ConsensusBlock {
@@ -22,7 +22,7 @@ export class ConsensusUnavailableError extends BlockVerificationUnavailableError
 
 function describeDisagreement(
     expected: ConsensusBlock | undefined,
-    result: Awaited<ReturnType<typeof ethereumProvider.getBlockFromAllEndpoints>>[number],
+    result: Awaited<ReturnType<typeof evmRpcClient.getBlockFromAllEndpoints>>[number],
     requestedBlockNumber: number,
 ): string {
     if (result.error) return `provider=P${result.endpointIndex} reason=${result.error}`;
@@ -50,7 +50,7 @@ export async function getBlockWithConsensus(
     let lastDisagreements: string[] = [];
 
     for (let retry = 0; retry <= CONSENSUS_MAX_RETRIES; retry += 1) {
-        const results = await ethereumProvider.getBlockFromAllEndpoints(blockNumber);
+        const results = await evmRpcClient.getBlockFromAllEndpoints(blockNumber);
         const firstBlock = results.find(
             (result) => result.block && result.block.hash && result.block.parentHash,
         )?.block;
@@ -68,7 +68,7 @@ export async function getBlockWithConsensus(
         if (
             expected &&
             disagreements.length === 0 &&
-            results.length === ethereumProvider.getEndpointCount()
+            results.length === evmRpcClient.getEndpointCount()
         ) {
             return expected;
         }
