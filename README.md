@@ -46,10 +46,6 @@ For production, run `npm run build` and `npm start`. The API listens on port `80
 
 The application creates missing tables at startup. It does not migrate existing table schemas; schema changes must be applied separately.
 
-For production, run `npm run build` and `npm start`. The API listens on port `8000`.
-
-At startup, the app creates the configured database if needed and creates missing tables. It does not migrate existing table schemas; schema changes must be applied separately.
-
 ## Startup and filters
 
 The scanner saves its checkpoint in PostgreSQL and resumes from it after a restart.
