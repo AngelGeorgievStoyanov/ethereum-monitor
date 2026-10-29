@@ -1,10 +1,10 @@
-import { createBlockMonitorService } from './blockMonitorService';
+import { createBlockMonitorService as buildBlockMonitorService } from './blockMonitorService';
 export { matchesTxFilter } from '../utils/matchesTxFilter';
 
-let blockMonitorServiceInstance: ReturnType<typeof createBlockMonitorService> | undefined;
+let blockMonitorServiceInstance: ReturnType<typeof buildBlockMonitorService> | undefined;
 
 export function createBlockMonitorService() {
-    return createBlockMonitorService();
+    return buildBlockMonitorService();
 }
 
 export function getBlockMonitorService() {
