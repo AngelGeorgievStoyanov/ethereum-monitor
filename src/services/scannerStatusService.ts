@@ -1,7 +1,7 @@
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { findScannerStatusState } from '../repositories/scannerStateRepository';
 import { findLatestScannerRescanJob } from '../repositories/scannerRescanJobRepository';
-import { ethereumProvider } from './ethereumRpcService';
+import { evmRpcClient } from './evmBlockDataService';
 import { getScannerControlState } from './scannerControlService';
 import { getRecoveryMetrics } from './recoveryMetrics';
 import { mapScannerStatusResponse } from '../mappers/scannerStatusMapper';
@@ -17,7 +17,7 @@ export async function getScannerStatusResponse() {
     let rpcAvailable = false;
 
     try {
-        const finalized = await ethereumProvider.getBlock('finalized');
+        const finalized = await evmRpcClient.getBlock('finalized');
         if (finalized) {
             latestFinalizedBlock = finalized.number;
             rpcAvailable = true;
@@ -33,7 +33,7 @@ export async function getScannerStatusResponse() {
         recoveryMetrics: getRecoveryMetrics(),
         latestFinalizedBlock,
         rpcAvailable,
-        rpcMetrics: ethereumProvider.getMetrics(),
+        rpcMetrics: evmRpcClient.getMetrics(),
         checkedAt: new Date().toISOString(),
     });
 }
