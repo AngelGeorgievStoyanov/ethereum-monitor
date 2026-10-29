@@ -14,7 +14,6 @@ import {
     SCANNER_MAX_PAUSE_DURATION_MINUTES,
 } from '../constants/scanner.constants';
 import { HttpError, sendHttpError } from '../utils/httpError';
-import { ethereumProvider } from '../services/ethereumRpcService';
 import {
     isScannerProcessingBlocks,
     releaseManualRescanReservation,
@@ -22,48 +21,15 @@ import {
 } from '../services/blockMonitorService';
 import { getTxFilterService } from '../services/txFilterService';
 import { runManualRescan, RescanReorgDetectedError } from '../services/rescanService';
-import { getRecoveryMetrics, recordRescanFailure } from '../services/recoveryMetrics';
+import { recordRescanFailure } from '../services/recoveryMetrics';
 import ScannerRescanJob from '../models/scannerRescanJob';
 import { formatError } from '../utils/formatError';
 import { isScannerLockHeld } from '../services/scannerLockService';
+import { getScannerStatusResponse } from '../services/scannerStatusService';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
-        const checkpoint = await ScannerState.findByPk(SCANNER_ID);
-        let latestFinalizedBlock: number | null = null;
-        let rpcAvailable = false;
-
-        try {
-            const finalized = await ethereumProvider.getBlock('finalized');
-            if (finalized) {
-                latestFinalizedBlock = finalized.number;
-                rpcAvailable = true;
-            }
-        } catch {
-            // Keep scanner status available even when the RPC providers are temporarily down.
-        }
-
-        const lastProcessedBlock = checkpoint?.lastProcessedBlock ?? null;
-        res.json({
-            ...(await getScannerControlState()),
-            lastProcessedBlock,
-            reorgRecoveryActive: checkpoint?.reorgRecoveryActive ?? false,
-            reorgRecoveryBlocked: checkpoint?.reorgRecoveryBlocked ?? false,
-            reorgRecoveryBlockReason: checkpoint?.reorgRecoveryBlockReason ?? null,
-            reorgRecoveryStableBlocks: checkpoint?.reorgRecoveryStableBlocks ?? 0,
-            reorgRecoveryStartBlock: checkpoint?.reorgRecoveryStartBlock ?? null,
-            reorgRecoveryTargetBlock: checkpoint?.reorgRecoveryTargetBlock ?? null,
-            rescanJob: await ScannerRescanJob.findOne({ order: [['createdAt', 'DESC']] }),
-            recoveryMetrics: getRecoveryMetrics(),
-            latestFinalizedBlock,
-            lagBlocks:
-                lastProcessedBlock !== null && latestFinalizedBlock !== null
-                    ? latestFinalizedBlock - lastProcessedBlock
-                    : null,
-            rpcAvailable,
-            rpcMetrics: ethereumProvider.getMetrics(),
-            checkedAt: new Date().toISOString(),
-        });
+        res.json(await getScannerStatusResponse());
     } catch (error) {
         sendHttpError(res, 'Unable to retrieve scanner status', error);
     }
