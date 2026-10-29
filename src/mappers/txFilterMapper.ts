@@ -1,5 +1,4 @@
-import type { TxFilterRecord } from '../repositories/txFilterRepository';
-import type { TxFilterGroupRule } from '../types/tx-filter.types';
+import type { TxFilterGroupRule, TxFilterRecord } from '../types/tx-filter.types';
 
 export interface TxFilterResponse extends TxFilterRecord {
     rule: TxFilterGroupRule | null;
