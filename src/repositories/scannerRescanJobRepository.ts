@@ -46,3 +46,33 @@ export async function markActiveScannerRescanJobsInterrupted(): Promise<number> 
     );
     return updatedRows;
 }
+
+export async function createScannerRescanJob(input: {
+    id: string;
+    fromBlock: number;
+    toBlock: number;
+}): Promise<ScannerRescanJobSummary> {
+    const job = await ScannerRescanJob.create({
+        ...input,
+        currentBlock: input.fromBlock,
+        blocksProcessed: 0,
+        status: 'QUEUED',
+        error: null,
+        startedAt: null,
+        completedAt: null,
+    });
+    return toSummary(job);
+}
+
+export async function updateScannerRescanJob(
+    id: string,
+    updates: Partial<Pick<
+        ScannerRescanJobSummary,
+        'status' | 'currentBlock' | 'blocksProcessed' | 'error' | 'startedAt' | 'completedAt'
+    >>,
+): Promise<ScannerRescanJobSummary | null> {
+    const job = await ScannerRescanJob.findByPk(id);
+    if (!job) return null;
+    await job.update(updates);
+    return toSummary(job);
+}
