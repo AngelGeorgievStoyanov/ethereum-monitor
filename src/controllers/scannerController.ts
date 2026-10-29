@@ -1,16 +1,11 @@
 import { Request, Response } from 'express';
 import {
-    getScannerControlState,
-    requestScannerPause,
-    resumeScanner,
+    requestScannerPauseResponse,
+    resumeScannerResponse,
 } from '../services/scannerControlService';
 
 import { sendHttpError } from '../utils/httpError';
 import { validateScannerPauseInput } from '../validators/scannerControlValidator';
-import {
-    mapScannerControlResponse,
-    mapScannerResumeResponse,
-} from '../mappers/scannerControlMapper';
 import { getScannerStatusResponse } from '../services/scannerStatusService';
 import { getRescanJobStatus as loadRescanJobStatus } from '../services/scannerRescanJobService';
 import { retryBlockedReorgRecovery as retryReorgRecovery } from '../services/reorgRecoveryService';
@@ -29,8 +24,7 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
 export const pauseScanner = async (req: Request, res: Response): Promise<void> => {
     try {
         const input = validateScannerPauseInput(req.body);
-        await requestScannerPause(input.mode, input.atBlock, input.durationMinutes);
-        res.json(mapScannerControlResponse('Scanner pause requested', await getScannerControlState()));
+        res.json(await requestScannerPauseResponse(input.mode, input.atBlock, input.durationMinutes));
     } catch (error) {
         sendHttpError(res, 'Unable to request scanner pause', error);
     }
@@ -38,8 +32,7 @@ export const pauseScanner = async (req: Request, res: Response): Promise<void> =
 
 export const resumeScannerController = async (_req: Request, res: Response): Promise<void> => {
     try {
-        await resumeScanner();
-        res.json(mapScannerResumeResponse(await getScannerControlState()));
+        res.json(await resumeScannerResponse());
     } catch (error) {
         sendHttpError(res, 'Unable to resume scanner', error);
     }
