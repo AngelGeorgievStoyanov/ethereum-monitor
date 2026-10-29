@@ -1,26 +1,15 @@
 import { Request, Response } from 'express';
 import { deleteStoredTransaction, listStoredTransactions } from '../services/transactionService';
 import { sendHttpError } from '../utils/httpError';
-import { parsePositiveId } from '../utils/parsePositiveId';
-import { DEFAULT_LIMIT, DEFAULT_PAGE, MAX_LIMIT } from '../constants/transaction.constants';
-
-function parsePositiveQueryInteger(value: unknown): number | undefined {
-    if (typeof value !== 'string' || !/^\d+$/.test(value)) return undefined;
-
-    const parsed = Number(value);
-    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
-}
+import { validateTransactionIdInput, validateTransactionPaginationInput } from '../validators/transactionValidator';
 
 export async function getAllStoredTransactions(req: Request, res: Response): Promise<void> {
-    const page =
-        req.query.page === undefined ? DEFAULT_PAGE : parsePositiveQueryInteger(req.query.page);
-    const limit =
-        req.query.limit === undefined ? DEFAULT_LIMIT : parsePositiveQueryInteger(req.query.limit);
-
-    if (page === undefined || limit === undefined || limit > MAX_LIMIT) {
-        res.status(400).json({
-            message: `Invalid pagination parameters. page must be a positive integer and limit must be between 1 and ${MAX_LIMIT}.`,
-        });
+    let page: number;
+    let limit: number;
+    try {
+        ({ page, limit } = validateTransactionPaginationInput(req.query));
+    } catch (error) {
+        sendHttpError(res, 'Invalid transaction pagination', error);
         return;
     }
 
@@ -35,9 +24,11 @@ export async function deleteTransactionById(
     req: Request<{ id: string }>,
     res: Response,
 ): Promise<void> {
-    const id = parsePositiveId(req.params.id);
-    if (id === undefined) {
-        res.status(400).json({ message: 'Invalid transaction ID' });
+    let id: number;
+    try {
+        id = validateTransactionIdInput(req.params.id);
+    } catch (error) {
+        sendHttpError(res, 'Invalid transaction ID', error);
         return;
     }
 
