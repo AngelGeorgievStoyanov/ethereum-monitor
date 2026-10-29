@@ -11,13 +11,16 @@ import { BlockReceiptConsistencyError } from './ethereumRpcService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { recordReorgDetected } from './recoveryMetrics';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
-import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
+import {
+    CanonicalBlockIdentity,
+    findCanonicalBlockIdentity,
+} from '../repositories/blockRepository';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { isScannerLockHeld } from './scannerLockService';
 import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
 
-type ConfirmedBlock = { blockNumber: number; blockHash: string; parentHash: string };
+type ConfirmedBlock = CanonicalBlockIdentity;
 
 let lastConfirmedBlock: ConfirmedBlock | null = null;
 
@@ -31,12 +34,8 @@ async function getConfirmedCheckpointBlock(checkpoint: number): Promise<Confirme
     const persistedBlock = await findCanonicalBlockIdentity(checkpoint);
 
     if (persistedBlock) {
-        lastConfirmedBlock = {
-            blockNumber: persistedBlock.blockNumber,
-            blockHash: persistedBlock.blockHash,
-            parentHash: persistedBlock.parentHash,
-        };
-        return lastConfirmedBlock;
+        lastConfirmedBlock = persistedBlock;
+        return persistedBlock;
     }
 
     // A fresh checkpoint without a persisted block has no trusted in-memory hash yet.
