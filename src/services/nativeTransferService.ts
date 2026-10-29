@@ -3,7 +3,7 @@ import { ActiveTxFilter } from './txFilterEvaluatorService';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 import { matchesTxFilter } from '../utils/matchesTxFilter';
 import { mapTransactionFilterContext } from '../mappers/transactionContextMapper';
-import type { TransferBatchCandidate } from './transactionService';
+import type { TransferBatchCandidate } from '../types/transfer-batch.types';
 
 export interface ProcessNativeTransfersOptions {
     transactions: readonly TransactionResponse[];
