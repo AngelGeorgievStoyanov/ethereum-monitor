@@ -29,7 +29,7 @@ const scannerRuntimeAttributes = [
 ] as const;
 
 export async function findScannerState(id: string): Promise<ScannerRuntimeState | null> {
-    const state = await ScannerState.findByPk(id, { attributes: scannerRuntimeAttributes });
+    const state = await ScannerState.findByPk(id, { attributes: [...scannerRuntimeAttributes] });
     return state ? toScannerRuntimeState(state) : null;
 }
 
