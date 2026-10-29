@@ -4,9 +4,7 @@ import ScannerState from '../models/scannerState';
 import TxFilter from '../models/txFilter';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
-import {
-    FILTER_MUTATION_ADVISORY_LOCK_KEY,
-} from '../constants/tx-filter.constants';
+import { FILTER_MUTATION_ADVISORY_LOCK_KEY } from '../constants/tx-filter.constants';
 import {
     createTxFilter as insertTxFilter,
     deleteTxFilterById,

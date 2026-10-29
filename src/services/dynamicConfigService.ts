@@ -14,7 +14,7 @@ export function createDynamicConfigService() {
 
     async function loadTxFilters(): Promise<void> {
         const loadedFilters = await txFilterService.loadActiveTxFilters();
-        const next = new Map<number, ActiveTxFilter>(loadedFilters.map((filter) => [filter.id, filter]));
+        const next = new Map<number, ActiveTxFilter>(loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]));
         const signature = (map: Map<number, ActiveTxFilter>) => JSON.stringify(Array.from(map.entries()).sort(([a], [b]) => a - b));
         if (signature(activeTxFilters) === signature(next)) {
             console.log(`[DynamicConfig] Transaction filter cache unchanged (${activeTxFilters.size} active filter(s))`);
