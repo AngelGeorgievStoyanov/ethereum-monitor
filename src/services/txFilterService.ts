@@ -17,6 +17,7 @@ import {
     saveRuleForFilter,
 } from '../repositories/txFilterRuleRepository';
 import { getNextFilterStartBlock } from './txFilterActivationService';
+import { mapTxFilterListResponse, mapTxFilterResponse } from '../mappers/txFilterMapper';
 import type { ActiveTxFilter, TxFilterGroupRule } from '../types/tx-filter.types';
 import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
@@ -75,10 +76,15 @@ export function createTxFilterService() {
     async function getAllTxFilters() {
         const filters = await findAllTxFilters();
         const rulesByFilterId = await findRulesForFilters(filters.map((filter) => filter.id));
-        return filters.map((filter) => ({
-            ...filter,
-            rule: rulesByFilterId.get(filter.id) ?? legacyRule(filter),
-        }));
+        return mapTxFilterListResponse(
+            filters,
+            new Map(
+                filters.map((filter) => [
+                    filter.id,
+                    rulesByFilterId.get(filter.id) ?? legacyRule(filter),
+                ]),
+            ),
+        );
     }
 
     async function createTxFilter(data: {
@@ -114,7 +120,7 @@ export function createTxFilterService() {
             return createdFilter;
         });
 
-        const result = { ...filter, rule: data.rule ?? legacyRule(filter) };
+        const result = mapTxFilterResponse(filter, data.rule ?? legacyRule(filter));
         await refreshAfterMutation(result);
         return result;
     }
@@ -184,7 +190,7 @@ export function createTxFilterService() {
         });
 
         if (!updated) return null;
-        const result = { ...updated.filter, rule: updated.rule };
+        const result = mapTxFilterResponse(updated.filter, updated.rule);
         await refreshAfterMutation(result);
         return result;
     }
