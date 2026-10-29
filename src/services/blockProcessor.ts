@@ -195,10 +195,11 @@ export async function processFinalizedBlocks(
                 recordReorgDetected();
                 try {
                     await markReorgRecoveryPending(
-                        state,
+                        state.id,
                         state.lastProcessedBlock,
                         error.blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
                     );
+                    await state.reload();
                     console.warn(
                         `[Reorg] Block/receipt consistency failure at block ${error.blockNumber}; recovery scheduled from checkpoint ${state.lastProcessedBlock}`,
                     );
