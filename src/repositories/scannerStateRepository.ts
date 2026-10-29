@@ -107,3 +107,21 @@ export async function unblockScannerReorgRecovery(id: string): Promise<boolean> 
     );
     return updatedRows === 1;
 }
+
+export interface ScannerRescanState {
+    lastProcessedBlock: number;
+    reorgRecoveryActive: boolean;
+    reorgRecoveryBlocked: boolean;
+}
+
+export async function findScannerRescanState(id: string): Promise<ScannerRescanState | null> {
+    const state = await ScannerState.findByPk(id, {
+        attributes: ['lastProcessedBlock', 'reorgRecoveryActive', 'reorgRecoveryBlocked'],
+    });
+    if (!state) return null;
+    return {
+        lastProcessedBlock: state.lastProcessedBlock,
+        reorgRecoveryActive: state.reorgRecoveryActive,
+        reorgRecoveryBlocked: state.reorgRecoveryBlocked,
+    };
+}
