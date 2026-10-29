@@ -11,6 +11,7 @@ import {
     mapTransactionCreationData,
     TransferContextMetadata,
 } from '../mappers/transactionContextMapper';
+import { mapTransactionPageResponse } from '../mappers/transactionResponseMapper';
 
 export type TransferMetadata = TransferContextMetadata;
 
@@ -41,14 +42,15 @@ export async function createTransactionFromEthereumData({
     const transaction = await findOrCreateTransfer(data);
     await createTxMatches(
         transaction.id,
-        matchingTxFilters.map((txFilter) => txFilter.id),
+        matchingTxFilters.map(({ id, description }) => ({ id, description })),
     );
 
     return transaction;
 }
 
-export function listStoredTransactions(page: number, limit: number) {
-    return findTransactionsPage(page, limit);
+export async function listStoredTransactions(page: number, limit: number) {
+    const result = await findTransactionsPage(page, limit);
+    return mapTransactionPageResponse(result);
 }
 
 export function deleteStoredTransaction(id: number) {
