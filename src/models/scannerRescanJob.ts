@@ -12,6 +12,8 @@ class ScannerRescanJob extends Model {
     public error!: string | null;
     public startedAt!: Date | null;
     public completedAt!: Date | null;
+    public createdAt!: Date;
+    public updatedAt!: Date;
 }
 
 ScannerRescanJob.init(
