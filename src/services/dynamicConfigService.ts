@@ -1,5 +1,5 @@
 import { TX_FILTER_CACHE_REFRESH_INTERVAL_MS, TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
-import { ActiveTxFilter } from './txFilterEvaluatorService';
+import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
