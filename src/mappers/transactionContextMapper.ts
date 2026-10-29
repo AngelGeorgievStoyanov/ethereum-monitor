@@ -1,5 +1,5 @@
 import { TransactionResponse } from 'ethers';
-import { TransactionCreationAttributes } from '../models/transaction';
+import type { TransactionPersistenceData } from '../types/transaction.types';
 import { RpcTransactionReceipt } from '../types/ethereum-rpc.types';
 
 export interface TransferContextMetadata {
@@ -46,7 +46,7 @@ export function mapTransactionCreationData(
     receipt: RpcTransactionReceipt,
     blockTimestamp: number,
     transfer: TransferContextMetadata,
-): TransactionCreationAttributes {
+): TransactionPersistenceData {
     return {
         txHash: tx.hash,
         nonce: tx.nonce,
