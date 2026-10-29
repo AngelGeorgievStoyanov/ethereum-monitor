@@ -31,6 +31,7 @@ import {
     updateScannerRescanJob,
 } from '../repositories/scannerRescanJobRepository';
 import type { ScannerRescanJobSummary } from '../types/scanner-status.types';
+import { findScannerStatusState, unblockScannerReorgRecovery } from '../repositories/scannerStateRepository';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -311,7 +312,7 @@ export const getRescanJobStatus = async (req: Request, res: Response): Promise<v
 
 export const retryBlockedReorgRecovery = async (_req: Request, res: Response): Promise<void> => {
     try {
-        const state = await ScannerState.findByPk(SCANNER_ID);
+        const state = await findScannerStatusState(SCANNER_ID);
         if (!state || !state.reorgRecoveryActive) {
             res.status(409).json({ message: 'No pending reorg recovery is available to retry.' });
             return;
@@ -322,13 +323,17 @@ export const retryBlockedReorgRecovery = async (_req: Request, res: Response): P
             });
             return;
         }
-        state.reorgRecoveryBlocked = false;
-        state.reorgRecoveryBlockReason = null;
-        await state.save();
+        const unblocked = await unblockScannerReorgRecovery(SCANNER_ID);
+        if (!unblocked) {
+            res.status(409).json({
+                message: 'Reorg recovery state changed before it could be unblocked. Refresh status and retry.',
+            });
+            return;
+        }
         res.json({
             message: 'Reorg recovery unblocked. Resume the scanner if it is paused.',
             reorgRecoveryActive: state.reorgRecoveryActive,
-            reorgRecoveryBlocked: state.reorgRecoveryBlocked,
+            reorgRecoveryBlocked: false,
             reorgRecoveryStartBlock: state.reorgRecoveryStartBlock,
             reorgRecoveryTargetBlock: state.reorgRecoveryTargetBlock,
         });
