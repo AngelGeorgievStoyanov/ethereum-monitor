@@ -57,8 +57,6 @@ export async function markReorgRecoveryPending(
 ): Promise<void> {
     if (!(await isScannerLockHeld()))
         throw new Error('Cannot mark reorg recovery pending without owning the scanner lock');
-    if (!(await isScannerLockHeld()))
-        throw new Error('Scanner lock ownership was lost before persisting reorg recovery state');
     await persistReorgRecoveryPending(scannerStateId, checkpoint, targetBlock);
 }
 
@@ -205,6 +203,7 @@ async function processReorgRecoveryInternal(
                 state.lastProcessedBlock,
                 blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
             );
+            await state.reload();
             await findAncestorAndRollback(state);
             continue;
         }
