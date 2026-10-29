@@ -1,36 +1,20 @@
-import { ScannerControlState } from '../services/scannerControlService';
-import { ScannerStatusState } from '../repositories/scannerStateRepository';
-import { ScannerRescanJobSummary } from '../repositories/scannerRescanJobRepository';
-
-export interface ScannerStatusResponse {
-    paused: boolean;
-    mode: ScannerControlState['mode'];
-    pauseRequestedAtBlock: number | null;
-    pauseUntil: number | null;
-    lastProcessedBlock: number | null;
-    reorgRecoveryActive: boolean;
-    reorgRecoveryBlocked: boolean;
-    reorgRecoveryBlockReason: string | null;
-    reorgRecoveryStableBlocks: number;
-    reorgRecoveryStartBlock: number | null;
-    reorgRecoveryTargetBlock: number | null;
-    rescanJob: ScannerRescanJobSummary | null;
-    recoveryMetrics: ReturnType<typeof import('../services/recoveryMetrics').getRecoveryMetrics>;
-    latestFinalizedBlock: number | null;
-    lagBlocks: number | null;
-    rpcAvailable: boolean;
-    rpcMetrics: ReturnType<typeof import('../clients/rpcClient').getRpcClient>['getMetrics'] extends () => infer T ? T : never;
-    checkedAt: string;
-}
+import type {
+    ScannerControlState,
+    ScannerRescanJobSummary,
+    ScannerStatusResponse,
+    ScannerStatusState,
+    RecoveryMetrics,
+    RpcEndpointMetrics,
+} from '../types/scanner-status.types';
 
 export function mapScannerStatusResponse(input: {
     control: ScannerControlState;
     state: ScannerStatusState | null;
     rescanJob: ScannerRescanJobSummary | null;
-    recoveryMetrics: ScannerStatusResponse['recoveryMetrics'];
+    recoveryMetrics: RecoveryMetrics;
     latestFinalizedBlock: number | null;
     rpcAvailable: boolean;
-    rpcMetrics: ScannerStatusResponse['rpcMetrics'];
+    rpcMetrics: RpcEndpointMetrics[];
     checkedAt: string;
 }): ScannerStatusResponse {
     const lastProcessedBlock = input.state?.lastProcessedBlock ?? null;
