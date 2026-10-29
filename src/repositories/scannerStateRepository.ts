@@ -1,20 +1,45 @@
 import ScannerState from '../models/scannerState';
+import type { ScannerRuntimeState } from '../types/scanner-state.types';
 import type { ScannerStatusState } from '../types/scanner-status.types';
 
-export function findScannerState(id: string) {
-    return ScannerState.findByPk(id);
+function toScannerRuntimeState(state: ScannerState): ScannerRuntimeState {
+    return {
+        id: state.id,
+        lastProcessedBlock: state.lastProcessedBlock,
+        lastRescanFromBlock: state.lastRescanFromBlock,
+        reorgRecoveryActive: state.reorgRecoveryActive,
+        reorgRecoveryBlocked: state.reorgRecoveryBlocked,
+        reorgRecoveryBlockReason: state.reorgRecoveryBlockReason,
+        reorgRecoveryStableBlocks: state.reorgRecoveryStableBlocks,
+        reorgRecoveryStartBlock: state.reorgRecoveryStartBlock,
+        reorgRecoveryTargetBlock: state.reorgRecoveryTargetBlock,
+    };
 }
 
-export function createScannerState(data: {
+const scannerRuntimeAttributes = [
+    'id',
+    'lastProcessedBlock',
+    'lastRescanFromBlock',
+    'reorgRecoveryActive',
+    'reorgRecoveryBlocked',
+    'reorgRecoveryBlockReason',
+    'reorgRecoveryStableBlocks',
+    'reorgRecoveryStartBlock',
+    'reorgRecoveryTargetBlock',
+] as const;
+
+export async function findScannerState(id: string): Promise<ScannerRuntimeState | null> {
+    const state = await ScannerState.findByPk(id, { attributes: scannerRuntimeAttributes });
+    return state ? toScannerRuntimeState(state) : null;
+}
+
+export async function createScannerState(data: {
     id: string;
     lastProcessedBlock: number;
     lastRescanFromBlock: number | null;
-}) {
-    return ScannerState.create(data);
-}
-
-export function saveScannerState(state: ScannerState) {
-    return state.save();
+}): Promise<ScannerRuntimeState> {
+    const state = await ScannerState.create(data);
+    return toScannerRuntimeState(state);
 }
 
 export async function updateScannerCheckpoint(id: string, lastProcessedBlock: number) {
