@@ -1,4 +1,3 @@
-import { findScannerState } from '../repositories/scannerStateRepository';
 import {
     findScannerRescanJobById,
     updateScannerRescanJob,
@@ -26,9 +25,6 @@ export async function executeRescanJob(
             return;
         }
 
-        const state = await findScannerState(SCANNER_ID);
-        if (!state) throw new Error('Scanner state is not initialized');
-
         await updateScannerRescanJob(jobId, {
             status: 'RUNNING',
             currentBlock: fromBlock,
@@ -36,7 +32,7 @@ export async function executeRescanJob(
         });
         const result = await runManualRescan({
             fromBlock,
-            state,
+            scannerStateId: SCANNER_ID,
             getActiveTxFilters: () => getDynamicConfigService().getTxFilters(),
             onProgress: async (currentBlock, blocksProcessed) => {
                 await updateScannerRescanJob(jobId, { currentBlock, blocksProcessed });
