@@ -1,4 +1,4 @@
-import { TxFilterGroupRule } from '../services/txFilterEvaluatorService';
+import { TxFilterGroupRule } from '../types/tx-filter.types';
 import { HttpError } from '../utils/httpError';
 
 export interface CreateTxFilterInput {
