@@ -11,6 +11,12 @@ import { resumeScanner } from './scannerControlService';
 import { releaseManualRescanReservation } from './blockMonitorService';
 import type { ScannerRescanJobSummary } from '../types/scanner-status.types';
 
+export async function getRescanJobStatus(
+    jobId: string,
+): Promise<ScannerRescanJobSummary | null> {
+    return findScannerRescanJobById(jobId);
+}
+
 export async function executeRescanJob(
     jobId: string,
     fromBlock: number,
