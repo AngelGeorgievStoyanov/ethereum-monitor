@@ -1,4 +1,4 @@
-import ScannerState from '../models/scannerState';
+import type { ScannerRuntimeState } from '../types/scanner-state.types';
 import {
     MAX_BLOCKS_PER_FINALIZED_CATCHUP,
     SCANNER_CONTROL_REFRESH_INTERVAL_MS,
@@ -93,7 +93,7 @@ export function createBlockMonitorService() {
         if (scannerStarted) return;
         scannerStarted = true;
 
-        let state: ScannerState;
+        let state: ScannerRuntimeState;
 
         try {
             while (!(await tryAcquireScannerLock())) {
