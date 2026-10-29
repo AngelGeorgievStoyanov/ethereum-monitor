@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { getTxFilterService, TxFilterSyncError } from '../services/txFilterService';
 import { sendHttpError } from '../utils/httpError';
-import { TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
+import { mapTxFilterSyncFailureResponse } from '../mappers/txFilterResponseMapper';
 import {
     validateCreateTxFilterInput,
     validateUpdateTxFilterInput,
@@ -25,11 +25,7 @@ export const createTxFilter = async (req: Request, res: Response): Promise<void>
         res.status(201).json(txFilter);
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
-            res.status(202).json({
-                message: `Filter saved to the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
-                scannerSync: 'out_of_sync',
-                data: error.result,
-            });
+            res.status(202).json(mapTxFilterSyncFailureResponse('created', error.result));
             return;
         }
         sendHttpError(res, 'Error creating transaction filter', error);
@@ -59,11 +55,7 @@ export const updateTxFilter = async (
         res.json(txFilter);
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
-            res.status(202).json({
-                message: `Filter changes were saved to the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
-                scannerSync: 'out_of_sync',
-                data: error.result,
-            });
+            res.status(202).json(mapTxFilterSyncFailureResponse('updated', error.result));
             return;
         }
         sendHttpError(res, 'Error updating transaction filter', error);
@@ -91,11 +83,7 @@ export const deleteTxFilter = async (
         res.json({ message: 'Transaction filter deleted' });
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
-            res.status(202).json({
-                message: `Filter was deleted from the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
-                scannerSync: 'out_of_sync',
-                data: error.result,
-            });
+            res.status(202).json(mapTxFilterSyncFailureResponse('deleted', error.result));
             return;
         }
         sendHttpError(res, 'Error deleting transaction filter', error);
