@@ -8,7 +8,7 @@ import {
 import { shouldPauseBeforeBlock } from './scannerControlService';
 import { formatError } from '../utils/formatError';
 import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
-import { BlockReceiptConsistencyError } from './ethereumRpcService';
+import { BlockReceiptConsistencyError } from './evmBlockDataService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { recordReorgDetected } from './recoveryMetrics';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
