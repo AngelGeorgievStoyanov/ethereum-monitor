@@ -305,7 +305,7 @@ export async function findOrCreateTransfer(
 }
 
 export async function findOrCreateInternalTransfer(
-    data: TransactionCreationAttributes,
+    data: TransactionPersistenceData,
 ): Promise<StoredTransactionRecord> {
     const where = {
         txHash: data.txHash,
