@@ -56,7 +56,7 @@ export async function requestManualRescan(requestedFromBlock: number): Promise<M
         });
     }
     if (!(await isScannerLockHeld())) {
-        return result(409, {
+        return rejected('conflict', {
             message:
                 'Manual rescan must be started on the instance that currently owns the scanner lock.',
         });
