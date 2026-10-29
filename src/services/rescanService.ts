@@ -118,7 +118,7 @@ async function runManualRescanInternal({
             !matchesBlock(consensusBlock, prepared.block)
         ) {
             recordReorgDetected();
-            await markReorgRecoveryPending(state, checkpoint);
+            await markReorgRecoveryPending(scannerStateId, checkpoint);
             throw new RescanReorgDetectedError(
                 `Fetched block data changed or disagreed with consensus at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
             );
