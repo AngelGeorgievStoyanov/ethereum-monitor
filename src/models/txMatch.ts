@@ -9,7 +9,10 @@ interface TxMatchAttributes {
     matchStatus: 'ACTIVE' | 'NOT_MATCHED' | 'FILTER_DELETED' | 'REORGED';
 }
 
-type TxMatchCreationAttributes = Optional<TxMatchAttributes, 'id' | 'txFilterDescription' | 'matchStatus'>;
+type TxMatchCreationAttributes = Optional<
+    TxMatchAttributes,
+    'id' | 'txFilterDescription' | 'matchStatus'
+>;
 
 class TxMatch
     extends Model<TxMatchAttributes, TxMatchCreationAttributes>

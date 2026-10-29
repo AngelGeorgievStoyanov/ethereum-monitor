@@ -25,7 +25,13 @@ interface TransactionAttributes {
 
 export type TransactionCreationAttributes = Optional<
     TransactionAttributes,
-    'id' | 'tokenAddress' | 'to' | 'internalCount' | 'recordStatus' | 'transactionType' | 'timestamp'
+    | 'id'
+    | 'tokenAddress'
+    | 'to'
+    | 'internalCount'
+    | 'recordStatus'
+    | 'transactionType'
+    | 'timestamp'
 >;
 
 class Transaction

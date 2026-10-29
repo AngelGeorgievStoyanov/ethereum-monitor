@@ -6,7 +6,10 @@ import { formatError } from '../utils/formatError';
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
     let timer: ReturnType<typeof setTimeout>;
     const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`RPC request timed out after ${timeoutMs}ms`)), timeoutMs);
+        timer = setTimeout(
+            () => reject(new Error(`RPC request timed out after ${timeoutMs}ms`)),
+            timeoutMs,
+        );
     });
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
@@ -59,7 +62,10 @@ export function createRpcClient() {
             endpoint.metrics.attempts += 1;
 
             try {
-                const result = await withTimeout(operation(endpoint.provider), RPC_ENDPOINT_TIMEOUT_MS);
+                const result = await withTimeout(
+                    operation(endpoint.provider),
+                    RPC_ENDPOINT_TIMEOUT_MS,
+                );
                 endpoint.metrics.successes += 1;
                 endpoint.metrics.totalDurationMs += Date.now() - startedAt;
                 return result;
@@ -96,11 +102,18 @@ export function createRpcClient() {
             const startedAt = Date.now();
             endpoint.metrics.attempts += 1;
             try {
-                const block = await withTimeout(endpoint.provider.getBlock(blockNumber), RPC_ENDPOINT_TIMEOUT_MS);
+                const block = await withTimeout(
+                    endpoint.provider.getBlock(blockNumber),
+                    RPC_ENDPOINT_TIMEOUT_MS,
+                );
                 endpoint.metrics.totalDurationMs += Date.now() - startedAt;
                 if (block) endpoint.metrics.successes += 1;
                 else endpoint.metrics.failures += 1;
-                results.push({ endpointIndex: endpoint.index, block, error: block ? null : 'EMPTY_BLOCK' });
+                results.push({
+                    endpointIndex: endpoint.index,
+                    block,
+                    error: block ? null : 'EMPTY_BLOCK',
+                });
             } catch (error) {
                 const message = formatError(error);
                 endpoint.metrics.failures += 1;

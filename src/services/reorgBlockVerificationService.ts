@@ -18,7 +18,9 @@ function validateSingleProviderBlock(
         throw new Error('Provider returned an empty block');
     }
     if (block.number !== requestedBlockNumber) {
-        throw new Error(`Provider returned block ${block.number}, expected ${requestedBlockNumber}`);
+        throw new Error(
+            `Provider returned block ${block.number}, expected ${requestedBlockNumber}`,
+        );
     }
     if (!block.hash || !block.parentHash) {
         throw new Error('Provider returned a block without hash or parentHash');
@@ -67,8 +69,7 @@ export async function getReorgVerifiedBlock(
         await sleep(CONSENSUS_RETRY_INTERVAL_MS);
     }
 
-    const message =
-        `Block verification unavailable for block ${blockNumber} during ${operation} after ${CONSENSUS_MAX_RETRIES} retries using the only configured RPC provider: ${lastFailure}`;
+    const message = `Block verification unavailable for block ${blockNumber} during ${operation} after ${CONSENSUS_MAX_RETRIES} retries using the only configured RPC provider: ${lastFailure}`;
     console.error(`[ReorgVerification] CRITICAL ${message}`);
     throw new BlockVerificationUnavailableError(blockNumber, operation, message);
 }

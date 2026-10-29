@@ -1,8 +1,5 @@
 import ScannerState from '../models/scannerState';
-import {
-    createScannerState,
-    findScannerState,
-} from '../repositories/scannerStateRepository';
+import { createScannerState, findScannerState } from '../repositories/scannerStateRepository';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { ethereumProvider } from './ethereumRpcService';
@@ -46,7 +43,9 @@ export async function initializeScannerState(): Promise<ScannerState> {
             // No explicit start block means skip existing history and begin after the current finalized block.
             initialBlock = finalized.number + 1;
             if (!Number.isSafeInteger(initialBlock)) {
-                throw new Error('Unsafe scanner start: latest finalized block cannot be incremented safely');
+                throw new Error(
+                    'Unsafe scanner start: latest finalized block cannot be incremented safely',
+                );
             }
         }
 

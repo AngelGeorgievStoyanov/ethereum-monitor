@@ -31,17 +31,22 @@ export async function createTransfersBatch(
 
     const persist = async (dbTransaction: SequelizeTransaction) => {
         const data = items.map((item) => item.data);
-        const identityConditions = [...new Map(
-            data.map((item) => {
-                const identity = getTransferIdentity(item);
-                return [identity, {
-                    txHash: item.txHash,
-                    transferType: item.transferType,
-                    blockHash: item.blockHash,
-                    ...(item.transferType === 'erc20' ? { logIndex: item.logIndex } : {}),
-                }] as const;
-            }),
-        ).values()];
+        const identityConditions = [
+            ...new Map(
+                data.map((item) => {
+                    const identity = getTransferIdentity(item);
+                    return [
+                        identity,
+                        {
+                            txHash: item.txHash,
+                            transferType: item.transferType,
+                            blockHash: item.blockHash,
+                            ...(item.transferType === 'erc20' ? { logIndex: item.logIndex } : {}),
+                        },
+                    ] as const;
+                }),
+            ).values(),
+        ];
         const lookup = {
             where: { [Op.or]: identityConditions },
             transaction: dbTransaction,
@@ -49,21 +54,32 @@ export async function createTransfersBatch(
         const existingTransactions = await Transaction.findAll(lookup);
         const existingIdentities = new Set(existingTransactions.map(getTransferIdentity));
         const itemsToPersist = reconcileMatches
-            ? items.filter((item) => item.matchingTxFilterIds.length > 0 || existingIdentities.has(getTransferIdentity(item.data)))
+            ? items.filter(
+                  (item) =>
+                      item.matchingTxFilterIds.length > 0 ||
+                      existingIdentities.has(getTransferIdentity(item.data)),
+              )
             : items;
-        const insertedTransactions = itemsToPersist.length === 0
-            ? []
-            : await Transaction.bulkCreate(itemsToPersist.map((item) => item.data), {
-                ignoreDuplicates: true,
-                returning: true,
-                transaction: dbTransaction,
-            });
+        const insertedTransactions =
+            itemsToPersist.length === 0
+                ? []
+                : await Transaction.bulkCreate(
+                      itemsToPersist.map((item) => item.data),
+                      {
+                          ignoreDuplicates: true,
+                          returning: true,
+                          transaction: dbTransaction,
+                      },
+                  );
         const transactionsByIdentity = new Map<string, Transaction>();
         for (const storedTransaction of existingTransactions) {
             transactionsByIdentity.set(getTransferIdentity(storedTransaction), storedTransaction);
         }
         for (const insertedTransaction of insertedTransactions) {
-            transactionsByIdentity.set(getTransferIdentity(insertedTransaction), insertedTransaction);
+            transactionsByIdentity.set(
+                getTransferIdentity(insertedTransaction),
+                insertedTransaction,
+            );
         }
 
         // Normally the first lookup plus PostgreSQL RETURNING resolves every row.
@@ -72,29 +88,37 @@ export async function createTransfersBatch(
             (item) => !transactionsByIdentity.has(getTransferIdentity(item.data)),
         );
         if (unresolvedItems.length > 0) {
-            const unresolvedConditions = [...new Map(
-                unresolvedItems.map((item) => {
-                    const data = item.data;
-                    return [getTransferIdentity(data), {
-                        txHash: data.txHash,
-                        transferType: data.transferType,
-                        blockHash: data.blockHash,
-                        ...(data.transferType === 'erc20' ? { logIndex: data.logIndex } : {}),
-                    }] as const;
-                }),
-            ).values()];
+            const unresolvedConditions = [
+                ...new Map(
+                    unresolvedItems.map((item) => {
+                        const data = item.data;
+                        return [
+                            getTransferIdentity(data),
+                            {
+                                txHash: data.txHash,
+                                transferType: data.transferType,
+                                blockHash: data.blockHash,
+                                ...(data.transferType === 'erc20'
+                                    ? { logIndex: data.logIndex }
+                                    : {}),
+                            },
+                        ] as const;
+                    }),
+                ).values(),
+            ];
             const unresolvedTransactions = await Transaction.findAll({
                 where: { [Op.or]: unresolvedConditions },
                 transaction: dbTransaction,
             });
             for (const storedTransaction of unresolvedTransactions) {
-                transactionsByIdentity.set(getTransferIdentity(storedTransaction), storedTransaction);
+                transactionsByIdentity.set(
+                    getTransferIdentity(storedTransaction),
+                    storedTransaction,
+                );
             }
         }
 
-        const filterIds = [
-            ...new Set(itemsToPersist.flatMap((item) => item.matchingTxFilterIds)),
-        ];
+        const filterIds = [...new Set(itemsToPersist.flatMap((item) => item.matchingTxFilterIds))];
         if (filterIds.length === 0 && !reconcileMatches) return;
 
         // Filter descriptions are part of the active in-memory cache; avoid querying TxFilter for each batch.
@@ -136,18 +160,28 @@ export async function createTransfersBatch(
         }
 
         if (reconcileMatches) {
-            const txIds = [...new Set(itemsToPersist
-                .map((item) => transactionsByIdentity.get(getTransferIdentity(item.data))?.id)
-                .filter((id): id is number => id !== undefined))];
-            const existingMatches = txIds.length === 0
-                ? []
-                : await TxMatch.findAll({
-                    where: { txId: { [Op.in]: txIds } },
-                    transaction: dbTransaction,
-                });
+            const txIds = [
+                ...new Set(
+                    itemsToPersist
+                        .map(
+                            (item) =>
+                                transactionsByIdentity.get(getTransferIdentity(item.data))?.id,
+                        )
+                        .filter((id): id is number => id !== undefined),
+                ),
+            ];
+            const existingMatches =
+                txIds.length === 0
+                    ? []
+                    : await TxMatch.findAll({
+                          where: { txId: { [Op.in]: txIds } },
+                          transaction: dbTransaction,
+                      });
             const matchingFilterIdsByTxId = new Map<number, Set<number>>();
             for (const item of itemsToPersist) {
-                const storedTransaction = transactionsByIdentity.get(getTransferIdentity(item.data));
+                const storedTransaction = transactionsByIdentity.get(
+                    getTransferIdentity(item.data),
+                );
                 if (!storedTransaction) continue;
                 matchingFilterIdsByTxId.set(
                     storedTransaction.id,
@@ -155,14 +189,18 @@ export async function createTransfersBatch(
                 );
             }
 
-            const updatesByGroup = new Map<string, {
-                ids: number[];
-                matchStatus: 'ACTIVE' | 'NOT_MATCHED';
-                txFilterDescription?: string;
-            }>();
+            const updatesByGroup = new Map<
+                string,
+                {
+                    ids: number[];
+                    matchStatus: 'ACTIVE' | 'NOT_MATCHED';
+                    txFilterDescription?: string;
+                }
+            >();
             for (const match of existingMatches) {
                 if (match.matchStatus === 'FILTER_DELETED' || match.txFilterId === null) continue;
-                const isMatching = matchingFilterIdsByTxId.get(match.txId)?.has(match.txFilterId) ?? false;
+                const isMatching =
+                    matchingFilterIdsByTxId.get(match.txId)?.has(match.txFilterId) ?? false;
                 const description = isMatching ? descriptionsById.get(match.txFilterId) : undefined;
                 const matchStatus = isMatching ? 'ACTIVE' : 'NOT_MATCHED';
                 const key = `${matchStatus}:${match.txFilterId}:${description ?? ''}`;

@@ -42,7 +42,9 @@ export interface FetchedBlockForProcessing {
     attempt: number;
 }
 
-export async function fetchBlockForProcessing(blockNumber: number): Promise<FetchedBlockForProcessing> {
+export async function fetchBlockForProcessing(
+    blockNumber: number,
+): Promise<FetchedBlockForProcessing> {
     const fetched = await fetchBlockData(blockNumber);
     if (!fetched.block.hash || !fetched.block.parentHash) {
         throw new Error(`Block ${blockNumber} is missing its hash or parent hash`);

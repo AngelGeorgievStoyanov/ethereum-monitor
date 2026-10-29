@@ -51,17 +51,30 @@ export async function getBlockWithConsensus(
 
     for (let retry = 0; retry <= CONSENSUS_MAX_RETRIES; retry += 1) {
         const results = await ethereumProvider.getBlockFromAllEndpoints(blockNumber);
-        const firstBlock = results.find((result) => result.block && result.block.hash && result.block.parentHash)?.block;
+        const firstBlock = results.find(
+            (result) => result.block && result.block.hash && result.block.parentHash,
+        )?.block;
         const expected: ConsensusBlock | undefined = firstBlock
-            ? { blockNumber: firstBlock.number, blockHash: firstBlock.hash!, parentHash: firstBlock.parentHash }
+            ? {
+                  blockNumber: firstBlock.number,
+                  blockHash: firstBlock.hash!,
+                  parentHash: firstBlock.parentHash,
+              }
             : undefined;
-        const disagreements = results.map((result) => describeDisagreement(expected, result, blockNumber)).filter(Boolean);
+        const disagreements = results
+            .map((result) => describeDisagreement(expected, result, blockNumber))
+            .filter(Boolean);
 
-        if (expected && disagreements.length === 0 && results.length === ethereumProvider.getEndpointCount()) {
+        if (
+            expected &&
+            disagreements.length === 0 &&
+            results.length === ethereumProvider.getEndpointCount()
+        ) {
             return expected;
         }
 
-        lastDisagreements = disagreements.length > 0 ? disagreements : ['No valid provider response'];
+        lastDisagreements =
+            disagreements.length > 0 ? disagreements : ['No valid provider response'];
         const now = Date.now();
         if (retry === 0 || now - lastLoggedAt >= CONSENSUS_LOG_INTERVAL_MS) {
             console.warn(

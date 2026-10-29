@@ -2,10 +2,7 @@ import sequelize from '../database';
 import { SCANNER_ADVISORY_LOCK_KEY } from '../constants/scanner.constants';
 
 interface PgConnection {
-    query(
-        sql: string,
-        values?: unknown[],
-    ): Promise<{ rows?: Array<{ locked?: boolean }> }>;
+    query(sql: string, values?: unknown[]): Promise<{ rows?: Array<{ locked?: boolean }> }>;
 }
 
 interface ConnectionManager {
@@ -71,10 +68,9 @@ export async function tryAcquireScannerLock(): Promise<boolean> {
     });
 
     try {
-        const result = await connection.query(
-            'SELECT pg_try_advisory_lock($1) AS locked',
-            [SCANNER_ADVISORY_LOCK_KEY],
-        );
+        const result = await connection.query('SELECT pg_try_advisory_lock($1) AS locked', [
+            SCANNER_ADVISORY_LOCK_KEY,
+        ]);
         const acquired = result.rows?.[0]?.locked === true;
 
         if (acquired) {

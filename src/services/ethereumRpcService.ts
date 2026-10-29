@@ -49,9 +49,13 @@ function validateBlockReceipts(
         (receipt) => String(receipt.blockHash ?? '').toLowerCase() !== firstReceiptBlockHash,
     );
     if (inconsistentReceiptHashes) {
-        const distinctHashes = [...new Set(receipts.map(
-            (receipt) => String(receipt.blockHash ?? '').toLowerCase() || '<missing>',
-        ))];
+        const distinctHashes = [
+            ...new Set(
+                receipts.map(
+                    (receipt) => String(receipt.blockHash ?? '').toLowerCase() || '<missing>',
+                ),
+            ),
+        ];
         throw new BlockReceiptConsistencyError(
             blockNumber,
             `Block ${blockNumber} returned inconsistent receipt blockHash values: ${distinctHashes.join(', ')}`,
@@ -186,4 +190,3 @@ export async function fetchBlockData(blockNumber: number) {
 
     throw new Error(`Unable to fetch block data for block ${blockNumber}`);
 }
-

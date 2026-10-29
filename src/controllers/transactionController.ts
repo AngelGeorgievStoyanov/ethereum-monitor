@@ -19,8 +19,7 @@ export async function getAllStoredTransactions(req: Request, res: Response): Pro
 
     if (page === undefined || limit === undefined || limit > MAX_LIMIT) {
         res.status(400).json({
-            message:
-                `Invalid pagination parameters. page must be a positive integer and limit must be between 1 and ${MAX_LIMIT}.`,
+            message: `Invalid pagination parameters. page must be a positive integer and limit must be between 1 and ${MAX_LIMIT}.`,
         });
         return;
     }

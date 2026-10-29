@@ -10,10 +10,10 @@ Requirements: Node.js 24, npm, PostgreSQL, and an Ethereum Mainnet RPC endpoint.
 2. Create an empty database named `ethereum_monitor`.
 3. Create a `.env` file:
 
-   ```env
-   DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/ethereum_monitor
-   RPC_URL_1=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
-   ```
+    ```env
+    DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/ethereum_monitor
+    RPC_URL_1=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
+    ```
 
 4. Run `npm run dev`.
 
@@ -46,19 +46,19 @@ Catch-up is limited to 100 blocks per cycle. When far behind, normal processing 
 A rescan checks existing canonical history from `fromBlock` through the saved checkpoint. It does not move the checkpoint.
 
 1. Pause the scanner in manual mode:
-   ```http
-   POST /api/scanner/pause
-   Content-Type: application/json
+    ```http
+    POST /api/scanner/pause
+    Content-Type: application/json
 
-   {"mode":"manual"}
-   ```
+    {"mode":"manual"}
+    ```
 2. Start the rescan:
-   ```http
-   POST /api/scanner/rescan
-   Content-Type: application/json
+    ```http
+    POST /api/scanner/rescan
+    Content-Type: application/json
 
-   {"fromBlock":19000000}
-   ```
+    {"fromBlock":19000000}
+    ```
 3. Check progress with `GET /api/scanner/rescan/OPERATION_ID`, using the returned operation ID.
 
 The scanner must be idle and canonical history must exist for the full range. A chain mismatch stops the rescan and starts reorg recovery. Failed or interrupted jobs can be retried from the same starting block after checking their status.
@@ -67,19 +67,19 @@ The scanner must be idle and canonical history must exist for the full range. A 
 
 All routes use the `/api` prefix.
 
-| Method | Route | Purpose |
-| --- | --- | --- |
-| GET | `/health/live` | Process liveness. |
-| GET | `/health/ready` | Database and RPC availability. |
-| GET | `/scanner/status` | Checkpoint, lag, pause, recovery, and RPC metrics. |
-| POST | `/scanner/pause` | Pause now or after a block. |
-| POST | `/scanner/resume` | Resume scanning. |
-| POST | `/scanner/rescan` | Start a manual rescan. |
-| GET | `/scanner/rescan/:id` | Check rescan progress. |
-| POST | `/scanner/reorg-retry` | Retry blocked recovery. |
-| GET/POST/PUT/DELETE | `/tx-filters` | Manage filters. |
-| GET | `/transactions?page=1&limit=20` | List stored transfers. |
-| DELETE | `/transactions/:id` | Delete a stored transfer. |
+| Method              | Route                           | Purpose                                            |
+| ------------------- | ------------------------------- | -------------------------------------------------- |
+| GET                 | `/health/live`                  | Process liveness.                                  |
+| GET                 | `/health/ready`                 | Database and RPC availability.                     |
+| GET                 | `/scanner/status`               | Checkpoint, lag, pause, recovery, and RPC metrics. |
+| POST                | `/scanner/pause`                | Pause now or after a block.                        |
+| POST                | `/scanner/resume`               | Resume scanning.                                   |
+| POST                | `/scanner/rescan`               | Start a manual rescan.                             |
+| GET                 | `/scanner/rescan/:id`           | Check rescan progress.                             |
+| POST                | `/scanner/reorg-retry`          | Retry blocked recovery.                            |
+| GET/POST/PUT/DELETE | `/tx-filters`                   | Manage filters.                                    |
+| GET                 | `/transactions?page=1&limit=20` | List stored transfers.                             |
+| DELETE              | `/transactions/:id`             | Delete a stored transfer.                          |
 
 ## Configuration
 

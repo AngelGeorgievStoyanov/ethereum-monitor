@@ -26,8 +26,7 @@ export const createTxFilter = async (req: Request, res: Response): Promise<void>
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
-                message:
-                    `Filter saved to the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
+                message: `Filter saved to the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });
@@ -59,8 +58,7 @@ export const updateTxFilter = async (
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
-                message:
-                    `Filter changes were saved to the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
+                message: `Filter changes were saved to the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });
@@ -90,8 +88,7 @@ export const deleteTxFilter = async (
     } catch (error) {
         if (error instanceof TxFilterSyncError) {
             res.status(202).json({
-                message:
-                    `Filter was deleted from the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
+                message: `Filter was deleted from the database, but the scanner is still using its previous filters. Reload failed after ${TX_FILTER_RELOAD_RETRY_DELAYS_MS.length + 1} attempts.`,
                 scannerSync: 'out_of_sync',
                 data: error.result,
             });

@@ -32,7 +32,11 @@ async function markInterruptedRescanJobs(): Promise<void> {
         { where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } } },
     );
     if (count > 0) {
-        console.warn('[Rescan] Marked ' + count + ' abandoned rescan job(s) as INTERRUPTED after acquiring scanner ownership');
+        console.warn(
+            '[Rescan] Marked ' +
+                count +
+                ' abandoned rescan job(s) as INTERRUPTED after acquiring scanner ownership',
+        );
     }
 }
 
@@ -129,8 +133,11 @@ export function createBlockMonitorService() {
 
             const now = Date.now();
             const noProgressMs = now - lastProgressAt;
-            if (noProgressMs >= SCANNER_STALL_WARNING_INTERVAL_MS &&
-                (lastStallWarningAt === 0 || now - lastStallWarningAt >= SCANNER_STALL_WARNING_INTERVAL_MS)) {
+            if (
+                noProgressMs >= SCANNER_STALL_WARNING_INTERVAL_MS &&
+                (lastStallWarningAt === 0 ||
+                    now - lastStallWarningAt >= SCANNER_STALL_WARNING_INTERVAL_MS)
+            ) {
                 console.warn(
                     `[Scanner] No checkpoint progress for ${Math.round(noProgressMs / 1000)}s; ` +
                         `checkpoint=${state.lastProcessedBlock}. Block processing may be stalled.`,
@@ -192,8 +199,9 @@ export function createBlockMonitorService() {
                     } else {
                         waitingForPause = false;
                         const finalized = await ethereumProvider.getBlock('finalized');
-                        if (!finalized) throw new Error('Unable to resolve the latest finalized block');
-    
+                        if (!finalized)
+                            throw new Error('Unable to resolve the latest finalized block');
+
                         if (finalized.number < state.lastProcessedBlock) {
                             const checkpoint = state.lastProcessedBlock;
                             const primaryFinalized = finalized.number;
@@ -202,7 +210,7 @@ export function createBlockMonitorService() {
                             );
                             void logFinalizedRegressionDiagnostics(checkpoint, primaryFinalized);
                         }
-    
+
                         if (waitingForFilters) {
                             const pausePendingOrActive = await isScannerPausePendingOrActive();
                             if (!pausePendingOrActive) {
@@ -224,7 +232,7 @@ export function createBlockMonitorService() {
                             );
                             waitingForFilters = false;
                         }
-    
+
                         const finalizedCatchupTarget = Math.min(
                             finalized.number,
                             state.lastProcessedBlock + MAX_BLOCKS_PER_FINALIZED_CATCHUP,
@@ -234,7 +242,7 @@ export function createBlockMonitorService() {
                                 `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${MAX_BLOCKS_PER_FINALIZED_CATCHUP}`,
                             );
                         }
-    
+
                         // Reserve and block normal processing atomically with respect to the rescan endpoint.
                         if (manualRescanReserved) {
                             await sleep(SCANNER_POLL_INTERVAL_MS);
@@ -258,12 +266,12 @@ export function createBlockMonitorService() {
                                     txFilterService.getTxFilters(),
                                 );
                             }
-                            } finally {
+                        } finally {
                             processingFinalizedBlocks = false;
                         }
                     }
-                    }
-                } catch (error) {
+                }
+            } catch (error) {
                 console.error(
                     `[Scanner] Processing failed; checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
                 );

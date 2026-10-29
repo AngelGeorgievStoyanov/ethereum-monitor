@@ -7,7 +7,8 @@ class ScannerRescanJob extends Model {
     public toBlock!: number;
     public currentBlock!: number | null;
     public blocksProcessed!: number;
-    public status!: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'RECOVERY_STARTED' | 'FAILED' | 'INTERRUPTED';
+    public status!:
+        'QUEUED' | 'RUNNING' | 'COMPLETED' | 'RECOVERY_STARTED' | 'FAILED' | 'INTERRUPTED';
     public error!: string | null;
     public startedAt!: Date | null;
     public completedAt!: Date | null;

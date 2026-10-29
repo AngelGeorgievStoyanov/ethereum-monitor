@@ -92,12 +92,17 @@ export const pauseScanner = async (req: Request, res: Response): Promise<void> =
     }
     if (
         durationMinutes !== undefined &&
-        (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > SCANNER_MAX_PAUSE_DURATION_MINUTES)
+        (!Number.isSafeInteger(durationMinutes) ||
+            durationMinutes < 1 ||
+            durationMinutes > SCANNER_MAX_PAUSE_DURATION_MINUTES)
     ) {
         sendHttpError(
             res,
             'Invalid scanner pause duration',
-            new HttpError(400, `durationMinutes must be an integer between 1 and ${SCANNER_MAX_PAUSE_DURATION_MINUTES}`),
+            new HttpError(
+                400,
+                `durationMinutes must be an integer between 1 and ${SCANNER_MAX_PAUSE_DURATION_MINUTES}`,
+            ),
         );
         return;
     }
@@ -125,7 +130,6 @@ export const resumeScannerController = async (_req: Request, res: Response): Pro
     }
 };
 
-
 async function executeRescanJob(jobId: string, fromBlock: number, toBlock: number): Promise<void> {
     let job: ScannerRescanJob | null = null;
 
@@ -140,7 +144,11 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
         const state = await ScannerState.findByPk(SCANNER_ID);
         if (!state) throw new Error('Scanner state is not initialized');
 
-        await activeJob.update({ status: 'RUNNING', currentBlock: fromBlock, startedAt: new Date() });
+        await activeJob.update({
+            status: 'RUNNING',
+            currentBlock: fromBlock,
+            startedAt: new Date(),
+        });
         const result = await runManualRescan({
             fromBlock,
             state,
@@ -157,16 +165,26 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
             error: null,
         });
         await resumeScanner();
-        console.log(`[Rescan] Job ${jobId} completed; range=${fromBlock}-${toBlock}; blocksProcessed=${result.blocksProcessed}; scanner resumed`);
+        console.log(
+            `[Rescan] Job ${jobId} completed; range=${fromBlock}-${toBlock}; blocksProcessed=${result.blocksProcessed}; scanner resumed`,
+        );
     } catch (error) {
         const message = formatError(error);
         if (error instanceof RescanReorgDetectedError && job) {
-            await job.update({ status: 'RECOVERY_STARTED', error: message, completedAt: new Date() });
-            console.warn(`[Rescan] Job ${jobId} detected a reorg; handing control to automatic recovery`);
+            await job.update({
+                status: 'RECOVERY_STARTED',
+                error: message,
+                completedAt: new Date(),
+            });
+            console.warn(
+                `[Rescan] Job ${jobId} detected a reorg; handing control to automatic recovery`,
+            );
             try {
                 await resumeScanner();
             } catch (resumeError) {
-                console.error(`[Rescan] Job ${jobId} could not resume scanner for recovery: ${formatError(resumeError)}`);
+                console.error(
+                    `[Rescan] Job ${jobId} could not resume scanner for recovery: ${formatError(resumeError)}`,
+                );
             }
             return;
         }
@@ -175,12 +193,20 @@ async function executeRescanJob(jobId: string, fromBlock: number, toBlock: numbe
         try {
             if (!job) job = await ScannerRescanJob.findByPk(jobId);
             if (job) {
-                await job.update({ status: 'FAILED', error: message.slice(0, 1000), completedAt: new Date() });
+                await job.update({
+                    status: 'FAILED',
+                    error: message.slice(0, 1000),
+                    completedAt: new Date(),
+                });
             } else {
-                console.error(`[Rescan] Job ${jobId} could not be marked FAILED because its row could not be loaded`);
+                console.error(
+                    `[Rescan] Job ${jobId} could not be marked FAILED because its row could not be loaded`,
+                );
             }
         } catch (statusError) {
-            console.error(`[Rescan] Job ${jobId} status update failed: ${formatError(statusError)}`);
+            console.error(
+                `[Rescan] Job ${jobId} status update failed: ${formatError(statusError)}`,
+            );
         }
         console.error(`[Rescan] Job ${jobId} failed: ${message}`);
     } finally {
@@ -198,15 +224,24 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
 
     const scannerControl = await getScannerControlState();
     if (!scannerControl.paused || scannerControl.mode !== 'manual') {
-        res.status(409).json({ message: 'Pause the scanner with mode="manual" before starting a rescan; temporary pauses may expire during the operation.' });
+        res.status(409).json({
+            message:
+                'Pause the scanner with mode="manual" before starting a rescan; temporary pauses may expire during the operation.',
+        });
         return;
     }
     if (!(await isScannerLockHeld())) {
-        res.status(409).json({ message: 'Manual rescan must be started on the instance that currently owns the scanner lock.' });
+        res.status(409).json({
+            message:
+                'Manual rescan must be started on the instance that currently owns the scanner lock.',
+        });
         return;
     }
     if (isScannerProcessingBlocks()) {
-        res.status(409).json({ message: 'The scanner is still finishing block processing. Retry the rescan after it becomes idle.' });
+        res.status(409).json({
+            message:
+                'The scanner is still finishing block processing. Retry the rescan after it becomes idle.',
+        });
         return;
     }
 
@@ -224,7 +259,9 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             return;
         }
         if (state.reorgRecoveryActive || state.reorgRecoveryBlocked) {
-            res.status(409).json({ message: 'Cannot start a rescan while reorg recovery is active or blocked.' });
+            res.status(409).json({
+                message: 'Cannot start a rescan while reorg recovery is active or blocked.',
+            });
             return;
         }
 
@@ -237,7 +274,8 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
         });
         if (canonicalBlocks !== expectedBlocks) {
             res.status(409).json({
-                message: 'Cannot start rescan because canonical block history is missing in the requested range.',
+                message:
+                    'Cannot start rescan because canonical block history is missing in the requested range.',
                 fromBlock,
                 toBlock: state.lastProcessedBlock,
                 expectedBlocks,
@@ -250,13 +288,17 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
             where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } },
         });
         if (activeJob) {
-            res.status(409).json({ message: 'A rescan job is already running.', operationId: activeJob.id });
+            res.status(409).json({
+                message: 'A rescan job is already running.',
+                operationId: activeJob.id,
+            });
             return;
         }
 
         if (!tryReserveManualRescan()) {
             res.status(409).json({
-                message: 'The scanner is processing blocks or another rescan is reserved. Retry when it is idle.',
+                message:
+                    'The scanner is processing blocks or another rescan is reserved. Retry when it is idle.',
             });
             return;
         }
@@ -277,7 +319,9 @@ export const rescanScannerController = async (req: Request, res: Response): Prom
 
         void executeRescanJob(operationId, fromBlock, state.lastProcessedBlock).catch((error) => {
             releaseManualRescanReservation();
-            console.error(`[Rescan] Job ${operationId} failed before its status could be updated: ${formatError(error)}`);
+            console.error(
+                `[Rescan] Job ${operationId} failed before its status could be updated: ${formatError(error)}`,
+            );
         });
         reservedForThisRequest = false;
         res.status(202).json({
@@ -308,7 +352,6 @@ export const getRescanJobStatus = async (req: Request, res: Response): Promise<v
     }
 };
 
-
 export const retryBlockedReorgRecovery = async (_req: Request, res: Response): Promise<void> => {
     try {
         const state = await ScannerState.findByPk(SCANNER_ID);
@@ -317,7 +360,9 @@ export const retryBlockedReorgRecovery = async (_req: Request, res: Response): P
             return;
         }
         if (!state.reorgRecoveryBlocked) {
-            res.status(409).json({ message: 'Reorg recovery is not blocked; no explicit retry is needed.' });
+            res.status(409).json({
+                message: 'Reorg recovery is not blocked; no explicit retry is needed.',
+            });
             return;
         }
         state.reorgRecoveryBlocked = false;

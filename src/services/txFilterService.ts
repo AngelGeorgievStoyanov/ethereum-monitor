@@ -4,7 +4,10 @@ import ScannerState from '../models/scannerState';
 import TxFilter from '../models/txFilter';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
-import { FILTER_MUTATION_ADVISORY_LOCK_KEY, TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
+import {
+    FILTER_MUTATION_ADVISORY_LOCK_KEY,
+    TX_FILTER_RELOAD_RETRY_DELAYS_MS,
+} from '../constants/tx-filter.constants';
 import {
     createTxFilter as insertTxFilter,
     deleteTxFilterById,
@@ -78,7 +81,9 @@ export function createTxFilterService() {
             Array.from(next.entries()).sort(([leftId], [rightId]) => leftId - rightId),
         );
         if (currentSignature === nextSignature) {
-            console.log(`[Scanner] Transaction filter cache unchanged (${txFilters.size} active filter(s))`);
+            console.log(
+                `[Scanner] Transaction filter cache unchanged (${txFilters.size} active filter(s))`,
+            );
             return;
         }
 
@@ -91,7 +96,11 @@ export function createTxFilterService() {
         const task = reloadQueue
             .catch(() => undefined)
             .then(async () => {
-                for (let attempt = 0; attempt <= TX_FILTER_RELOAD_RETRY_DELAYS_MS.length; attempt += 1) {
+                for (
+                    let attempt = 0;
+                    attempt <= TX_FILTER_RELOAD_RETRY_DELAYS_MS.length;
+                    attempt += 1
+                ) {
                     try {
                         await loadTxFilters();
                         return true;
@@ -193,7 +202,7 @@ export function createTxFilterService() {
                 ? await getInitialConfiguredStartBlock(transaction)
                 : undefined;
             const activeFromBlock = data.isActive
-                ? (initialStartBlock ?? await getNextFilterStartBlock())
+                ? (initialStartBlock ?? (await getNextFilterStartBlock()))
                 : null;
             const createdFilter = await insertTxFilter(
                 {
@@ -239,7 +248,13 @@ export function createTxFilterService() {
             if (!current) return null;
 
             const existingRule = updates.rule === undefined ? await findRuleForFilter(id) : null;
-            if (updates.rule === null && !current.from && !current.to && !updates.from && !updates.to) {
+            if (
+                updates.rule === null &&
+                !current.from &&
+                !current.to &&
+                !updates.from &&
+                !updates.to
+            ) {
                 throw new ValidationError('A filter requires at least one condition');
             }
 

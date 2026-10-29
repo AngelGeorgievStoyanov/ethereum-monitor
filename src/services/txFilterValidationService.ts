@@ -26,7 +26,12 @@ export function validateTxFilterGroup(group: TxFilterGroupRule): void {
             );
         }
         try {
-            evaluateTxFilterOperator({ field: condition.field, operator: condition.operator, actualValue: null, expectedValue: condition.value });
+            evaluateTxFilterOperator({
+                field: condition.field,
+                operator: condition.operator,
+                actualValue: null,
+                expectedValue: condition.value,
+            });
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             throw new ValidationError(message);

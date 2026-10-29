@@ -33,7 +33,9 @@ async function startScannerWithRetry() {
             return;
         } catch (error) {
             if (error instanceof UnsafeScannerStartError) {
-                console.error(`[Scanner] Startup stopped because START_BLOCK is unsafe: ${formatError(error)}`);
+                console.error(
+                    `[Scanner] Startup stopped because START_BLOCK is unsafe: ${formatError(error)}`,
+                );
                 return;
             }
 

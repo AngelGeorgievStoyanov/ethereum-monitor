@@ -188,7 +188,10 @@ export async function processFinalizedBlocks(
             console.error(
                 `[Scanner] Processing failed at block ${currentBatchStart}; checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
             );
-            if (error instanceof BlockReceiptConsistencyError || error instanceof BlockChainDiscontinuityError) {
+            if (
+                error instanceof BlockReceiptConsistencyError ||
+                error instanceof BlockChainDiscontinuityError
+            ) {
                 recordReorgDetected();
                 try {
                     await markReorgRecoveryPending(

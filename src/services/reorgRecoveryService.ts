@@ -1,6 +1,9 @@
 import { Op } from 'sequelize';
 import sequelize from '../database';
-import { MAX_REORG_LOOKBACK_BLOCKS, REORG_RECOVERY_STABLE_BLOCKS } from '../constants/scanner.constants';
+import {
+    MAX_REORG_LOOKBACK_BLOCKS,
+    REORG_RECOVERY_STABLE_BLOCKS,
+} from '../constants/scanner.constants';
 import Block from '../models/block';
 import StoredTransaction from '../models/transaction';
 import TxMatch from '../models/txMatch';
@@ -39,8 +42,10 @@ function logSingleProviderReorgMode(): void {
 }
 
 function sameBlock(stored: Block, current: { blockHash: string; parentHash: string }): boolean {
-    return stored.blockHash.toLowerCase() === current.blockHash.toLowerCase() &&
-        stored.parentHash.toLowerCase() === current.parentHash.toLowerCase();
+    return (
+        stored.blockHash.toLowerCase() === current.blockHash.toLowerCase() &&
+        stored.parentHash.toLowerCase() === current.parentHash.toLowerCase()
+    );
 }
 
 export async function markReorgRecoveryPending(
@@ -48,9 +53,13 @@ export async function markReorgRecoveryPending(
     checkpoint: number,
     targetBlock = checkpoint + REORG_RECOVERY_STABLE_BLOCKS,
 ): Promise<void> {
-    if (!(await isScannerLockHeld())) throw new Error('Cannot mark reorg recovery pending without owning the scanner lock');
+    if (!(await isScannerLockHeld()))
+        throw new Error('Cannot mark reorg recovery pending without owning the scanner lock');
     await sequelize.transaction(async (transaction) => {
-        if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before persisting reorg recovery state');
+        if (!(await isScannerLockHeld()))
+            throw new Error(
+                'Scanner lock ownership was lost before persisting reorg recovery state',
+            );
         const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
             lock: transaction.LOCK.UPDATE,
@@ -68,9 +77,11 @@ export async function markReorgRecoveryPending(
 }
 
 async function findAncestorAndRollback(state: ScannerState): Promise<void> {
-    if (!(await isScannerLockHeld())) throw new Error('Cannot search for or roll back a reorg without owning the scanner lock');
+    if (!(await isScannerLockHeld()))
+        throw new Error('Cannot search for or roll back a reorg without owning the scanner lock');
     const originalCheckpoint = state.reorgRecoveryStartBlock;
-    if (originalCheckpoint === null) throw new Error('Reorg recovery has no checkpoint to reconcile');
+    if (originalCheckpoint === null)
+        throw new Error('Reorg recovery has no checkpoint to reconcile');
 
     console.warn(`[Reorg] Searching for a common ancestor at or below block ${originalCheckpoint}`);
     let ancestor: Block | null = null;
@@ -84,7 +95,9 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
             where: { blockNumber, status: 'CANONICAL' },
         });
         if (!storedBlock) {
-            throw new ReorgRecoverySafetyError(`Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`);
+            throw new ReorgRecoverySafetyError(
+                `Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`,
+            );
         }
 
         const currentBlock = await getReorgVerifiedBlock(blockNumber, 'common ancestor search');
@@ -96,19 +109,25 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
     }
 
     if (!ancestor) {
-        throw new ReorgRecoverySafetyError(`No common ancestor found within ${MAX_REORG_LOOKBACK_BLOCKS} blocks at or below ${originalCheckpoint}`);
+        throw new ReorgRecoverySafetyError(
+            `No common ancestor found within ${MAX_REORG_LOOKBACK_BLOCKS} blocks at or below ${originalCheckpoint}`,
+        );
     }
 
-    if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before reorg rollback');
+    if (!(await isScannerLockHeld()))
+        throw new Error('Scanner lock ownership was lost before reorg rollback');
     await sequelize.transaction(async (transaction) => {
-        if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before reorg rollback transaction');
+        if (!(await isScannerLockHeld()))
+            throw new Error('Scanner lock ownership was lost before reorg rollback transaction');
         const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
             lock: transaction.LOCK.UPDATE,
         });
         if (!persistedState) throw new Error(`Scanner state "${state.id}" was not found`);
         if (persistedState.lastProcessedBlock !== originalCheckpoint) {
-            throw new Error(`Checkpoint changed while recovering reorg: expected ${originalCheckpoint}, found ${persistedState.lastProcessedBlock}`);
+            throw new Error(
+                `Checkpoint changed while recovering reorg: expected ${originalCheckpoint}, found ${persistedState.lastProcessedBlock}`,
+            );
         }
 
         const orphanedBlocks = await Block.findAll({
@@ -119,13 +138,14 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
             transaction,
         });
         const orphanedBlockHashes = orphanedBlocks.map((block) => block.blockHash);
-        const orphanedTransactions = orphanedBlockHashes.length === 0
-            ? []
-            : await StoredTransaction.findAll({
-                where: { blockHash: { [Op.in]: orphanedBlockHashes } },
-                attributes: ['id'],
-                transaction,
-            });
+        const orphanedTransactions =
+            orphanedBlockHashes.length === 0
+                ? []
+                : await StoredTransaction.findAll({
+                      where: { blockHash: { [Op.in]: orphanedBlockHashes } },
+                      attributes: ['id'],
+                      transaction,
+                  });
         const orphanedTransactionIds = orphanedTransactions.map((item) => item.id);
 
         await Block.update(
@@ -158,7 +178,8 @@ async function findAncestorAndRollback(state: ScannerState): Promise<void> {
         }
 
         if (persistedState.reorgRecoveryTargetBlock === null) {
-            persistedState.reorgRecoveryTargetBlock = originalCheckpoint + REORG_RECOVERY_STABLE_BLOCKS;
+            persistedState.reorgRecoveryTargetBlock =
+                originalCheckpoint + REORG_RECOVERY_STABLE_BLOCKS;
         }
         persistedState.lastProcessedBlock = ancestor!.blockNumber;
         persistedState.reorgRecoveryActive = true;
@@ -205,14 +226,18 @@ async function processReorgRecoveryInternal(
         // Cheaply check the checkpoint with the selected provider during normal scanning.
         // If it disagrees, the verification service selects single-provider verification or strict consensus.
         const currentCheckpoint = await ethereumProvider.getBlock(state.lastProcessedBlock);
-        if (!currentCheckpoint) throw new Error(`Unable to read checkpoint block ${state.lastProcessedBlock}`);
+        if (!currentCheckpoint)
+            throw new Error(`Unable to read checkpoint block ${state.lastProcessedBlock}`);
         const primaryMatches = sameBlock(storedCheckpoint, {
             blockHash: currentCheckpoint.hash ?? '',
             parentHash: currentCheckpoint.parentHash,
         });
         if (primaryMatches) return false;
 
-        const verifiedCheckpoint = await getReorgVerifiedBlock(state.lastProcessedBlock, 'reorg detection');
+        const verifiedCheckpoint = await getReorgVerifiedBlock(
+            state.lastProcessedBlock,
+            'reorg detection',
+        );
         if (sameBlock(storedCheckpoint, verifiedCheckpoint)) {
             console.warn(
                 ethereumProvider.getEndpointCount() === 1
@@ -240,7 +265,9 @@ async function processReorgRecoveryInternal(
 
     while (state.reorgRecoveryActive && state.lastProcessedBlock < finalizedBlockNumber) {
         if (!(await isScannerLockHeld())) {
-            console.warn('[Reorg] Scanner lock lost; recovery will resume after the lock is reacquired');
+            console.warn(
+                '[Reorg] Scanner lock lost; recovery will resume after the lock is reacquired',
+            );
             return true;
         }
 
@@ -249,10 +276,20 @@ async function processReorgRecoveryInternal(
         const previousCanonicalBlock = await Block.findOne({
             where: { blockNumber: state.lastProcessedBlock, status: 'CANONICAL' },
         });
-        if (previousCanonicalBlock && verifiedBlock.parentHash.toLowerCase() !== previousCanonicalBlock.blockHash.toLowerCase()) {
-            console.warn(`[Reorg] Chain changed again during recovery at block ${blockNumber}; restarting ancestor search`);
+        if (
+            previousCanonicalBlock &&
+            verifiedBlock.parentHash.toLowerCase() !==
+                previousCanonicalBlock.blockHash.toLowerCase()
+        ) {
+            console.warn(
+                `[Reorg] Chain changed again during recovery at block ${blockNumber}; restarting ancestor search`,
+            );
             recordReorgDetected();
-            await markReorgRecoveryPending(state, state.lastProcessedBlock, blockNumber + REORG_RECOVERY_STABLE_BLOCKS);
+            await markReorgRecoveryPending(
+                state,
+                state.lastProcessedBlock,
+                blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
+            );
             await findAncestorAndRollback(state);
             continue;
         }
@@ -263,17 +300,24 @@ async function processReorgRecoveryInternal(
             fetched.block.hash.toLowerCase() !== verifiedBlock.blockHash.toLowerCase() ||
             fetched.block.parentHash.toLowerCase() !== verifiedBlock.parentHash.toLowerCase()
         ) {
-            throw new ReorgRecoverySafetyError(`Block data fetched for recovery block ${blockNumber} does not match the verified provider block`);
+            throw new ReorgRecoverySafetyError(
+                `Block data fetched for recovery block ${blockNumber} does not match the verified provider block`,
+            );
         }
         const prepared = await processFetchedBlock(fetched, filters, true);
 
-        const recoveryTargetBlock = state.reorgRecoveryTargetBlock ?? (state.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS);
-        const stableBlocks = blockNumber > recoveryTargetBlock - REORG_RECOVERY_STABLE_BLOCKS
-            ? state.reorgRecoveryStableBlocks + 1
-            : 0;
+        const recoveryTargetBlock =
+            state.reorgRecoveryTargetBlock ??
+            state.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS;
+        const stableBlocks =
+            blockNumber > recoveryTargetBlock - REORG_RECOVERY_STABLE_BLOCKS
+                ? state.reorgRecoveryStableBlocks + 1
+                : 0;
         const recoveryComplete = blockNumber >= recoveryTargetBlock;
         if (!(await isScannerLockHeld())) {
-            console.warn(`[Reorg] Scanner lock lost before committing recovery block ${blockNumber}`);
+            console.warn(
+                `[Reorg] Scanner lock lost before committing recovery block ${blockNumber}`,
+            );
             return true;
         }
         const committedCheckpoint = await persistProcessedBlockBatch({
@@ -306,7 +350,9 @@ async function processReorgRecoveryInternal(
         if (recoveryComplete) {
             recordReorgRecoveryCompleted();
             singleProviderReorgWarningLogged = false;
-            console.log(`[Reorg] Recovery completed at block ${blockNumber}; normal scanner mode may resume`);
+            console.log(
+                `[Reorg] Recovery completed at block ${blockNumber}; normal scanner mode may resume`,
+            );
             return true;
         }
     }
@@ -314,18 +360,22 @@ async function processReorgRecoveryInternal(
     return true;
 }
 
-
 async function markVerificationRecoveryBlocked(
     state: ScannerState,
     error: BlockVerificationUnavailableError,
 ): Promise<void> {
     if (!(await isScannerLockHeld())) {
-        console.error('[Reorg] Cannot persist blocked recovery state because scanner lock ownership was lost');
+        console.error(
+            '[Reorg] Cannot persist blocked recovery state because scanner lock ownership was lost',
+        );
         return;
     }
     if (error instanceof ConsensusUnavailableError) recordReorgConsensusFailure();
     await sequelize.transaction(async (transaction) => {
-        if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before persisting block-verification-blocked recovery state');
+        if (!(await isScannerLockHeld()))
+            throw new Error(
+                'Scanner lock ownership was lost before persisting block-verification-blocked recovery state',
+            );
         const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
             lock: transaction.LOCK.UPDATE,
@@ -334,14 +384,17 @@ async function markVerificationRecoveryBlocked(
         if (!persistedState.reorgRecoveryActive) {
             persistedState.reorgRecoveryActive = true;
             persistedState.reorgRecoveryStartBlock = persistedState.lastProcessedBlock;
-            persistedState.reorgRecoveryTargetBlock = persistedState.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS;
+            persistedState.reorgRecoveryTargetBlock =
+                persistedState.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS;
             persistedState.reorgRecoveryStableBlocks = 0;
         }
         persistedState.reorgRecoveryBlocked = true;
-        const reasonPrefix = error instanceof ConsensusUnavailableError
-            ? 'CONSENSUS_UNAVAILABLE'
-            : 'BLOCK_VERIFICATION_UNAVAILABLE';
-        persistedState.reorgRecoveryBlockReason = `${reasonPrefix}:${error.operation}:block=${error.blockNumber}`.slice(0, 500);
+        const reasonPrefix =
+            error instanceof ConsensusUnavailableError
+                ? 'CONSENSUS_UNAVAILABLE'
+                : 'BLOCK_VERIFICATION_UNAVAILABLE';
+        persistedState.reorgRecoveryBlockReason =
+            `${reasonPrefix}:${error.operation}:block=${error.blockNumber}`.slice(0, 500);
         await persistedState.save({ transaction });
     });
     await state.reload();
@@ -355,13 +408,17 @@ async function markReceiptConsistencyRecoveryBlocked(
     error: BlockReceiptConsistencyError,
 ): Promise<void> {
     if (!(await isScannerLockHeld())) {
-        console.error('[Reorg] Cannot persist receipt-consistency-blocked recovery because scanner lock ownership was lost');
+        console.error(
+            '[Reorg] Cannot persist receipt-consistency-blocked recovery because scanner lock ownership was lost',
+        );
         return;
     }
 
     await sequelize.transaction(async (transaction) => {
         if (!(await isScannerLockHeld())) {
-            throw new Error('Scanner lock ownership was lost before persisting receipt-consistency-blocked recovery');
+            throw new Error(
+                'Scanner lock ownership was lost before persisting receipt-consistency-blocked recovery',
+            );
         }
         const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
@@ -389,7 +446,6 @@ async function markReceiptConsistencyRecoveryBlocked(
     );
 }
 
-
 export async function processReorgRecovery(
     state: ScannerState,
     finalizedBlockNumber: number,
@@ -414,14 +470,21 @@ export async function processReorgRecovery(
     }
 }
 
-
-async function markRecoverySafetyBlocked(state: ScannerState, error: ReorgRecoverySafetyError): Promise<void> {
+async function markRecoverySafetyBlocked(
+    state: ScannerState,
+    error: ReorgRecoverySafetyError,
+): Promise<void> {
     if (!(await isScannerLockHeld())) {
-        console.error('[Reorg] Cannot persist safety-blocked recovery state because scanner lock ownership was lost');
+        console.error(
+            '[Reorg] Cannot persist safety-blocked recovery state because scanner lock ownership was lost',
+        );
         return;
     }
     await sequelize.transaction(async (transaction) => {
-        if (!(await isScannerLockHeld())) throw new Error('Scanner lock ownership was lost before persisting safety-blocked recovery state');
+        if (!(await isScannerLockHeld()))
+            throw new Error(
+                'Scanner lock ownership was lost before persisting safety-blocked recovery state',
+            );
         const persistedState = await ScannerState.findByPk(state.id, {
             transaction,
             lock: transaction.LOCK.UPDATE,
@@ -433,11 +496,14 @@ async function markRecoverySafetyBlocked(state: ScannerState, error: ReorgRecove
             persistedState.reorgRecoveryStartBlock = persistedState.lastProcessedBlock;
         }
         if (persistedState.reorgRecoveryTargetBlock === null) {
-            persistedState.reorgRecoveryTargetBlock = persistedState.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS;
+            persistedState.reorgRecoveryTargetBlock =
+                persistedState.lastProcessedBlock + REORG_RECOVERY_STABLE_BLOCKS;
         }
         persistedState.reorgRecoveryBlockReason = `SAFETY:${error.message}`.slice(0, 500);
         await persistedState.save({ transaction });
     });
     await state.reload();
-    console.error(`[Reorg] CRITICAL: recovery blocked for safety; ${error.message}. Explicit operator intervention is required.`);
+    console.error(
+        `[Reorg] CRITICAL: recovery blocked for safety; ${error.message}. Explicit operator intervention is required.`,
+    );
 }
