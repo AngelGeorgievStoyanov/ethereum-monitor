@@ -18,16 +18,20 @@ import {
 } from '../repositories/txFilterRuleRepository';
 import { getNextFilterStartBlock } from './txFilterActivationService';
 import { mapTxFilterListResponse, mapTxFilterResponse } from '../mappers/txFilterMapper';
+import { mapTxFilterSyncFailureResponse, type TxFilterMutationOperation } from '../mappers/txFilterResponseMapper';
 import type { ActiveTxFilter, TxFilterGroupRule } from '../types/tx-filter.types';
 import { validateTxFilterGroup } from './txFilterValidationService';
 import { ValidationError } from '../utils/validationError';
 
 export class TxFilterSyncError extends Error {
-    constructor(public readonly result: unknown) {
+    public readonly response: ReturnType<typeof mapTxFilterSyncFailureResponse>;
+
+    constructor(operation: TxFilterMutationOperation, result: unknown) {
         super(
             'The filter change was saved to the database, but the scanner filters were not refreshed.',
         );
         this.name = 'TxFilterSyncError';
+        this.response = mapTxFilterSyncFailureResponse(operation, result);
     }
 }
 
@@ -47,8 +51,8 @@ export function createTxFilterService() {
     let refreshDynamicConfig: (() => Promise<boolean>) | undefined;
     let activeTxFiltersCache: ActiveTxFilter[] = [];
     function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void { refreshDynamicConfig = handler; }
-    async function refreshAfterMutation(result: unknown): Promise<void> {
-        if (!refreshDynamicConfig || !(await refreshDynamicConfig())) throw new TxFilterSyncError(result);
+    async function refreshAfterMutation(result: unknown, operation: TxFilterMutationOperation): Promise<void> {
+        if (!refreshDynamicConfig || !(await refreshDynamicConfig())) throw new TxFilterSyncError(operation, result);
     }
     async function loadActiveTxFilters(): Promise<ActiveTxFilter[]> {
         const activeFilters = await findActiveTxFilters();
@@ -121,7 +125,7 @@ export function createTxFilterService() {
         });
 
         const result = mapTxFilterResponse(filter, data.rule ?? legacyRule(filter));
-        await refreshAfterMutation(result);
+        await refreshAfterMutation(result, 'created');
         return result;
     }
 
@@ -191,7 +195,7 @@ export function createTxFilterService() {
 
         if (!updated) return null;
         const result = mapTxFilterResponse(updated.filter, updated.rule);
-        await refreshAfterMutation(result);
+        await refreshAfterMutation(result, 'updated');
         return result;
     }
 
@@ -199,7 +203,7 @@ export function createTxFilterService() {
         const deleted = await withTxFilterMutationLock(async (transaction) => {
             return deleteTxFilterById(id, transaction);
         });
-        if (deleted > 0) await refreshAfterMutation({ message: 'Transaction filter deleted', deleted: true });
+        if (deleted > 0) await refreshAfterMutation({ message: 'Transaction filter deleted', deleted: true }, 'deleted');
         return deleted;
     }
 
