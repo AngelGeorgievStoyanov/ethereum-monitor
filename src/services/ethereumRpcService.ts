@@ -124,9 +124,6 @@ function validateBlockReceipts(
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
         const startedAt = Date.now();
-        let getBlockDurationMs = 0;
-        let getBlockReceiptsDurationMs = 0;
-
         try {
             const {
                 block,
