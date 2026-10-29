@@ -1,6 +1,4 @@
-import { Op } from 'sequelize';
 import ScannerState from '../models/scannerState';
-import ScannerRescanJob from '../models/scannerRescanJob';
 import {
     MAX_BLOCKS_PER_FINALIZED_CATCHUP,
     SCANNER_CONTROL_REFRESH_INTERVAL_MS,
@@ -15,6 +13,7 @@ import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
 import { invalidateConfirmedBlockCache, processFinalizedBlocks } from './blockProcessor';
 import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
+import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
 import { getScannerControlState, isScannerPausePendingOrActive } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
@@ -23,14 +22,7 @@ let processingFinalizedBlocks = false;
 let manualRescanReserved = false;
 
 async function markInterruptedRescanJobs(): Promise<void> {
-    const [count] = await ScannerRescanJob.update(
-        {
-            status: 'INTERRUPTED',
-            error: 'Scanner ownership was lost before the rescan operation completed',
-            completedAt: new Date(),
-        },
-        { where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } } },
-    );
+    const count = await markActiveScannerRescanJobsInterrupted();
     if (count > 0) {
         console.warn(
             '[Rescan] Marked ' +
