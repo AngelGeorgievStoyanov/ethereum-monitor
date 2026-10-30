@@ -84,7 +84,7 @@ The complete rule tree is validated before a filter is saved. Validation checks 
 
 Dynamic Config loads only records where `isActive = true`. Each active rule is compiled once into a JavaScript predicate and cached. Membership arrays are prepared as Sets and captured as constants by the generated function.
 
-Each transfer context is passed to every active filter. All matching filters are retained for that transfer. The scanner does not check activation blocks or interpret the JSON rule tree during matching.
+Each transfer context is passed to every active filter. All matching filters are retained for that transfer. When a filter is deleted, its previous matches keep the original filter ID and description and are marked as `FILTER_DELETED` for audit history. The scanner does not check activation blocks or interpret the JSON rule tree during matching.
 
 Generated code uses only field accessors and operator templates defined in source-controlled catalogs. Filter values are passed as constants and are never interpolated into executable source. The JavaScript function constructor requires Node.js dynamic code generation to be enabled.
 
