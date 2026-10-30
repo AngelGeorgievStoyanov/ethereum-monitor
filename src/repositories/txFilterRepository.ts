@@ -27,6 +27,12 @@ export async function findActiveTxFilters(): Promise<TxFilterRecord[]> {
     return filters.map(toTxFilterRecord);
 }
 
+export async function countActiveTxFilters(
+    transaction: SequelizeTransaction,
+): Promise<number> {
+    return TxFilter.count({ where: { isActive: true }, transaction });
+}
+
 export async function createTxFilter(
     data: {
         description: string;
