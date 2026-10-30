@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
     countActiveTxFilters,
     createTxFilter as insertTxFilter,
@@ -82,7 +83,9 @@ export function createTxFilterService() {
         const next: ActiveTxFilter[] = [];
 
         for (const filter of activeFilters) {
-            const ruleSignature = JSON.stringify(filter.rule);
+            const ruleSignature = createHash('sha256')
+                .update(JSON.stringify(filter.rule))
+                .digest('hex');
             const cached = compiledFilters.get(filter.id);
 
             if (cached?.ruleSignature === ruleSignature) {
@@ -90,7 +93,7 @@ export function createTxFilterService() {
                 next.push({
                     id: filter.id,
                     description: filter.description,
-                    rule: filter.rule,
+                    ruleSignature,
                     predicate: cached.predicate,
                 });
                 continue;
@@ -115,7 +118,7 @@ export function createTxFilterService() {
                 next.push({
                     id: filter.id,
                     description: filter.description,
-                    rule: filter.rule,
+                    ruleSignature,
                     predicate,
                 });
             } catch (error) {
