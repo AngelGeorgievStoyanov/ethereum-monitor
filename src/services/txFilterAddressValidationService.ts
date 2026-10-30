@@ -67,13 +67,29 @@ async function validateOnChainTokenContract(address: string): Promise<void> {
         }
 
         const contract = new Contract(address, ERC20_VALIDATION_ABI, provider);
-        const [totalSupply, balance] = await Promise.all([
-            contract.getFunction('totalSupply').staticCall(),
-            contract.getFunction('balanceOf').staticCall(ZeroAddress),
-        ]);
+        try {
+            const [totalSupply, balance] = await Promise.all([
+                contract.getFunction('totalSupply').staticCall(),
+                contract.getFunction('balanceOf').staticCall(ZeroAddress),
+            ]);
 
-        if (typeof totalSupply !== 'bigint' || typeof balance !== 'bigint') {
-            throw new ValidationError(`Token address ${address} does not expose the expected ERC-20 interface`);
+            if (typeof totalSupply !== 'bigint' || typeof balance !== 'bigint') {
+                throw new ValidationError(`Token address ${address} does not expose the expected ERC-20 interface`);
+            }
+        } catch (error) {
+            if (error instanceof ValidationError) throw error;
+
+            const code =
+                typeof error === 'object' && error !== null && 'code' in error
+                    ? (error as { code?: unknown }).code
+                    : undefined;
+
+            if (code === 'CALL_EXCEPTION' || code === 'BAD_DATA') {
+                throw new ValidationError(
+                    `Token address ${address} does not expose the expected ERC-20 interface`,
+                );
+            }
+            throw error;
         }
     });
 }
