@@ -101,23 +101,30 @@ timestamp is represented in milliseconds since the Unix epoch.
 
 For eq, a null actual value is compared directly with the expected value. ne, notIn, and the comparison operators do not match when the actual value is null or undefined. contains also does not match null or undefined values. in checks whether the set contains the actual value; therefore, a null actual value can match if the supplied array contains null. between requires a non-null actual value and non-null bounds.
 
-## Address validation
+## Address validation and capacity
 
-Exact address values used with eq, ne, in, and notIn on the from, to, and tokenAddress fields are validated before a filter is created or its rule is updated. Partial substring values used with contains are not treated as complete addresses. The checks run only during filter mutations, not while scanning transfers.
+Exact address values used with eq, ne, in, and notIn on the from, to, and tokenAddress fields are subject to the configured address format validation before a filter is created or its rule is updated. Partial substring values used with contains are not treated as complete addresses. These checks run only during filter mutations, not while scanning transfers.
 
-The settings are independent in src/constants/tx-filter-address.constants.ts:
+The independent settings are in src/constants/tx-filter-address.constants.ts:
 
-- address: controls validation for from and to.
-- tokenContract: controls validation for tokenAddress.
-- Each setting has ethers and onChain booleans. Either check can be enabled independently, or both can be enabled. When both are enabled, both must pass.
+- address.ethers controls validation for from and to.
+- tokenContract.ethers controls validation for tokenAddress.
+- Set either ethers option to false to disable that format check. The two settings can be configured independently.
 
-The ethers check uses ethers.isAddress, including mixed-case checksum validation.
+When enabled, the check uses ethers.isAddress, including mixed-case checksum validation. It validates address syntax and checksum only. It does not check whether an address has transaction history, deployed code, or an ERC-20 contract.
 
-The on-chain check for from and to queries contract code and transaction count. An address with no code and no transaction history is accepted; an empty history does not make an address invalid. The RPC calls must complete successfully.
+Address validation makes no RPC calls and does not depend on RPC availability.
 
-The on-chain tokenAddress check requires deployed contract code and successful totalSupply() and balanceOf() calls. This is a practical ERC-20 interface check, not a guarantee of full ERC-20 compliance.
+The capacity limits are defined in src/constants/tx-filter.constants.ts:
 
-An RPC/network failure is reported separately from an invalid address or token contract. It does not silently pass validation.
+- Maximum 20 unique address values in one filter rule, across from, to, and tokenAddress.
+- Maximum 50 active filters.
+- Inactive filters do not count toward the active-filter limit.
+- The general maximum array size for in and notIn remains 1000, but address values are additionally subject to the 20-address limit.
+
+The active-filter limit is checked inside the transaction-filter mutation advisory lock. This makes creation and activation checks serial, preventing concurrent requests from exceeding the configured limit.
+
+These limits are intended for a lightweight transaction-filter feature. If the application needs substantially more addresses or active filters, do not simply increase the limits. A separate address-monitoring microservice with a message queue or event bus is a better architecture. It can manage large address subscriptions, batch and schedule RPC requests, enforce independent rate limits, and publish detected events. This isolates high-volume address monitoring from the main scanner and filter evaluation flow.
 
 ## Validation, compilation, and execution
 
