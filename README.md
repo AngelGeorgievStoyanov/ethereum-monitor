@@ -132,3 +132,16 @@ All routes use the /api prefix.
 | DELETE              | /transactions/:id               | Delete a stored transfer.                          |
 
 The dashboard is served separately at GET /dashboard.
+
+## Configuration
+
+- BLOCKCHAIN_NETWORK_AND_DATABASE_NAME: required; database name and scanner ID.
+- DATABASE_URL: PostgreSQL server connection URL. Do not include a database name in the path.
+- RPC_URL_1: required RPC endpoint for the configured network.
+- RPC_URL_2, RPC_URL_3, etc.: optional fallback and verification endpoints for the same network.
+- START_BLOCK: optional initial block; used only when no checkpoint exists. Normal RPC requests time out after RPC_ENDPOINT_TIMEOUT_MS and can fail over to another configured endpoint.
+
+Native ETH transfers are unique by transaction hash and block hash. ERC-20 transfers also include the log index. This preserves separate records when a transaction appears on a replacement block. Internal trace transfers are not currently processed or available to transaction filters.
+
+Recovery metrics and block-processing metrics are kept in memory and reset when the process restarts.
+
