@@ -232,14 +232,14 @@ export function createBlockMonitorService() {
                             const recoveryHandled = await processReorgRecovery(
                                 state,
                                 finalizedCatchupTarget,
-                                () => dynamicConfigService.getTxFilters(),
+                                () => dynamicConfigService.getTxFilterSnapshot(),
                             );
                             if (recoveryHandled) {
                                 // Recovery can roll the checkpoint back and later replace its canonical hash.
                                 invalidateConfirmedBlockCache();
                             } else {
                                 await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
-                                    dynamicConfigService.getTxFilters(),
+                                    dynamicConfigService.getTxFilterSnapshot(),
                                 );
                             }
                         } finally {

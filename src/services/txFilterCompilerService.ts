@@ -8,6 +8,7 @@ import type {
     TxFilterRule,
 } from '../types/tx-filter.types';
 import { getTxFilterField } from './txFilterFieldRegistry';
+import { validateTxFilterRule } from './txFilterValidationService';
 import {
     getTxFilterOperator,
     normalizeTxFilterValue,
@@ -86,6 +87,7 @@ function compileNode(rule: TxFilterRule, state: CompilationState, depth: number)
 }
 
 export function compileTxFilterRule(rule: TxFilterRule): CompiledTxFilter {
+    validateTxFilterRule(rule);
     const state: CompilationState = { constants: [], nodeCount: 0 };
     const expression = compileNode(rule, state, 1);
     const factory = new Function(

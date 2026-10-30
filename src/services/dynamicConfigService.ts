@@ -1,8 +1,9 @@
+import { createHash } from 'node:crypto';
 import {
     TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
     TX_FILTER_RELOAD_RETRY_DELAYS_MS,
 } from '../constants/tx-filter.constants';
-import type { ActiveTxFilter } from '../types/tx-filter.types';
+import type { ActiveTxFilter, TxFilterConfigSnapshot } from '../types/tx-filter.types';
 import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
@@ -10,6 +11,7 @@ import { sleep } from '../utils/sleep';
 export function createDynamicConfigService() {
     const txFilterService = getTxFilterService();
     let activeTxFilters = new Map<number, ActiveTxFilter>();
+    let activeTxFilterVersion = '';
     let reloadQueue: Promise<boolean> = Promise.resolve(true);
     let refreshTimer: ReturnType<typeof setInterval> | undefined;
     let pendingReloadCount = 0;
@@ -20,19 +22,34 @@ export function createDynamicConfigService() {
         const next = new Map<number, ActiveTxFilter>(
             loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]),
         );
-        const signature = (map: Map<number, ActiveTxFilter>) =>
-            JSON.stringify(Array.from(map.entries()).sort(([a], [b]) => a - b));
-        if (signature(activeTxFilters) === signature(next)) {
+        const configSignature = JSON.stringify(
+            Array.from(next.values()).map(({ id, description, rule }) => ({
+                id,
+                description,
+                rule,
+            })),
+        );
+        const nextVersion = createHash('sha256')
+            .update(configSignature)
+            .digest('hex')
+            .slice(0, 16);
+
+        if (nextVersion === activeTxFilterVersion) {
             console.log(
-                `[DynamicConfig] Transaction filter cache unchanged (${activeTxFilters.size} active filter(s))`,
+                `[DynamicConfig] Filter config unchanged; version=${activeTxFilterVersion}; filters=${activeTxFilters.size}`,
             );
             initialized = true;
             return;
         }
+
         activeTxFilters = next;
+        activeTxFilterVersion = nextVersion;
         initialized = true;
-        console.log(`[DynamicConfig] Loaded ${activeTxFilters.size} active transaction filter(s)`);
+        console.log(
+            `[DynamicConfig] Applied transaction filter config; version=${activeTxFilterVersion}; filters=${activeTxFilters.size}; instancePid=${process.pid}`,
+        );
     }
+
     async function refreshWithRetry(): Promise<boolean> {
         pendingReloadCount += 1;
         const task = reloadQueue
@@ -67,6 +84,7 @@ export function createDynamicConfigService() {
         reloadQueue = settled;
         return settled;
     }
+
     async function init(): Promise<void> {
         if (!(await refreshWithRetry())) {
             throw new Error(
@@ -82,19 +100,37 @@ export function createDynamicConfigService() {
             `[DynamicConfig] Refresh scheduled every ${TX_FILTER_CACHE_REFRESH_INTERVAL_MS}ms`,
         );
     }
+
     function stopRefreshTimer(): void {
         if (!refreshTimer) return;
         clearInterval(refreshTimer);
         refreshTimer = undefined;
     }
-    function getTxFilters(): ActiveTxFilter[] {
+
+    function getTxFilterSnapshot(): TxFilterConfigSnapshot {
         if (!initialized) throw new Error('Dynamic configuration has not been initialized');
-        return Array.from(activeTxFilters.values());
+        return {
+            version: activeTxFilterVersion,
+            filters: Array.from(activeTxFilters.values()),
+        };
     }
+
+    function getTxFilters(): ActiveTxFilter[] {
+        return getTxFilterSnapshot().filters;
+    }
+
     txFilterService.setDynamicConfigRefreshHandler(refreshWithRetry);
-    return { init, refreshWithRetry, stopRefreshTimer, getTxFilters };
+    return {
+        init,
+        refreshWithRetry,
+        stopRefreshTimer,
+        getTxFilters,
+        getTxFilterSnapshot,
+    };
 }
+
 let dynamicConfigServiceInstance: ReturnType<typeof createDynamicConfigService> | undefined;
+
 export function getDynamicConfigService() {
     if (!dynamicConfigServiceInstance) dynamicConfigServiceInstance = createDynamicConfigService();
     return dynamicConfigServiceInstance;

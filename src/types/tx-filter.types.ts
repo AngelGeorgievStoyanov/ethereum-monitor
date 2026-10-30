@@ -20,6 +20,11 @@ export interface ActiveTxFilter {
     predicate: CompiledTxFilter;
 }
 
+export interface TxFilterConfigSnapshot {
+    version: string;
+    filters: ActiveTxFilter[];
+}
+
 export interface TxFilterRecord {
     id: number;
     description: string;

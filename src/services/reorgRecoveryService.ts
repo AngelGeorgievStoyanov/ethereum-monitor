@@ -17,7 +17,7 @@ import { ConsensusUnavailableError } from './blockConsensusService';
 import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, evmRpcClient } from './evmBlockDataService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
-import type { ActiveTxFilter } from '../types/tx-filter.types';
+import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
 import { isScannerLockHeld } from './scannerLockService';
 import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import {
@@ -58,6 +58,7 @@ class ReorgRecoverySafetyError extends Error {
 }
 
 let singleProviderReorgWarningLogged = false;
+let lastLoggedRecoveryFilterConfigVersion = '';
 
 function logSingleProviderReorgMode(): void {
     if (evmRpcClient.getEndpointCount() !== 1 || singleProviderReorgWarningLogged) return;
@@ -142,7 +143,7 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
 async function processReorgRecoveryInternal(
     state: ScannerRuntimeState,
     finalizedBlockNumber: number,
-    getActiveTxFilters: () => ActiveTxFilter[],
+    getActiveTxFilters: () => TxFilterConfigSnapshot,
 ): Promise<boolean> {
     await refreshScannerState(state);
     if (!(await isScannerLockHeld())) {
@@ -199,8 +200,7 @@ async function processReorgRecoveryInternal(
     }
 
     if (!state.reorgRecoveryActive) return true;
-    const filters = getActiveTxFilters();
-    if (filters.length === 0) {
+    if (getActiveTxFilters().filters.length === 0) {
         console.warn('[Reorg] Recovery is paused because there are no active transaction filters');
         return true;
     }
@@ -245,7 +245,18 @@ async function processReorgRecoveryInternal(
                 `Block data fetched for recovery block ${blockNumber} does not match the verified provider block`,
             );
         }
-        const prepared = await processFetchedBlock(fetched, filters, true);
+        const filterConfig = getActiveTxFilters();
+        if (filterConfig.filters.length === 0) {
+            console.warn('[Reorg] Recovery is paused because there are no active transaction filters');
+            return true;
+        }
+        if (filterConfig.version !== lastLoggedRecoveryFilterConfigVersion) {
+            console.log(
+                `[Reorg] First recovery block using transaction filter config version=${filterConfig.version}; block=${blockNumber}; filters=${filterConfig.filters.length}`,
+            );
+            lastLoggedRecoveryFilterConfigVersion = filterConfig.version;
+        }
+        const prepared = await processFetchedBlock(fetched, filterConfig.filters, true);
 
         const recoveryTargetBlock =
             state.reorgRecoveryTargetBlock ??
@@ -363,7 +374,7 @@ async function markReceiptConsistencyRecoveryBlocked(
 export async function processReorgRecovery(
     state: ScannerRuntimeState,
     finalizedBlockNumber: number,
-    getActiveTxFilters: () => ActiveTxFilter[],
+    getActiveTxFilters: () => TxFilterConfigSnapshot,
 ): Promise<boolean> {
     try {
         return await processReorgRecoveryInternal(state, finalizedBlockNumber, getActiveTxFilters);

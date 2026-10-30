@@ -1,6 +1,7 @@
 import {
     countActiveTxFilters,
     createTxFilter as insertTxFilter,
+    deactivateInvalidTxFilter,
     deleteTxFilterById,
     findActiveTxFilters,
     findAllTxFilters,
@@ -8,7 +9,11 @@ import {
     findTxFilterForUpdate,
     withTxFilterMutationLock,
 } from '../repositories/txFilterRepository';
-import { MAX_ACTIVE_TX_FILTERS } from '../constants/tx-filter.constants';
+import {
+    MAX_ACTIVE_TX_FILTERS,
+    TX_FILTER_INVALID_FILTER_MAX_ATTEMPTS,
+    TX_FILTER_INVALID_FILTER_RETRY_INTERVAL_MS,
+} from '../constants/tx-filter.constants';
 import { mapTxFilterListResponse, mapTxFilterResponse } from '../mappers/txFilterMapper';
 import {
     mapTxFilterSyncFailureResponse,
@@ -18,6 +23,13 @@ import type { ActiveTxFilter, TxFilterRule } from '../types/tx-filter.types';
 import { compileTxFilterRule } from './txFilterCompilerService';
 import { validateTxFilterAddresses } from './txFilterAddressValidationService';
 import { ValidationError } from '../utils/validationError';
+import { formatError } from '../utils/formatError';
+
+interface InvalidFilterRetryState {
+    attempts: number;
+    lastAttemptAt: number;
+    ruleSignature: string;
+}
 
 export class TxFilterSyncError extends Error {
     public readonly response: ReturnType<typeof mapTxFilterSyncFailureResponse>;
@@ -32,10 +44,16 @@ export class TxFilterSyncError extends Error {
 export function createTxFilterService() {
     let refreshDynamicConfig: (() => Promise<boolean>) | undefined;
     let activeTxFiltersCache: ActiveTxFilter[] = [];
-    let compiledConfigSignature = '';
+    const compiledFilters = new Map<number, { ruleSignature: string; predicate: ActiveTxFilter['predicate'] }>();
+    const invalidFilterRetries = new Map<number, InvalidFilterRetryState>();
 
     function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void {
         refreshDynamicConfig = handler;
+    }
+
+    function validateAndCompileRule(rule: TxFilterRule): ActiveTxFilter['predicate'] {
+        validateTxFilterAddresses(rule);
+        return compileTxFilterRule(rule);
     }
 
     async function refreshAfterMutation(
@@ -49,18 +67,91 @@ export function createTxFilterService() {
 
     async function loadActiveTxFilters(): Promise<ActiveTxFilter[]> {
         const activeFilters = await findActiveTxFilters();
-        const signature = JSON.stringify(activeFilters);
-        if (signature === compiledConfigSignature) return activeTxFiltersCache;
+        const activeIds = new Set(activeFilters.map((filter) => filter.id));
 
-        const next: ActiveTxFilter[] = activeFilters.map((filter) => ({
-            id: filter.id,
-            description: filter.description,
-            rule: filter.rule,
-            predicate: compileTxFilterRule(filter.rule),
-        }));
+        for (const id of compiledFilters.keys()) {
+            if (!activeIds.has(id)) compiledFilters.delete(id);
+        }
+        for (const id of invalidFilterRetries.keys()) {
+            if (!activeIds.has(id)) invalidFilterRetries.delete(id);
+        }
+
+        const next: ActiveTxFilter[] = [];
+
+        for (const filter of activeFilters) {
+            const ruleSignature = JSON.stringify(filter.rule);
+            const cached = compiledFilters.get(filter.id);
+
+            if (cached?.ruleSignature === ruleSignature) {
+                invalidFilterRetries.delete(filter.id);
+                next.push({
+                    id: filter.id,
+                    description: filter.description,
+                    rule: filter.rule,
+                    predicate: cached.predicate,
+                });
+                continue;
+            }
+
+            const previousRetry = invalidFilterRetries.get(filter.id);
+            const retryState =
+                previousRetry?.ruleSignature === ruleSignature ? previousRetry : undefined;
+            const now = Date.now();
+
+            if (
+                retryState &&
+                now - retryState.lastAttemptAt < TX_FILTER_INVALID_FILTER_RETRY_INTERVAL_MS
+            ) {
+                continue;
+            }
+
+            try {
+                const predicate = validateAndCompileRule(filter.rule);
+                compiledFilters.set(filter.id, { ruleSignature, predicate });
+                invalidFilterRetries.delete(filter.id);
+                next.push({
+                    id: filter.id,
+                    description: filter.description,
+                    rule: filter.rule,
+                    predicate,
+                });
+            } catch (error) {
+                compiledFilters.delete(filter.id);
+                const attempts = Math.min(
+                    (retryState?.attempts ?? 0) + 1,
+                    TX_FILTER_INVALID_FILTER_MAX_ATTEMPTS,
+                );
+                invalidFilterRetries.set(filter.id, { attempts, lastAttemptAt: now, ruleSignature });
+
+                console.error(
+                    `[DynamicConfig] Invalid active transaction filter; filterId=${filter.id}; attempt=${attempts}/${TX_FILTER_INVALID_FILTER_MAX_ATTEMPTS}; reason=${formatError(error)}`,
+                );
+
+                if (attempts < TX_FILTER_INVALID_FILTER_MAX_ATTEMPTS) continue;
+
+                try {
+                    const deactivated = await deactivateInvalidTxFilter(filter.id, ruleSignature);
+                    if (deactivated) {
+                        invalidFilterRetries.delete(filter.id);
+                        compiledFilters.delete(filter.id);
+                        console.error(
+                            `[DynamicConfig] Transaction filter automatically deactivated after ${attempts} consecutive invalid load attempts; filterId=${filter.id}`,
+                        );
+                    } else {
+                        console.warn(
+                            `[DynamicConfig] Automatic deactivation skipped because filter ${filter.id} was removed, deactivated, or changed in the database`,
+                        );
+                        invalidFilterRetries.delete(filter.id);
+                    }
+                } catch (deactivationError) {
+                    console.error(
+                        `[DynamicConfig] Failed to deactivate invalid transaction filter; filterId=${filter.id}; reason=${formatError(deactivationError)}`,
+                    );
+                }
+            }
+        }
 
         activeTxFiltersCache = next;
-        compiledConfigSignature = signature;
         return next;
     }
 
@@ -78,7 +169,7 @@ export function createTxFilterService() {
         isActive: boolean;
         rule: TxFilterRule;
     }) {
-        validateTxFilterAddresses(data.rule);
+        validateAndCompileRule(data.rule);
 
         const filter = await withTxFilterMutationLock(async (transaction) => {
             if (
@@ -113,11 +204,13 @@ export function createTxFilterService() {
             rule?: TxFilterRule;
         },
     ) {
-        if (updates.rule) validateTxFilterAddresses(updates.rule);
-
         const updated = await withTxFilterMutationLock(async (transaction) => {
             const current = await findTxFilterForUpdate(id, transaction);
             if (!current) return null;
+
+            if (updates.rule !== undefined || updates.isActive === true) {
+                validateAndCompileRule(updates.rule ?? current.rule);
+            }
 
             if (
                 updates.isActive === true &&

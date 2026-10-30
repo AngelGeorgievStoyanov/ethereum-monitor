@@ -48,7 +48,8 @@ The scanner saves its checkpoint in PostgreSQL and resumes from it after a resta
 - When creating a new scanner state, START_BLOCK sets the first block to process. The scanner stores START_BLOCK - 1 as its initial checkpoint. The value must be a non-negative safe integer at or below the current finalized block, and the RPC provider must return that block with a valid hash and parent hash.
 - When creating a new scanner state without START_BLOCK, scanning starts after the current finalized block. Existing chain history is skipped.
 - Filter creation does not determine the initial checkpoint. When there are no active filters, the scanner waits without advancing the checkpoint. Once an active filter is available, scanning continues from the next unprocessed block. Newly created filters do not trigger an automatic historical backfill.
-- DynamicConfigService owns the in-memory active-filter cache. It loads active filters before scanner startup, refreshes the cache every 60 seconds, and refreshes after filter changes through the API. If a refresh fails, the last valid cache is retained.
+- DynamicConfigService owns the in-memory active-filter cache. Each instance applies a content-based configuration version and logs it. Normal scanner batches use one consistent snapshot; reorg recovery refreshes its snapshot for each block. Local API mutations refresh the local instance immediately; other instances discover changes on their next 60-second refresh when the database is available. If a refresh fails, the last successfully applied cache is retained.
+- Invalid active filters are logged and excluded without blocking valid filters. Each invalid filter is retried once per minute and is automatically deactivated in the database after three consecutive failed attempts. Retry counters reset on process restart.
 
 ### Filter capacity
 
@@ -57,6 +58,12 @@ The default limits are 20 unique addresses per filter and 50 active filters. Onl
 Address format validation uses ethers.isAddress and can be independently enabled or disabled for from/to addresses and tokenAddress in src/constants/tx-filter-address.constants.ts. Filter address validation does not make RPC calls.
 
 These limits are intended for a lightweight filter feature. If the application needs to monitor substantially more addresses or a much larger number of active filters, do not simply increase the limits. Use a separate address-monitoring microservice with a message queue or event bus. That service can manage large address subscriptions, batch and schedule RPC work, apply independent rate limits, and publish detected events for the transaction scanner or downstream consumers. This keeps high-volume address monitoring isolated from the main scanner.
+
+## Transaction filter engine
+
+The Generic Boolean Engine evaluates nested all (AND), any (OR), and not (NOT) rules against the predefined transfer context. It is generic over the available context fields and operators; it does not attempt to cover every possible EVM transaction shape.
+
+A runtime error in one compiled filter is logged with its filter ID and treated as a non-match for that filter and transfer. Other filters and scanner processing continue.
 
 ## Block processing and recovery
 

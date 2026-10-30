@@ -1,4 +1,5 @@
 import type { ScannerRuntimeState } from '../types/scanner-state.types';
+import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
 import { refreshScannerState } from './scannerStateService';
 import {
     REORG_RECOVERY_STABLE_BLOCKS,
@@ -22,6 +23,7 @@ import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityE
 type ConfirmedBlock = CanonicalBlockIdentity;
 
 let lastConfirmedBlock: ConfirmedBlock | null = null;
+let lastLoggedFilterConfigVersion = '';
 
 async function getConfirmedCheckpointBlock(checkpoint: number): Promise<ConfirmedBlock | null> {
     if (checkpoint < 0) return null;
@@ -73,7 +75,7 @@ function validateBatchConnectivity(
 export async function processFinalizedBlocks(
     state: ScannerRuntimeState,
     finalizedBlockNumber: number,
-    getActiveTxFilters: () => import('./txFilterEvaluatorService').ActiveTxFilter[],
+    getActiveTxFilters: () => TxFilterConfigSnapshot,
 ): Promise<void> {
     const catchupStartedAt = Date.now();
     const catchupStartBlock = state.lastProcessedBlock + 1;
@@ -83,7 +85,8 @@ export async function processFinalizedBlocks(
     while (state.lastProcessedBlock < finalizedBlockNumber) {
         currentBatchStart = state.lastProcessedBlock + 1;
         if (await shouldPauseBeforeBlock(currentBatchStart, state.lastProcessedBlock)) return;
-        const activeTxFilters = getActiveTxFilters();
+        const filterConfig = getActiveTxFilters();
+        const activeTxFilters = filterConfig.filters;
         if (activeTxFilters.length === 0) return;
 
         const lag = finalizedBlockNumber - state.lastProcessedBlock;
@@ -94,6 +97,12 @@ export async function processFinalizedBlocks(
             (_, index) => currentBatchStart! + index,
         );
         const expectedCheckpoint = state.lastProcessedBlock;
+        if (filterConfig.version !== lastLoggedFilterConfigVersion) {
+            console.log(
+                `[Scanner] First batch using transaction filter config version=${filterConfig.version}; blocks=${blockNumbers[0]}-${blockNumbers[blockNumbers.length - 1]}; filters=${activeTxFilters.length}`,
+            );
+            lastLoggedFilterConfigVersion = filterConfig.version;
+        }
 
         try {
             const previousConfirmedBlock = await getConfirmedCheckpointBlock(expectedCheckpoint);

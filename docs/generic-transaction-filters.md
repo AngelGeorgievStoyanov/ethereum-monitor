@@ -87,6 +87,8 @@ Address, hash, and selected string fields are normalized to lowercase when the t
 
 Each filter context represents one transfer, not one raw blockchain transaction. A native transaction produces its native transfer context. An ERC-20 transaction can produce multiple contexts when it contains multiple matching transfer logs. All active filters are evaluated separately for each context.
 
+The filter engine is a generic Boolean rule engine over this predefined transfer context. It supports nested all (AND), any (OR), and not (NOT) groups. It is not intended to interpret every possible EVM transaction shape.
+
 value is an exact integer represented internally as BigInt. Native transfer values are in wei; ERC-20 values are in the token's smallest units. These units are not normalized across transfer types. Use transferType and, where relevant, tokenAddress together with value.
 
 timestamp is represented in milliseconds since the Unix epoch.
@@ -136,7 +138,11 @@ The complete rule tree is validated before a filter is saved. Validation checks 
 
 These values are implementation constants, not permanent API guarantees. They can be changed in the source configuration.
 
-Dynamic Config loads only records where isActive = true. Each active rule is compiled once into a JavaScript predicate and cached. Membership arrays are prepared as Sets and captured as constants by the generated function.
+Dynamic Config loads only records where isActive = true. Each active rule is validated and compiled through the same validation-and-compilation path used before a filter is created or activated. Each valid rule is compiled once and cached. Membership arrays are prepared as Sets and captured as constants by the generated function.
+
+A malformed active filter is isolated: it is logged with its filter ID and excluded from the active configuration, while valid filters continue loading. The filter is retried once per 60-second interval. After three consecutive failed attempts, the application deactivates it in the database. Retry counters are in memory and reset when the process restarts. Automatic deactivation checks that the database rule has not changed since the failed load, so a concurrent valid update is not disabled.
+
+Each instance calculates a content-based configuration version and logs the version when it applies a changed configuration. The scanner captures one configuration snapshot at the start of each normal block batch and uses that snapshot for the entire batch. Reorg recovery captures a fresh snapshot for each block. An in-flight batch finishes with the version it started with; the next batch uses the latest version applied by that instance. Local API mutations refresh the local instance immediately. Other instances discover changes on their next periodic refresh, scheduled every 60 seconds, provided the database is reachable. A failed refresh retains the last successfully applied configuration.
 
 Each transfer context is passed to every active filter. All matching filters are retained for that transfer. When a filter is deleted, its previous matches keep the original filter ID and description and are marked as FILTER_DELETED for audit history. The scanner does not check activation blocks or interpret the JSON rule tree during matching.
 

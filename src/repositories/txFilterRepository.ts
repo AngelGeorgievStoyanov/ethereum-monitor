@@ -88,6 +88,29 @@ export async function deleteTxFilterById(id: number, transaction?: SequelizeTran
     return sequelize.transaction(remove);
 }
 
+export async function deactivateInvalidTxFilter(
+    id: number,
+    expectedRuleSignature: string,
+): Promise<boolean> {
+    return withTxFilterMutationLock(async (transaction) => {
+        const filter = await TxFilter.findByPk(id, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
+        if (
+            !filter ||
+            !filter.isActive ||
+            JSON.stringify(filter.rule) !== expectedRuleSignature
+        ) {
+            return false;
+        }
+
+        filter.isActive = false;
+        await filter.save({ transaction });
+        return true;
+    });
+}
+
 export async function findTxFilterForUpdate(
     id: number,
     transaction: SequelizeTransaction,
