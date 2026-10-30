@@ -25,8 +25,7 @@ if (!databaseUrl) {
     throw new Error('DATABASE_URL must be configured for PostgreSQL');
 }
 
-const blockchainNetworkAndDatabaseName =
-    process.env.BLOCKCHAIN_NETWORK_AND_DATABASE_NAME?.trim();
+const blockchainNetworkAndDatabaseName = process.env.BLOCKCHAIN_NETWORK_AND_DATABASE_NAME?.trim();
 
 if (!blockchainNetworkAndDatabaseName) {
     throw new Error('BLOCKCHAIN_NETWORK_AND_DATABASE_NAME must be configured');

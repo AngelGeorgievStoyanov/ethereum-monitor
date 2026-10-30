@@ -27,9 +27,7 @@ export async function findActiveTxFilters(): Promise<TxFilterRecord[]> {
     return filters.map(toTxFilterRecord);
 }
 
-export async function countActiveTxFilters(
-    transaction: SequelizeTransaction,
-): Promise<number> {
+export async function countActiveTxFilters(transaction: SequelizeTransaction): Promise<number> {
     return TxFilter.count({ where: { isActive: true }, transaction });
 }
 
@@ -97,11 +95,7 @@ export async function deactivateInvalidTxFilter(
             transaction,
             lock: transaction.LOCK.UPDATE,
         });
-        if (
-            !filter ||
-            !filter.isActive ||
-            JSON.stringify(filter.rule) !== expectedRuleSignature
-        ) {
+        if (!filter || !filter.isActive || JSON.stringify(filter.rule) !== expectedRuleSignature) {
             return false;
         }
 

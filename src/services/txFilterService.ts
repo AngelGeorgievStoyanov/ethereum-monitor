@@ -36,7 +36,9 @@ export class TxFilterSyncError extends Error {
     public readonly response: ReturnType<typeof mapTxFilterSyncFailureResponse>;
 
     constructor(operation: TxFilterMutationOperation, result: unknown) {
-        super('The filter change was saved to the database, but the scanner filters were not refreshed.');
+        super(
+            'The filter change was saved to the database, but the scanner filters were not refreshed.',
+        );
         this.name = 'TxFilterSyncError';
         this.response = mapTxFilterSyncFailureResponse(operation, result);
     }
@@ -127,7 +129,11 @@ export function createTxFilterService() {
                     (retryState?.attempts ?? 0) + 1,
                     TX_FILTER_INVALID_FILTER_MAX_ATTEMPTS,
                 );
-                invalidFilterRetries.set(filter.id, { attempts, lastAttemptAt: now, ruleSignature });
+                invalidFilterRetries.set(filter.id, {
+                    attempts,
+                    lastAttemptAt: now,
+                    ruleSignature,
+                });
 
                 console.error(
                     `[DynamicConfig] Invalid active transaction filter; filterId=${filter.id}; attempt=${attempts}/${TX_FILTER_INVALID_FILTER_MAX_ATTEMPTS}; reason=${formatError(error)}`,

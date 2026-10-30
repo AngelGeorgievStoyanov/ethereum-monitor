@@ -12,10 +12,7 @@ function getDatabaseDetails(): { databaseName: string; adminDatabaseUrl: string 
     };
 }
 
-async function databaseExists(
-    sequelize: Sequelize,
-    databaseName: string,
-): Promise<boolean> {
+async function databaseExists(sequelize: Sequelize, databaseName: string): Promise<boolean> {
     const databases = await sequelize.query<{ '?column?': number }>(
         'SELECT 1 FROM pg_database WHERE datname = $databaseName',
         {

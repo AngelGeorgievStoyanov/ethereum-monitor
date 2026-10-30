@@ -1,7 +1,4 @@
-import {
-    MAX_FILTER_DEPTH,
-    MAX_FILTER_NODES,
-} from '../constants/tx-filter.constants';
+import { MAX_FILTER_DEPTH, MAX_FILTER_NODES } from '../constants/tx-filter.constants';
 import type {
     CompiledTxFilter,
     TxFilterConditionRule,
@@ -28,10 +25,7 @@ function applyTemplate(template: string, replacements: Record<string, string>): 
     );
 }
 
-function compileCondition(
-    condition: TxFilterConditionRule,
-    state: CompilationState,
-): string {
+function compileCondition(condition: TxFilterConditionRule, state: CompilationState): string {
     const field = getTxFilterField(condition.field);
     const operator = getTxFilterOperator(condition.op);
     const actual = field.accessor;
@@ -41,21 +35,21 @@ function compileCondition(
             normalizeTxFilterValue(value, field),
         );
         const constant = addConstant(state, new Set(values));
-        return applyTemplate(operator.template, { '$actual': actual, '$constant': constant });
+        return applyTemplate(operator.template, { $actual: actual, $constant: constant });
     }
     if (operator.valueMode === 'range') {
         const values = condition.value as unknown[];
         const lower = addConstant(state, normalizeTxFilterValue(values[0], field));
         const upper = addConstant(state, normalizeTxFilterValue(values[1], field));
         return applyTemplate(operator.template, {
-            '$actual': actual,
-            '$lower': lower,
-            '$upper': upper,
+            $actual: actual,
+            $lower: lower,
+            $upper: upper,
         });
     }
 
     const expected = addConstant(state, normalizeTxFilterValue(condition.value, field));
-    return applyTemplate(operator.template, { '$actual': actual, '$expected': expected });
+    return applyTemplate(operator.template, { $actual: actual, $expected: expected });
 }
 
 function compileNode(rule: TxFilterRule, state: CompilationState, depth: number): string {

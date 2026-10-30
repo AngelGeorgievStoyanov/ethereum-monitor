@@ -55,9 +55,7 @@ export async function processNativeTransfers({
             transfer,
         );
 
-        const matchingTxFilters = txFilters.filter((filter) =>
-            matchesTxFilter(context, filter),
-        );
+        const matchingTxFilters = txFilters.filter((filter) => matchesTxFilter(context, filter));
         if (matchingTxFilters.length === 0 && !includeUnmatched) continue;
 
         candidates.push({

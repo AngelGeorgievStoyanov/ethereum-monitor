@@ -25,9 +25,7 @@ export async function startApplication(): Promise<void> {
         });
 
         void blockMonitorService.start().catch((error) => {
-            console.error(
-                `[Scanner] Startup failed; stopping process: ${formatError(error)}`,
-            );
+            console.error(`[Scanner] Startup failed; stopping process: ${formatError(error)}`);
             process.exit(1);
         });
 

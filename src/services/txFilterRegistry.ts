@@ -1,14 +1,6 @@
 export type TxFilterFieldType = 'string' | 'number' | 'bigint' | 'date';
 export type TxFilterOperatorName =
-    | 'eq'
-    | 'ne'
-    | 'gt'
-    | 'gte'
-    | 'lt'
-    | 'lte'
-    | 'in'
-    | 'notIn'
-    | 'between';
+    'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'notIn' | 'between';
 
 export type TxFilterAddressKind = 'address' | 'tokenContract';
 
@@ -26,14 +18,7 @@ export interface TxFilterFieldDefinition {
 }
 
 const EQUALITY_OPERATORS = ['eq', 'ne', 'in', 'notIn'] as const;
-const COMPARISON_OPERATORS = [
-    ...EQUALITY_OPERATORS,
-    'gt',
-    'gte',
-    'lt',
-    'lte',
-    'between',
-] as const;
+const COMPARISON_OPERATORS = [...EQUALITY_OPERATORS, 'gt', 'gte', 'lt', 'lte', 'between'] as const;
 
 const comparable =
     '$actual !== null && $actual !== undefined && $expected !== null && $expected !== undefined';

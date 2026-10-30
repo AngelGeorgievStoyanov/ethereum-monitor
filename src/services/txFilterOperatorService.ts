@@ -1,14 +1,8 @@
 import { MAX_FILTER_ARRAY_VALUES } from '../constants/tx-filter.constants';
-import type {
-    TxFilterFieldDefinition,
-    TxFilterOperatorName,
-} from './txFilterRegistry';
+import type { TxFilterFieldDefinition, TxFilterOperatorName } from './txFilterRegistry';
 import { getTxFilterOperator } from './txFilterRegistry';
 
-export function normalizeTxFilterValue(
-    value: unknown,
-    field: TxFilterFieldDefinition,
-): unknown {
+export function normalizeTxFilterValue(value: unknown, field: TxFilterFieldDefinition): unknown {
     if (value === null || value === undefined) return value;
 
     if (field.type === 'bigint') {
@@ -60,7 +54,9 @@ export function validateOperatorValue(
             throw new Error(`Operator "${operator}" requires a non-empty array value`);
         }
         if (value.length > MAX_FILTER_ARRAY_VALUES) {
-            throw new Error(`Filter arrays cannot contain more than ${MAX_FILTER_ARRAY_VALUES} values`);
+            throw new Error(
+                `Filter arrays cannot contain more than ${MAX_FILTER_ARRAY_VALUES} values`,
+            );
         }
         for (const item of value) normalizeTxFilterValue(item, field);
         return;

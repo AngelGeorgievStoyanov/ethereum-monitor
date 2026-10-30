@@ -247,7 +247,9 @@ async function processReorgRecoveryInternal(
         }
         const filterConfig = getActiveTxFilters();
         if (filterConfig.filters.length === 0) {
-            console.warn('[Reorg] Recovery is paused because there are no active transaction filters');
+            console.warn(
+                '[Reorg] Recovery is paused because there are no active transaction filters',
+            );
             return true;
         }
         if (filterConfig.version !== lastLoggedRecoveryFilterConfigVersion) {

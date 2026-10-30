@@ -29,10 +29,7 @@ export function createDynamicConfigService() {
                 ruleSignature,
             })),
         );
-        const nextVersion = createHash('sha256')
-            .update(configSignature)
-            .digest('hex')
-            .slice(0, 16);
+        const nextVersion = createHash('sha256').update(configSignature).digest('hex').slice(0, 16);
 
         if (nextVersion === activeTxFilterVersion) {
             console.log(

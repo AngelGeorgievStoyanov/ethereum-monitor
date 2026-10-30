@@ -117,19 +117,19 @@ The scanner must be idle and canonical history must exist for the full range. A 
 
 All routes use the /api prefix.
 
-| Method              | Route                           | Purpose                                            |
-| ------------------- | ------------------------------- | -------------------------------------------------- |
-| GET                 | /health/live                    | Process liveness.                                  |
-| GET                 | /health/ready                   | Database and RPC availability.                     |
-| GET                 | /scanner/status                 | Checkpoint, lag, pause, recovery, RPC, and processing metrics. |
-| POST                | /scanner/pause                  | Pause now or after a block.                        |
-| POST                | /scanner/resume                 | Resume scanning.                                   |
-| POST                | /scanner/rescan                 | Start a manual rescan.                             |
-| GET                 | /scanner/rescan/:id             | Check rescan progress.                             |
-| POST                | /scanner/reorg-retry            | Retry blocked recovery.                            |
-| GET/POST/PUT/DELETE | /tx-filters                     | Manage filters.                                    |
-| GET                 | /transactions?page=1&limit=20   | List stored transfers.                             |
-| DELETE              | /transactions/:id               | Delete a stored transfer.                          |
+| Method              | Route                         | Purpose                                                        |
+| ------------------- | ----------------------------- | -------------------------------------------------------------- |
+| GET                 | /health/live                  | Process liveness.                                              |
+| GET                 | /health/ready                 | Database and RPC availability.                                 |
+| GET                 | /scanner/status               | Checkpoint, lag, pause, recovery, RPC, and processing metrics. |
+| POST                | /scanner/pause                | Pause now or after a block.                                    |
+| POST                | /scanner/resume               | Resume scanning.                                               |
+| POST                | /scanner/rescan               | Start a manual rescan.                                         |
+| GET                 | /scanner/rescan/:id           | Check rescan progress.                                         |
+| POST                | /scanner/reorg-retry          | Retry blocked recovery.                                        |
+| GET/POST/PUT/DELETE | /tx-filters                   | Manage filters.                                                |
+| GET                 | /transactions?page=1&limit=20 | List stored transfers.                                         |
+| DELETE              | /transactions/:id             | Delete a stored transfer.                                      |
 
 The dashboard is served separately at GET /dashboard.
 
@@ -144,4 +144,3 @@ The dashboard is served separately at GET /dashboard.
 Native ETH transfers are unique by transaction hash and block hash. ERC-20 transfers also include the log index. This preserves separate records when a transaction appears on a replacement block. Internal trace transfers are not currently processed or available to transaction filters.
 
 Recovery metrics and block-processing metrics are kept in memory and reset when the process restarts.
-

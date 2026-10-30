@@ -1,7 +1,4 @@
-import {
-    MAX_FILTER_DEPTH,
-    MAX_FILTER_NODES,
-} from '../constants/tx-filter.constants';
+import { MAX_FILTER_DEPTH, MAX_FILTER_NODES } from '../constants/tx-filter.constants';
 import type { TxFilterRule } from '../types/tx-filter.types';
 import { getTxFilterField } from './txFilterRegistry';
 import { validateOperatorValue } from './txFilterOperatorService';
