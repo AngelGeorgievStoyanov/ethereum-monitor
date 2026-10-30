@@ -75,11 +75,6 @@ export async function deleteTxFilterById(id: number, transaction?: SequelizeTran
             { matchStatus: 'FILTER_DELETED' },
             { where: { txFilterId: id }, transaction: activeTransaction },
         );
-        await TxMatch.update(
-            { txFilterId: null },
-            { where: { txFilterId: id }, transaction: activeTransaction },
-        );
-
         return TxFilter.destroy({ where: { id }, transaction: activeTransaction });
     };
 
