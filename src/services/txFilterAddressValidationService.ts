@@ -1,7 +1,5 @@
 import { isAddress } from 'ethers';
-import {
-    MAX_TX_FILTER_ADDRESSES,
-} from '../constants/tx-filter.constants';
+import { MAX_TX_FILTER_ADDRESSES } from '../constants/tx-filter.constants';
 import { TX_FILTER_ADDRESS_VALIDATION } from '../constants/tx-filter-address.constants';
 import type { TxFilterRule } from '../types/tx-filter.types';
 import { ValidationError } from '../utils/validationError';
@@ -46,7 +44,7 @@ function getAddressValues(
     }
 }
 
-export async function validateTxFilterAddresses(rule: TxFilterRule): Promise<void> {
+export function validateTxFilterAddresses(rule: TxFilterRule): void {
     const addresses: Array<{ kind: AddressKind; value: string }> = [];
     getAddressValues(rule, addresses);
 
@@ -60,8 +58,7 @@ export async function validateTxFilterAddresses(rule: TxFilterRule): Promise<voi
     const validated = new Set<string>();
 
     for (const { kind, value } of addresses) {
-        const options = TX_FILTER_ADDRESS_VALIDATION[kind];
-        if (!options.ethers) continue;
+        if (!TX_FILTER_ADDRESS_VALIDATION[kind].ethers) continue;
 
         const key = `${kind}:${value.toLowerCase()}`;
         if (validated.has(key)) continue;
