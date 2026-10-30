@@ -5,3 +5,6 @@ export const TX_FILTER_CACHE_REFRESH_INTERVAL_MS = 60000;
 export const MAX_FILTER_DEPTH = 20;
 export const MAX_FILTER_NODES = 2000;
 export const MAX_FILTER_ARRAY_VALUES = 1000;
+
+export const MAX_TX_FILTER_ADDRESSES = 20;
+export const MAX_ACTIVE_TX_FILTERS = 50;
