@@ -72,7 +72,7 @@ export interface StoredTxFilterRecord {
 export interface StoredTransactionMatchRecord {
     id: number;
     txId: number;
-    txFilterId: number | null;
+    txFilterId: number;
     txFilterDescription: string | null;
     matchStatus: StoredTransactionMatchStatus;
     createdAt: Date;
