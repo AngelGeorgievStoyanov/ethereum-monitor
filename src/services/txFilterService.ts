@@ -8,9 +8,7 @@ import {
     findTxFilterForUpdate,
     withTxFilterMutationLock,
 } from '../repositories/txFilterRepository';
-import {
-    MAX_ACTIVE_TX_FILTERS,
-} from '../constants/tx-filter.constants';
+import { MAX_ACTIVE_TX_FILTERS } from '../constants/tx-filter.constants';
 import { mapTxFilterListResponse, mapTxFilterResponse } from '../mappers/txFilterMapper';
 import {
     mapTxFilterSyncFailureResponse,
