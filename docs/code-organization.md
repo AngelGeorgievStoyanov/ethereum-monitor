@@ -1,5 +1,8 @@
 # Code Organization Conventions
 
+> **Project scope:** These are lightweight project guidelines for a demonstration/interview application, not a claim that every existing module already follows every rule. The current codebase contains some existing deviations (including services that call repository functions directly). Treat the guidelines as the intended direction for future changes and identify existing deviations explicitly during reviews. Do not add layers or abstractions solely to satisfy the document when they do not provide practical value. This project is not a production architecture; production or substantially larger workloads require a separate architecture review and may require splitting responsibilities into independently scalable components.
+
+
 ## 1. Controllers
 
 Controllers are responsible for the HTTP layer only.
