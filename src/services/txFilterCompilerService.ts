@@ -1,3 +1,7 @@
+import {
+    MAX_FILTER_DEPTH,
+    MAX_FILTER_NODES,
+} from '../constants/tx-filter.constants';
 import type {
     CompiledTxFilter,
     TxFilterConditionRule,
@@ -9,8 +13,6 @@ import {
     normalizeTxFilterValue,
 } from './txFilterOperatorService';
 
-const MAX_FILTER_DEPTH = 20;
-const MAX_FILTER_NODES = 2000;
 
 interface CompilationState {
     constants: unknown[];
