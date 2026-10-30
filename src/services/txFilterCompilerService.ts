@@ -23,10 +23,7 @@ function addConstant(state: CompilationState, value: unknown): string {
     return `constants[${index}]`;
 }
 
-function applyTemplate(
-    template: string,
-    replacements: Record<string, string>,
-): string {
+function applyTemplate(template: string, replacements: Record<string, string>): string {
     return Object.entries(replacements).reduce(
         (result, [placeholder, value]) => result.split(placeholder).join(value),
         template,
@@ -65,11 +62,7 @@ function compileCondition(
     return applyTemplate(operator.template, { '$actual': actual, '$expected': expected });
 }
 
-function compileNode(
-    rule: TxFilterRule,
-    state: CompilationState,
-    depth: number,
-): string {
+function compileNode(rule: TxFilterRule, state: CompilationState, depth: number): string {
     state.nodeCount += 1;
     if (state.nodeCount > MAX_FILTER_NODES) {
         throw new Error(`Filter exceeds the maximum of ${MAX_FILTER_NODES} nodes`);

@@ -1,41 +1,12 @@
-import type { TxFilterGroupRule } from '../types/tx-filter.types';
-import { evaluateTxFilterOperator } from './txFilterOperatorService';
+import type { TxFilterRule } from '../types/tx-filter.types';
+import { compileTxFilterRule } from './txFilterCompilerService';
 import { ValidationError } from '../utils/validationError';
 
-export function validateTxFilterGroup(group: TxFilterGroupRule): void {
-    if (!group || !['AND', 'OR'].includes(group.logic)) {
-        throw new ValidationError('Every filter group must use AND or OR logic');
+export function validateTxFilterRule(rule: TxFilterRule): void {
+    try {
+        compileTxFilterRule(rule);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new ValidationError(message);
     }
-    if (!Array.isArray(group.conditions) || !Array.isArray(group.groups)) {
-        throw new ValidationError('Every filter group must contain conditions and groups arrays');
-    }
-    if (group.conditions.length === 0 && group.groups.length === 0) {
-        throw new ValidationError(
-            'Every filter group must contain at least one condition or subgroup',
-        );
-    }
-    for (const condition of group.conditions) {
-        if (
-            !condition ||
-            typeof condition.field !== 'string' ||
-            typeof condition.operator !== 'string' ||
-            condition.value === undefined
-        ) {
-            throw new ValidationError(
-                'Every filter condition requires a field, operator, and value',
-            );
-        }
-        try {
-            evaluateTxFilterOperator({
-                field: condition.field,
-                operator: condition.operator,
-                actualValue: null,
-                expectedValue: condition.value,
-            });
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            throw new ValidationError(message);
-        }
-    }
-    for (const child of group.groups) validateTxFilterGroup(child);
 }

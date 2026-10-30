@@ -1,8 +1,4 @@
-import {
-    ActiveTxFilter,
-    TransactionFilterContext,
-    evaluateTxFilterGroup,
-} from '../services/txFilterEvaluatorService';
+import type { ActiveTxFilter, TransactionFilterContext } from '../types/tx-filter.types';
 
 export function matchesTxFilter(
     transaction: TransactionFilterContext,
@@ -11,5 +7,5 @@ export function matchesTxFilter(
 ): boolean {
     if (!txFilter.isActive) return false;
     if (txFilter.activeFromBlock !== null && blockNumber < txFilter.activeFromBlock) return false;
-    return evaluateTxFilterGroup(txFilter.rule, transaction);
+    return txFilter.predicate(transaction);
 }

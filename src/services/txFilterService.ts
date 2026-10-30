@@ -34,6 +34,7 @@ export class TxFilterSyncError extends Error {
 export function createTxFilterService() {
     let refreshDynamicConfig: (() => Promise<boolean>) | undefined;
     let activeTxFiltersCache: ActiveTxFilter[] = [];
+    let compiledConfigSignature = '';
 
     function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void {
         refreshDynamicConfig = handler;
@@ -50,11 +51,9 @@ export function createTxFilterService() {
 
     async function loadActiveTxFilters(): Promise<ActiveTxFilter[]> {
         const activeFilters = await findActiveTxFilters();
-        const next: ActiveTxFilter[] = [];
         let missingFiltersStartBlock: number | undefined;
 
         for (const filter of activeFilters) {
-            validateTxFilterRule(filter.rule);
             if (filter.activeFromBlock === null || filter.activeFromBlock === undefined) {
                 if (missingFiltersStartBlock === undefined) {
                     missingFiltersStartBlock = await getNextFilterStartBlock();
@@ -62,17 +61,22 @@ export function createTxFilterService() {
                 await assignActiveFilterStartBlock(filter.id, missingFiltersStartBlock);
                 filter.activeFromBlock = missingFiltersStartBlock;
             }
-            next.push({
-                id: filter.id,
-                description: filter.description,
-                isActive: filter.isActive,
-                activeFromBlock: filter.activeFromBlock,
-                rule: filter.rule,
-                predicate: compileTxFilterRule(filter.rule),
-            });
         }
 
+        const signature = JSON.stringify(activeFilters);
+        if (signature === compiledConfigSignature) return activeTxFiltersCache;
+
+        const next: ActiveTxFilter[] = activeFilters.map((filter) => ({
+            id: filter.id,
+            description: filter.description,
+            isActive: filter.isActive,
+            activeFromBlock: filter.activeFromBlock,
+            rule: filter.rule,
+            predicate: compileTxFilterRule(filter.rule),
+        }));
+
         activeTxFiltersCache = next;
+        compiledConfigSignature = signature;
         return next;
     }
 
