@@ -1,5 +1,3 @@
-import type { TxFilterRule } from './tx-filter.types';
-
 export type StoredTransferType = 'native' | 'erc20' | 'internal';
 export type StoredTransactionChainStatus = 'SUCCESS' | 'FAILED';
 export type StoredTransactionRecordStatus = 'NORMAL' | 'REORGED';
@@ -63,9 +61,10 @@ export interface StoredTransactionRecord {
 export interface StoredTxFilterRecord {
     id: number;
     description: string;
+    from: string | null;
+    to: string | null;
     isActive: boolean;
     activeFromBlock: number | null;
-    rule: TxFilterRule;
     createdAt: Date;
     updatedAt: Date;
 }

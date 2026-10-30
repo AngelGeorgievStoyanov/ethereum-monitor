@@ -24,6 +24,16 @@ function addConstant(state: CompilationState, value: unknown): string {
     return `constants[${index}]`;
 }
 
+function applyTemplate(
+    template: string,
+    replacements: Record<string, string>,
+): string {
+    return Object.entries(replacements).reduce(
+        (result, [placeholder, value]) => result.split(placeholder).join(value),
+        template,
+    );
+}
+
 function compileCondition(
     condition: TxFilterConditionRule,
     state: CompilationState,
@@ -39,20 +49,21 @@ function compileCondition(
             normalizeTxFilterValue(value, field),
         );
         const constant = addConstant(state, new Set(values));
-        return operator.template.replace('$actual', actual).replace('$constant', constant);
+        return applyTemplate(operator.template, { '$actual': actual, '$constant': constant });
     }
     if (operator.valueMode === 'range') {
         const values = condition.value as unknown[];
         const lower = addConstant(state, normalizeTxFilterValue(values[0], field));
         const upper = addConstant(state, normalizeTxFilterValue(values[1], field));
-        return operator.template
-            .replace('$actual', actual)
-            .replace('$lower', lower)
-            .replace('$upper', upper);
+        return applyTemplate(operator.template, {
+            '$actual': actual,
+            '$lower': lower,
+            '$upper': upper,
+        });
     }
 
     const expected = addConstant(state, normalizeTxFilterValue(condition.value, field));
-    return operator.template.replace('$actual', actual).replace('$expected', expected);
+    return applyTemplate(operator.template, { '$actual': actual, '$expected': expected });
 }
 
 function compileNode(
@@ -87,7 +98,8 @@ function compileNode(
             }
             return `(${rule.any.map((child) => compileNode(child, state, depth + 1)).join(' || ')})`;
         }
-        return `(!${compileNode(rule.not, state, depth + 1)})`;
+        if ('not' in rule) return `(!${compileNode(rule.not, state, depth + 1)})`;
+        throw new Error('Unknown logical group');
     }
 
     if (keys.length !== 3 || !keys.includes('field') || !keys.includes('op') || !keys.includes('value')) {

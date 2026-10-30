@@ -1,38 +1,23 @@
-import type { TxFilterFieldDefinition } from './txFilterFieldRegistry';
+import { getTxFilterField } from './txFilterFieldRegistry';
 
-export interface TxFilterOperatorDefinition {
-    template: string;
-    valueMode?: 'single' | 'set' | 'range';
-}
+export type TxFilterOperator =
+    'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'notIn' | 'contains';
 
-const comparable = '$actual !== null && $actual !== undefined && $expected !== null && $expected !== undefined';
+const OPERATORS = new Set<TxFilterOperator>([
+    'eq',
+    'ne',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'in',
+    'notIn',
+    'contains',
+]);
 
-export const TX_FILTER_OPERATORS: Record<string, TxFilterOperatorDefinition> = {
-    eq: { template: '($actual === $expected)' },
-    ne: { template: '($actual !== null && $actual !== undefined && $actual !== $expected)' },
-    gt: { template: `(${comparable} && $actual > $expected)` },
-    gte: { template: `(${comparable} && $actual >= $expected)` },
-    lt: { template: `(${comparable} && $actual < $expected)` },
-    lte: { template: `(${comparable} && $actual <= $expected)` },
-    in: { template: '($constant.has($actual))', valueMode: 'set' },
-    notIn: {
-        template: '($actual !== null && $actual !== undefined && !$constant.has($actual))',
-        valueMode: 'set',
-    },
-    contains: { template: '($actual !== null && $actual !== undefined && $actual.includes($expected))' },
-    between: {
-        template: '($actual !== null && $actual !== undefined && $lower !== null && $upper !== null && $actual >= $lower && $actual <= $upper)',
-        valueMode: 'range',
-    },
-};
-
-export function normalizeTxFilterValue(
-    value: unknown,
-    field: TxFilterFieldDefinition,
-): unknown {
+function normalize(value: unknown, type: string, caseInsensitive: boolean): unknown {
     if (value === null || value === undefined) return value;
-
-    if (field.type === 'bigint') {
+    if (type === 'bigint') {
         if (typeof value !== 'string' && typeof value !== 'bigint') {
             throw new Error('Big integer filter values must be exact integer strings');
         }
@@ -40,8 +25,7 @@ export function normalizeTxFilterValue(
         if (!/^-?\d+$/.test(stringValue)) throw new Error('Invalid integer filter value');
         return BigInt(stringValue);
     }
-
-    if (field.type === 'number') {
+    if (type === 'number') {
         if (typeof value !== 'number' && typeof value !== 'string') {
             throw new Error('Numeric filter values must be numbers');
         }
@@ -51,53 +35,114 @@ export function normalizeTxFilterValue(
         }
         return numberValue;
     }
-
-    if (field.type === 'date') {
+    if (type === 'date') {
         if (!(value instanceof Date) && typeof value !== 'string' && typeof value !== 'number') {
             throw new Error('Date filter values must be dates, strings, or timestamps');
         }
-        const dateValue = value instanceof Date ? value.getTime() : new Date(value).getTime();
+        const dateValue = (value instanceof Date ? value : new Date(value)).getTime();
         if (!Number.isFinite(dateValue)) throw new Error('Invalid date filter value');
         return dateValue;
     }
-
     if (typeof value !== 'string') throw new Error('String filter values must be strings');
-    return field.normalize === 'lowercase' ? value.toLowerCase() : value;
+    return caseInsensitive ? value.toLowerCase() : value;
 }
 
-export function validateOperatorValue(
-    operator: string,
-    value: unknown,
-    field: TxFilterFieldDefinition,
-): void {
-    const definition = TX_FILTER_OPERATORS[operator];
-    if (!definition) throw new Error(`Unsupported transaction filter operator "${operator}"`);
-
+export function validateTxFilterOperator(field: string, operator: string, value: unknown): void {
+    if (!OPERATORS.has(operator as TxFilterOperator)) {
+        throw new Error(`Unsupported transaction filter operator "${operator}"`);
+    }
+    const definition = getTxFilterField(field);
     if (
-        ['gt', 'gte', 'lt', 'lte', 'between'].includes(operator) &&
-        !['number', 'bigint', 'date'].includes(field.type)
+        ['gt', 'gte', 'lt', 'lte'].includes(operator) &&
+        !['number', 'bigint', 'date'].includes(definition.type)
     ) {
-        throw new Error(`Operator "${operator}" is not supported for this field`);
+        throw new Error(`Operator "${operator}" is not supported for field "${field}"`);
     }
-    if (operator === 'contains' && field.type !== 'string') {
-        throw new Error('Operator "contains" is only supported for string fields');
-    }
-
-    if (definition.valueMode === 'set') {
-        if (!Array.isArray(value)) throw new Error(`Operator "${operator}" requires an array value`);
-        for (const item of value) normalizeTxFilterValue(item, field);
-        return;
-    }
-    if (definition.valueMode === 'range') {
-        if (!Array.isArray(value) || value.length !== 2) {
-            throw new Error('Operator "between" requires an array with exactly two values');
-        }
-        normalizeTxFilterValue(value[0], field);
-        normalizeTxFilterValue(value[1], field);
-        return;
+    if (operator === 'contains' && definition.type !== 'string') {
+        throw new Error(`Operator "contains" is only supported for string fields`);
     }
     if (operator === 'contains' && typeof value !== 'string') {
         throw new Error('Operator "contains" requires a string value');
     }
-    normalizeTxFilterValue(value, field);
+    if ((operator === 'in' || operator === 'notIn') && !Array.isArray(value)) {
+        throw new Error(`Operator "${operator}" requires an array value`);
+    }
+    const values = operator === 'in' || operator === 'notIn' ? (value as unknown[]) : [value];
+    for (const item of values)
+        normalize(item, definition.type, Boolean(definition.caseInsensitive));
+}
+
+export interface EvaluateTxFilterOperatorOptions {
+    field: string;
+    operator: string;
+    actualValue: unknown;
+    expectedValue: unknown;
+}
+
+export function evaluateTxFilterOperator({
+    field,
+    operator,
+    actualValue,
+    expectedValue,
+}: EvaluateTxFilterOperatorOptions): boolean {
+    validateTxFilterOperator(field, operator, expectedValue);
+    const definition = getTxFilterField(field);
+    const actual = normalize(actualValue, definition.type, Boolean(definition.caseInsensitive));
+    if (operator === 'in' || operator === 'notIn') {
+        const found =
+            Array.isArray(expectedValue) &&
+            expectedValue.some(
+                (item) =>
+                    actual ===
+                    normalize(item, definition.type, Boolean(definition.caseInsensitive)),
+            );
+        if (operator === 'in') return found;
+        return actual !== null && actual !== undefined && !found;
+    }
+    const expected = normalize(expectedValue, definition.type, Boolean(definition.caseInsensitive));
+
+    if (operator === 'eq') return actual === expected;
+    if (operator === 'ne') {
+        if (actual === null || actual === undefined) return false;
+        if (expected === null || expected === undefined) return true;
+        return actual !== expected;
+    }
+    if (operator === 'contains') {
+        return (
+            typeof actual === 'string' && typeof expected === 'string' && actual.includes(expected)
+        );
+    }
+    if (actual === null || actual === undefined || expected === null || expected === undefined) {
+        return false;
+    }
+
+    if (typeof actual === 'bigint' && typeof expected === 'bigint') {
+        switch (operator) {
+            case 'gt':
+                return actual > expected;
+            case 'gte':
+                return actual >= expected;
+            case 'lt':
+                return actual < expected;
+            case 'lte':
+                return actual <= expected;
+            default:
+                return false;
+        }
+    }
+    if (typeof actual === 'number' && typeof expected === 'number') {
+        switch (operator) {
+            case 'gt':
+                return actual > expected;
+            case 'gte':
+                return actual >= expected;
+            case 'lt':
+                return actual < expected;
+            case 'lte':
+                return actual <= expected;
+            default:
+                return false;
+        }
+    }
+    return false;
 }
