@@ -7,7 +7,6 @@ import { getTxFilterField } from './txFilterFieldRegistry';
 import { validateOperatorValue } from './txFilterOperatorService';
 import { ValidationError } from '../utils/validationError';
 
-
 interface ValidationState {
     nodeCount: number;
 }
