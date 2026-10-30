@@ -12,7 +12,6 @@ The implementation deliberately favors a compact architecture over production in
 
 For a substantially larger system or production deployment, the architecture must be redesigned. The main responsibilities, including RPC ingestion, address monitoring, filter evaluation, persistence, and event delivery, must be separated into independent services that can be scaled independently. The resulting architecture must also address queueing, access control, observability, redundancy, and operational safeguards. The current design should not be treated as a production blueprint.
 
-
 ## Setup
 
 Requirements: Node.js 24, npm, PostgreSQL, and an RPC endpoint for the network you want to monitor.
@@ -86,6 +85,12 @@ With multiple RPC endpoints, reorg verification requires every configured endpoi
 
 Catch-up is limited to 100 blocks per cycle. When far behind, normal processing can handle up to 3 blocks in parallel. Recovery remains sequential.
 
+## Monitoring dashboard
+
+Open http://localhost:8000/dashboard while the backend is running. The page requests GET /api/scanner/status every 5 seconds and displays scanner state, block lag, processing totals, recent block timings, RPC endpoint statistics, and recovery/rescan information.
+
+Processing and recovery metrics are held in process memory and reset when the process restarts. RPC counters include requests made through the shared RPC client, including status checks and recovery diagnostics. The dashboard is intended for local or otherwise trusted use; the API does not implement authentication or authorization.
+
 ## Manual rescan
 
 A rescan checks existing canonical history from fromBlock through the saved checkpoint. It does not move the checkpoint.
@@ -116,7 +121,7 @@ All routes use the /api prefix.
 | ------------------- | ------------------------------- | -------------------------------------------------- |
 | GET                 | /health/live                    | Process liveness.                                  |
 | GET                 | /health/ready                   | Database and RPC availability.                     |
-| GET                 | /scanner/status                 | Checkpoint, lag, pause, recovery, and RPC metrics. |
+| GET                 | /scanner/status                 | Checkpoint, lag, pause, recovery, RPC, and processing metrics. |
 | POST                | /scanner/pause                  | Pause now or after a block.                        |
 | POST                | /scanner/resume                 | Resume scanning.                                   |
 | POST                | /scanner/rescan                 | Start a manual rescan.                             |
@@ -126,14 +131,4 @@ All routes use the /api prefix.
 | GET                 | /transactions?page=1&limit=20   | List stored transfers.                             |
 | DELETE              | /transactions/:id               | Delete a stored transfer.                          |
 
-## Configuration
-
-- BLOCKCHAIN_NETWORK_AND_DATABASE_NAME: required; database name and scanner ID.
-- DATABASE_URL: PostgreSQL server connection URL. Do not include a database name in the path.
-- RPC_URL_1: required RPC endpoint for the configured network.
-- RPC_URL_2, RPC_URL_3, etc.: optional fallback and verification endpoints for the same network.
-- START_BLOCK: optional initial block; used only when no checkpoint exists. Normal RPC requests time out after RPC_ENDPOINT_TIMEOUT_MS and can fail over to another configured endpoint.
-
-Native ETH transfers are unique by transaction hash and block hash. ERC-20 transfers also include the log index. This preserves separate records when a transaction appears on a replacement block. Internal trace transfers are not currently processed or available to transaction filters.
-
-Recovery metrics are kept in memory and reset when the process restarts.
+The dashboard is served separately at GET /dashboard.

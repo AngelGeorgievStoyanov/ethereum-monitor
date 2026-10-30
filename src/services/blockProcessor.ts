@@ -186,7 +186,7 @@ export async function processFinalizedBlocks(
                     state.lastProcessedBlock,
                     finalizedBlockNumber,
                 );
-                accumulateBlockMetrics(totals, result, blockDurationMs);
+                accumulateBlockMetrics(totals, result, blockDurationMs, blockNumber);
             }
         } catch (error) {
             console.error(

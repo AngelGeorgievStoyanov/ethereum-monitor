@@ -62,6 +62,45 @@ export interface RpcEndpointMetrics {
     lastFailureAt: string | null;
 }
 
+export interface RecentBlockMetric {
+    blockNumber: number;
+    processedAt: string;
+    blockDurationMs: number;
+    fetchDurationMs: number;
+    filterMatchingDurationMs: number;
+    databaseWriteDurationMs: number;
+    nativeTransfersSeen: number;
+    nativeMatches: number;
+    erc20TransferLogsSeen: number;
+    erc20Matches: number;
+}
+
+export interface BlockProcessingMetrics {
+    processedBlocks: number;
+    totalTransactions: number;
+    totalNativeTransfersSeen: number;
+    totalNativeMatches: number;
+    totalErc20TransferLogsSeen: number;
+    totalErc20Matches: number;
+    totalErc20FailedAttemptsSeen: number;
+    totalErc20FailedAttemptsMatched: number;
+    totalFetchDurationMs: number;
+    totalGetBlockDurationMs: number;
+    totalGetBlockReceiptsDurationMs: number;
+    totalFilterMatchingDurationMs: number;
+    totalBlockDurationMs: number;
+    totalDatabaseWriteDurationMs: number;
+    lastProcessedBlock: number | null;
+    lastProcessedAt: string | null;
+    lastBlockDurationMs: number | null;
+    blocksProcessedLastMinute: number;
+    blocksPerSecondLastMinute: number;
+    averageBlockDurationLastMinuteMs: number | null;
+    averageFetchDurationLastMinuteMs: number | null;
+    averageDatabaseWriteDurationLastMinuteMs: number | null;
+    recentBlocks: RecentBlockMetric[];
+}
+
 export interface ScannerStatusResponse {
     paused: boolean;
     mode: ScannerPauseMode | null;
@@ -76,6 +115,9 @@ export interface ScannerStatusResponse {
     reorgRecoveryTargetBlock: number | null;
     rescanJob: ScannerRescanJobSummary | null;
     recoveryMetrics: RecoveryMetrics;
+    processingMetrics: BlockProcessingMetrics;
+    activeFiltersCount: number;
+    processUptimeSeconds: number;
     latestFinalizedBlock: number | null;
     lagBlocks: number | null;
     rpcAvailable: boolean;

@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Ethereum Monitor Dashboard</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #0b1020;
+            color: #e8edf7;
+            font-synthesis: none;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-width: 320px; background: radial-gradient(circle at 15% 0%, #172440 0, #0b1020 42%); }
+        main { width: min(1240px, calc(100% - 32px)); margin: 0 auto; padding: 30px 0 48px; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+        h1 { margin: 0; font-size: clamp(23px, 4vw, 32px); letter-spacing: -0.04em; }
+        h2 { margin: 0 0 16px; font-size: 16px; font-weight: 650; }
+        p { color: #94a3b8; }
+        .sub { margin: 7px 0 0; font-size: 13px; }
+        .status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #334155; border-radius: 999px; color: #cbd5e1; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; }
+        .ok .dot { background: #34d399; box-shadow: 0 0 12px #34d39988; }
+        .warn .dot { background: #fbbf24; }
+        .bad .dot { background: #fb7185; }
+        .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+        .card, .panel { border: 1px solid #243149; border-radius: 16px; background: #111a2cdd; box-shadow: 0 12px 32px #00000018; }
+        .card { min-height: 116px; padding: 18px; }
+        .label { color: #91a0b8; font-size: 12px; }
+        .value { margin-top: 12px; font-size: clamp(22px, 3vw, 30px); font-weight: 700; letter-spacing: -.04em; overflow-wrap: anywhere; }
+        .hint { margin-top: 6px; color: #8291a9; font-size: 11px; }
+        .layout { display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; margin-top: 14px; }
+        .panel { padding: 20px; margin-top: 14px; min-width: 0; }
+        .pipeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+        .step { padding: 14px; border: 1px solid #26354d; border-radius: 12px; background: #0d1627; }
+        .step strong { display: block; font-size: 13px; }
+        .step span { display: block; margin-top: 7px; color: #9aa9bf; font-size: 11px; }
+        .step .state { color: #34d399; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+        th, td { padding: 11px 9px; border-bottom: 1px solid #263249; text-align: left; }
+        th { color: #91a0b8; font-weight: 600; }
+        td { color: #dbe4f2; }
+        .muted { color: #91a0b8; }
+        .chart { width: 100%; height: 190px; display: block; }
+        .chart-legend { display: flex; gap: 18px; color: #91a0b8; font-size: 11px; }
+        .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #60a5fa; }
+        .legend-dot.db { background: #a78bfa; }
+        .error { display: none; padding: 12px 14px; margin: 0 0 14px; border: 1px solid #7f1d1d; border-radius: 10px; background: #451a1a66; color: #fecaca; font-size: 13px; }
+        footer { margin-top: 18px; color: #64748b; font-size: 11px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        @media (max-width: 850px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .layout { grid-template-columns: 1fr; } }
+        @media (max-width: 560px) { main { width: min(100% - 22px, 1240px); padding-top: 20px; } header { align-items: flex-start; flex-direction: column; } .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } .panel { padding: 15px; } }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <div>
+            <h1>Ethereum Monitor</h1>
+            <p class="sub">Live scanner overview · refreshes every 5 seconds</p>
+        </div>
+        <div id="overallStatus" class="status"><span class="dot"></span><span id="overallStatusText">CONNECTING</span></div>
+    </header>
+    <div id="connectionError" class="error"></div>
+    <section class="grid">
+        <article class="card"><div class="label">Last processed block</div><div class="value" id="checkpoint">—</div><div class="hint" id="lastProcessedAt">Waiting for data</div></article>
+        <article class="card"><div class="label">Latest finalized block</div><div class="value" id="finalized">—</div><div class="hint">Reported by RPC</div></article>
+        <article class="card"><div class="label">Block lag</div><div class="value" id="lag">—</div><div class="hint">Finalized minus checkpoint</div></article>
+        <article class="card"><div class="label">Active filters</div><div class="value" id="activeFilters">—</div><div class="hint">Loaded in the current process</div></article>
+    </section>
+
+    <section class="panel">
+        <h2>Processing pipeline</h2>
+        <div class="pipeline">
+            <div class="step"><strong>RPC ingestion</strong><span id="rpcState">Waiting</span></div>
+            <div class="step"><strong>Block processing</strong><span id="processingState">Waiting</span></div>
+            <div class="step"><strong>Filter evaluation</strong><span id="filterState">Waiting</span></div>
+            <div class="step"><strong>Database persistence</strong><span id="databaseState">Waiting</span></div>
+        </div>
+    </section>
+
+    <div class="layout">
+        <section class="panel">
+            <h2>Block processing · last minute</h2>
+            <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+                <div><div class="label">Blocks / minute</div><div class="value" id="blocksPerMinute">—</div></div>
+                <div><div class="label">Avg. block time</div><div class="value" id="avgBlock">—</div></div>
+                <div><div class="label">Avg. DB write</div><div class="value" id="avgDb">—</div></div>
+            </div>
+            <svg id="performanceChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Recent block processing and database write duration chart"></svg>
+            <div class="chart-legend"><span><i class="legend-dot"></i>Block duration</span><span><i class="legend-dot db"></i>Database write</span></div>
+        </section>
+        <section class="panel">
+            <h2>Transfer processing totals</h2>
+            <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+                <div><div class="label">Transactions scanned</div><div class="value" id="transactions">—</div></div>
+                <div><div class="label">Native transfers seen</div><div class="value" id="nativeSeen">—</div></div>
+                <div><div class="label">Native matches</div><div class="value" id="nativeMatches">—</div></div>
+                <div><div class="label">ERC-20 logs seen</div><div class="value" id="erc20Seen">—</div></div>
+                <div><div class="label">ERC-20 matches</div><div class="value" id="erc20Matches">—</div></div>
+                <div><div class="label">Failed ERC-20 attempts</div><div class="value" id="failedErc20">—</div></div>
+            </div>
+        </section>
+    </div>
+
+    <section class="panel">
+        <h2>RPC endpoints</h2>
+        <div class="table-wrap">
+            <table><thead><tr><th>Endpoint</th><th>Attempts</th><th>Success rate</th><th>Avg. latency</th><th>Failures</th><th>Last failure</th></tr></thead><tbody id="rpcRows"><tr><td colspan="6" class="muted">Waiting for data</td></tr></tbody></table>
+        </div>
+        <p class="hint">RPC counters include all calls made through the RPC client, including status checks and recovery diagnostics. Counters reset when the process restarts.</p>
+    </section>
+
+    <div class="layout">
+        <section class="panel">
+            <h2>Recovery</h2>
+            <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+                <div><div class="label">Reorgs detected</div><div class="value" id="reorgCount">—</div></div>
+                <div><div class="label">Last reorg depth</div><div class="value" id="reorgDepth">—</div></div>
+                <div><div class="label">Last recovery time</div><div class="value" id="reorgDuration">—</div></div>
+                <div><div class="label">Blocks reprocessed</div><div class="value" id="reprocessed">—</div></div>
+                <div><div class="label">Rescan runs</div><div class="value" id="rescanRuns">—</div></div>
+                <div><div class="label">Rescan failures</div><div class="value" id="rescanFailures">—</div></div>
+            </div>
+            <p class="hint" id="recoveryState">No recovery information</p>
+        </section>
+        <section class="panel">
+            <h2>Rescan job</h2>
+            <div class="label">Status</div><div class="value" id="rescanStatus">—</div>
+            <div class="hint" id="rescanProgress">No rescan job found</div>
+            <div class="hint" id="rescanError"></div>
+            <div style="margin-top:16px" class="label">Process uptime</div><div class="value" id="uptime">—</div>
+        </section>
+    </div>
+    <footer><span>Metrics are held in process memory and reset on restart.</span><span id="updatedAt">Last update: —</span></footer>
+</main>
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    let requestInProgress = false;
+    let lastData = null;
+    const number = (value) => value === null || value === undefined ? '—' : Number(value).toLocaleString();
+    const duration = (value) => value === null || value === undefined ? '—' : Math.round(value) + ' ms';
+    const setText = (id, value) => { $(id).textContent = value; };
+    const setPipeline = (id, text, state) => {
+        const element = $(id);
+        element.textContent = text;
+        element.className = state || '';
+    };
+    const ago = (value) => {
+        if (!value) return 'No block processed in this process';
+        const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+        return seconds < 2 ? 'Just now' : seconds + 's ago';
+    };
+    const uptime = (seconds) => {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return (days ? days + 'd ' : '') + hours + 'h ' + minutes + 'm';
+    };
+    function drawChart(samples) {
+        const svg = $('performanceChart');
+        const width = 700, height = 190, pad = 24;
+        if (!samples || samples.length === 0) {
+            svg.innerHTML = '<text x="350" y="96" text-anchor="middle" fill="#718096" font-size="13">No processed blocks in the last minute</text>';
+            return;
+        }
+        const max = Math.max(1, ...samples.map((item) => item.blockDurationMs), ...samples.map((item) => item.databaseWriteDurationMs));
+        const x = (index) => pad + (samples.length === 1 ? (width - pad * 2) / 2 : index * (width - pad * 2) / (samples.length - 1));
+        const y = (value) => height - pad - (value / max) * (height - pad * 2);
+        const line = (key) => samples.map((item, index) => (index === 0 ? 'M' : 'L') + x(index).toFixed(1) + ',' + y(item[key]).toFixed(1)).join(' ');
+        const grid = [0, 1, 2, 3].map((i) => {
+            const gy = pad + i * (height - pad * 2) / 3;
+            return '<line x1="' + pad + '" y1="' + gy + '" x2="' + (width - pad) + '" y2="' + gy + '" stroke="#263249" stroke-dasharray="3 5"/>';
+        }).join('');
+        svg.innerHTML = grid +
+            '<path d="' + line('blockDurationMs') + '" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="' + line('databaseWriteDurationMs') + '" fill="none" stroke="#a78bfa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    }
+    function render(data) {
+        lastData = data;
+        const metrics = data.processingMetrics || {};
+        const recovery = data.recoveryMetrics || {};
+        const lag = data.lagBlocks;
+        let label = 'RUNNING', statusClass = 'ok';
+        if (!data.rpcAvailable) { label = 'RPC UNAVAILABLE'; statusClass = 'bad'; }
+        else if (data.reorgRecoveryBlocked) { label = 'RECOVERY BLOCKED'; statusClass = 'bad'; }
+        else if (data.reorgRecoveryActive) { label = 'REORG RECOVERY'; statusClass = 'warn'; }
+        else if (data.paused) { label = 'PAUSED'; statusClass = 'warn'; }
+        else if (data.activeFiltersCount === 0) { label = 'WAITING FOR FILTERS'; statusClass = 'warn'; }
+        else if (lag === 0) { label = 'UP TO DATE'; statusClass = 'ok'; }
+        else if (metrics.lastProcessedAt && Date.now() - new Date(metrics.lastProcessedAt).getTime() > 60000) { label = 'POSSIBLY STALLED'; statusClass = 'warn'; }
+
+        $('overallStatus').className = 'status ' + statusClass;
+        setText('overallStatusText', label);
+        setText('checkpoint', number(data.lastProcessedBlock));
+        setText('lastProcessedAt', ago(metrics.lastProcessedAt));
+        setText('finalized', number(data.latestFinalizedBlock));
+        setText('lag', number(lag));
+        setText('activeFilters', number(data.activeFiltersCount));
+        setPipeline('rpcState', data.rpcAvailable ? 'Available' : 'Unavailable', data.rpcAvailable ? 'state' : '');
+        setPipeline('processingState', data.paused ? 'Paused' : data.reorgRecoveryActive ? 'Recovery in progress' : label, statusClass === 'bad' ? '' : 'state');
+        setPipeline('filterState', number(data.activeFiltersCount) + ' active filters', data.activeFiltersCount > 0 ? 'state' : '');
+        setPipeline('databaseState', 'Checkpoint persisted: ' + number(data.lastProcessedBlock), 'state');
+
+        setText('blocksPerMinute', number(metrics.blocksProcessedLastMinute));
+        setText('avgBlock', duration(metrics.averageBlockDurationLastMinuteMs));
+        setText('avgDb', duration(metrics.averageDatabaseWriteDurationLastMinuteMs));
+        setText('transactions', number(metrics.totalTransactions));
+        setText('nativeSeen', number(metrics.totalNativeTransfersSeen));
+        setText('nativeMatches', number(metrics.totalNativeMatches));
+        setText('erc20Seen', number(metrics.totalErc20TransferLogsSeen));
+        setText('erc20Matches', number(metrics.totalErc20Matches));
+        setText('failedErc20', number(metrics.totalErc20FailedAttemptsSeen));
+        drawChart(metrics.recentBlocks);
+
+        const rows = (data.rpcMetrics || []).map((item) => {
+            const rate = item.attempts > 0 ? ((item.successes / item.attempts) * 100).toFixed(1) + '%' : '—';
+            const avg = item.attempts > 0 ? duration(item.totalDurationMs / item.attempts) : '—';
+            return '<tr><td>#' + item.index + '</td><td>' + number(item.attempts) + '</td><td>' + rate + '</td><td>' + avg + '</td><td>' + number(item.failures) + '</td><td>' + (item.lastFailureAt ? new Date(item.lastFailureAt).toLocaleString() : '—') + '</td></tr>';
+        }).join('');
+        $('rpcRows').innerHTML = rows || '<tr><td colspan="6" class="muted">No RPC endpoints reported</td></tr>';
+
+        setText('reorgCount', number(recovery.reorgCount));
+        setText('reorgDepth', number(recovery.reorgDepthLast));
+        setText('reorgDuration', duration(recovery.reorgRecoveryDurationMsLast));
+        setText('reprocessed', number(recovery.reorgBlocksReprocessedTotal));
+        setText('rescanRuns', number(recovery.rescanRunsTotal));
+        setText('rescanFailures', number(recovery.rescanFailuresTotal));
+        setText('recoveryState', data.reorgRecoveryBlocked ? 'Blocked: ' + (data.reorgRecoveryBlockReason || 'Reason not provided') : data.reorgRecoveryActive ? 'Recovery is active' : 'No active recovery issue');
+
+        const job = data.rescanJob;
+        setText('rescanStatus', job ? job.status : '—');
+        setText('rescanProgress', job ? 'Blocks ' + number(job.blocksProcessed) + ' · range ' + number(job.fromBlock) + '–' + number(job.toBlock) + ' · current ' + number(job.currentBlock) : 'No rescan job found');
+        setText('rescanError', job && job.error ? job.error : '');
+        setText('uptime', uptime(data.processUptimeSeconds || 0));
+        setText('updatedAt', 'Last update: ' + new Date(data.checkedAt).toLocaleTimeString());
+        $('connectionError').style.display = 'none';
+    }
+    async function refresh() {
+        if (requestInProgress || document.visibilityState === 'hidden') return;
+        requestInProgress = true;
+        try {
+            const response = await fetch('/api/scanner/status', { cache: 'no-store' });
+            if (!response.ok) throw new Error('Status endpoint returned HTTP ' + response.status);
+            render(await response.json());
+        } catch (error) {
+            $('connectionError').textContent = 'Cannot load scanner status: ' + (error instanceof Error ? error.message : String(error));
+            $('connectionError').style.display = 'block';
+            if (!lastData) {
+                $('overallStatus').className = 'status bad';
+                setText('overallStatusText', 'CONNECTION LOST');
+            }
+        } finally {
+            requestInProgress = false;
+        }
+    }
+    refresh();
+    window.setInterval(refresh, 5000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import type {
+    BlockProcessingMetrics,
     ScannerControlState,
     ScannerRescanJobSummary,
     ScannerStatusResponse,
@@ -12,6 +13,9 @@ export function mapScannerStatusResponse(input: {
     state: ScannerStatusState | null;
     rescanJob: ScannerRescanJobSummary | null;
     recoveryMetrics: RecoveryMetrics;
+    processingMetrics: BlockProcessingMetrics;
+    activeFiltersCount: number;
+    processUptimeSeconds: number;
     latestFinalizedBlock: number | null;
     rpcAvailable: boolean;
     rpcMetrics: RpcEndpointMetrics[];
@@ -33,10 +37,13 @@ export function mapScannerStatusResponse(input: {
         reorgRecoveryTargetBlock: input.state?.reorgRecoveryTargetBlock ?? null,
         rescanJob: input.rescanJob,
         recoveryMetrics: input.recoveryMetrics,
+        processingMetrics: input.processingMetrics,
+        activeFiltersCount: input.activeFiltersCount,
+        processUptimeSeconds: input.processUptimeSeconds,
         latestFinalizedBlock: input.latestFinalizedBlock,
         lagBlocks:
             lastProcessedBlock !== null && input.latestFinalizedBlock !== null
-                ? input.latestFinalizedBlock - lastProcessedBlock
+                ? Math.max(0, input.latestFinalizedBlock - lastProcessedBlock)
                 : null,
         rpcAvailable: input.rpcAvailable,
         rpcMetrics: input.rpcMetrics,

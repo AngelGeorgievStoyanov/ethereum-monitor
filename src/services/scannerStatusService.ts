@@ -4,6 +4,8 @@ import { findLatestScannerRescanJob } from '../repositories/scannerRescanJobRepo
 import { evmRpcClient } from './evmBlockDataService';
 import { getScannerControlState } from './scannerControlService';
 import { getRecoveryMetrics } from './recoveryMetrics';
+import { getBlockProcessingMetrics } from './scannerMetrics';
+import { getDynamicConfigService } from './dynamicConfigService';
 import { mapScannerStatusResponse } from '../mappers/scannerStatusMapper';
 
 export async function getScannerStatusResponse() {
@@ -31,6 +33,9 @@ export async function getScannerStatusResponse() {
         state,
         rescanJob,
         recoveryMetrics: getRecoveryMetrics(),
+        processingMetrics: getBlockProcessingMetrics(),
+        activeFiltersCount: getDynamicConfigService().getTxFilters().length,
+        processUptimeSeconds: Math.floor(process.uptime()),
         latestFinalizedBlock,
         rpcAvailable,
         rpcMetrics: evmRpcClient.getMetrics(),
