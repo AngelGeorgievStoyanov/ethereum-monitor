@@ -1,10 +1,12 @@
+import {
+    MAX_FILTER_DEPTH,
+    MAX_FILTER_NODES,
+} from '../constants/tx-filter.constants';
 import type { TxFilterRule } from '../types/tx-filter.types';
 import { getTxFilterField } from './txFilterFieldRegistry';
 import { validateOperatorValue } from './txFilterOperatorService';
 import { ValidationError } from '../utils/validationError';
 
-const MAX_FILTER_DEPTH = 20;
-const MAX_FILTER_NODES = 2000;
 
 interface ValidationState {
     nodeCount: number;
