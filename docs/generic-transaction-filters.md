@@ -101,6 +101,24 @@ timestamp is represented in milliseconds since the Unix epoch.
 
 For eq, a null actual value is compared directly with the expected value. ne, notIn, and the comparison operators do not match when the actual value is null or undefined. contains also does not match null or undefined values. in checks whether the set contains the actual value; therefore, a null actual value can match if the supplied array contains null. between requires a non-null actual value and non-null bounds.
 
+## Address validation
+
+Address values used by the from, to, and tokenAddress fields are validated before a filter is created or its rule is updated. The checks run only during filter mutations, not while scanning transfers.
+
+The settings are independent in src/constants/tx-filter-address.constants.ts:
+
+- address: controls validation for from and to.
+- tokenContract: controls validation for tokenAddress.
+- Each setting has ethers and onChain booleans. Either check can be enabled independently, or both can be enabled. When both are enabled, both must pass.
+
+The ethers check uses ethers.isAddress, including mixed-case checksum validation.
+
+The on-chain check for from and to queries contract code and transaction count. An address with no code and no transaction history is accepted; an empty history does not make an address invalid. The RPC calls must complete successfully.
+
+The on-chain tokenAddress check requires deployed contract code and successful totalSupply() and balanceOf() calls. This is a practical ERC-20 interface check, not a guarantee of full ERC-20 compliance.
+
+An RPC/network failure is reported separately from an invalid address or token contract. It does not silently pass validation.
+
 ## Validation, compilation, and execution
 
 The complete rule tree is validated before a filter is saved. Validation checks the logical structure, field names, operators, value types, nesting depth, and node count. The current limits are:
