@@ -5,20 +5,25 @@ export interface TxFilterOperatorDefinition {
     valueMode?: 'single' | 'set' | 'range';
 }
 
+const comparable = '$actual !== null && $actual !== undefined && $expected !== null && $expected !== undefined';
+
 export const TX_FILTER_OPERATORS: Record<string, TxFilterOperatorDefinition> = {
     eq: { template: '($actual === $expected)' },
     ne: { template: '($actual !== null && $actual !== undefined && $actual !== $expected)' },
-    gt: { template: '($actual > $expected)' },
-    gte: { template: '($actual >= $expected)' },
-    lt: { template: '($actual < $expected)' },
-    lte: { template: '($actual <= $expected)' },
+    gt: { template: `(${comparable} && $actual > $expected)` },
+    gte: { template: `(${comparable} && $actual >= $expected)` },
+    lt: { template: `(${comparable} && $actual < $expected)` },
+    lte: { template: `(${comparable} && $actual <= $expected)` },
     in: { template: '($constant.has($actual))', valueMode: 'set' },
     notIn: {
         template: '($actual !== null && $actual !== undefined && !$constant.has($actual))',
         valueMode: 'set',
     },
     contains: { template: '($actual !== null && $actual !== undefined && $actual.includes($expected))' },
-    between: { template: '($actual >= $lower && $actual <= $upper)', valueMode: 'range' },
+    between: {
+        template: '($actual !== null && $actual !== undefined && $lower !== null && $upper !== null && $actual >= $lower && $actual <= $upper)',
+        valueMode: 'range',
+    },
 };
 
 export function normalizeTxFilterValue(
@@ -68,8 +73,10 @@ export function validateOperatorValue(
     const definition = TX_FILTER_OPERATORS[operator];
     if (!definition) throw new Error(`Unsupported transaction filter operator "${operator}"`);
 
-    if (['gt', 'gte', 'lt', 'lte', 'between'].includes(operator) &&
-        !['number', 'bigint', 'date'].includes(field.type)) {
+    if (
+        ['gt', 'gte', 'lt', 'lte', 'between'].includes(operator) &&
+        !['number', 'bigint', 'date'].includes(field.type)
+    ) {
         throw new Error(`Operator "${operator}" is not supported for this field`);
     }
     if (operator === 'contains' && field.type !== 'string') {

@@ -5,15 +5,16 @@ import TxFilter from '../models/txFilter';
 import TxMatch from '../models/txMatch';
 import Block from '../models/block';
 import ScannerState from '../models/scannerState';
-import type { TxFilterRecord, TxFilterRule } from '../types/tx-filter.types';
+import type { TxFilterRecord } from '../types/tx-filter.types';
 
 function toTxFilterRecord(filter: TxFilter): TxFilterRecord {
     return {
         id: filter.id,
         description: filter.description,
+        from: filter.from ?? null,
+        to: filter.to ?? null,
         isActive: filter.isActive,
         activeFromBlock: filter.activeFromBlock,
-        rule: filter.rule,
     };
 }
 
@@ -30,12 +31,18 @@ export async function findActiveTxFilters(): Promise<TxFilterRecord[]> {
     return filters.map(toTxFilterRecord);
 }
 
+export async function findTxFilterById(id: number): Promise<TxFilterRecord | null> {
+    const filter = await TxFilter.findByPk(id);
+    return filter ? toTxFilterRecord(filter) : null;
+}
+
 export async function createTxFilter(
     data: {
         description: string;
+        from: string | null;
+        to: string | null;
         isActive: boolean;
         activeFromBlock: number | null;
-        rule: TxFilterRule;
     },
     transaction?: SequelizeTransaction,
 ): Promise<TxFilterRecord> {
@@ -47,31 +54,34 @@ export async function updateTxFilter(
     id: number,
     updates: {
         description?: string;
+        from?: string | null;
+        to?: string | null;
         isActive?: boolean;
         activeFromBlock?: number | null;
-        rule?: TxFilterRule;
     },
     transaction?: SequelizeTransaction,
-): Promise<TxFilterRecord | null> {
-    const filter = await TxFilter.findByPk(id, transaction ? { transaction } : undefined);
-    if (!filter) return null;
+) {
+    const txFilter = await TxFilter.findByPk(id, transaction ? { transaction } : undefined);
+    if (!txFilter) return null;
 
-    if (updates.description !== undefined) filter.description = updates.description;
-    if (updates.isActive !== undefined) filter.isActive = updates.isActive;
-    if (updates.activeFromBlock !== undefined) filter.activeFromBlock = updates.activeFromBlock;
-    if (updates.rule !== undefined) filter.rule = updates.rule;
+    if (updates.description !== undefined) txFilter.description = updates.description;
+    if (updates.from !== undefined) txFilter.from = updates.from;
+    if (updates.to !== undefined) txFilter.to = updates.to;
+    if (updates.isActive !== undefined) txFilter.isActive = updates.isActive;
+    if (updates.activeFromBlock !== undefined) txFilter.activeFromBlock = updates.activeFromBlock;
 
-    await filter.save(transaction ? { transaction } : undefined);
-    return toTxFilterRecord(filter);
+    await txFilter.save(transaction ? { transaction } : undefined);
+    return toTxFilterRecord(txFilter);
 }
 
 export async function deleteTxFilterById(id: number, transaction?: SequelizeTransaction) {
     const remove = async (activeTransaction: SequelizeTransaction) => {
-        const filter = await TxFilter.findByPk(id, { transaction: activeTransaction });
-        if (!filter) return 0;
+        const txFilter = await TxFilter.findByPk(id, { transaction: activeTransaction });
+        if (!txFilter) return 0;
 
+        // Keep historical matches and snapshot the description before unlinking the filter.
         await TxMatch.update(
-            { txFilterDescription: filter.description },
+            { txFilterDescription: txFilter.description },
             {
                 where: { txFilterId: id, txFilterDescription: null },
                 transaction: activeTransaction,
@@ -86,6 +96,7 @@ export async function deleteTxFilterById(id: number, transaction?: SequelizeTran
             { where: { txFilterId: id }, transaction: activeTransaction },
         );
 
+        // Database foreign keys cascade-delete groups, nested groups, and conditions.
         return TxFilter.destroy({ where: { id }, transaction: activeTransaction });
     };
 

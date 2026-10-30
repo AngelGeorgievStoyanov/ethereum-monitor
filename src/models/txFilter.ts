@@ -1,13 +1,13 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../database';
-import type { TxFilterRule } from '../types/tx-filter.types';
 
 interface TxFilterAttributes {
     id: number;
     description: string;
+    from?: string | null;
+    to?: string | null;
     isActive: boolean;
     activeFromBlock: number | null;
-    rule: TxFilterRule;
 }
 
 export type TxFilterCreationAttributes = Optional<TxFilterAttributes, 'id' | 'isActive'>;
@@ -18,9 +18,10 @@ class TxFilter
 {
     public id!: number;
     public description!: string;
+    public from?: string | null;
+    public to?: string | null;
     public isActive!: boolean;
     public activeFromBlock!: number | null;
-    public rule!: TxFilterRule;
 }
 
 TxFilter.init(
@@ -34,6 +35,14 @@ TxFilter.init(
             type: DataTypes.STRING,
             allowNull: false,
         },
+        from: {
+            type: DataTypes.STRING(42),
+            allowNull: true,
+        },
+        to: {
+            type: DataTypes.STRING(42),
+            allowNull: true,
+        },
         isActive: {
             type: DataTypes.BOOLEAN,
             allowNull: false,
@@ -43,10 +52,6 @@ TxFilter.init(
             type: DataTypes.INTEGER,
             allowNull: true,
             defaultValue: null,
-        },
-        rule: {
-            type: DataTypes.JSONB,
-            allowNull: false,
         },
     },
     {

@@ -51,8 +51,7 @@ function compileCondition(
             .replace('$upper', upper);
     }
 
-    const expectedValue = normalizeTxFilterValue(condition.value, field);
-    const expected = addConstant(state, expectedValue);
+    const expected = addConstant(state, normalizeTxFilterValue(condition.value, field));
     return operator.template.replace('$actual', actual).replace('$expected', expected);
 }
 
@@ -68,36 +67,33 @@ function compileNode(
     if (depth > MAX_FILTER_DEPTH) {
         throw new Error(`Filter exceeds the maximum nesting depth of ${MAX_FILTER_DEPTH}`);
     }
-
     if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
         throw new Error('Every filter rule must be an object');
     }
 
-    if ('all' in rule) {
-        if (!Array.isArray(rule.all) || rule.all.length === 0) {
-            throw new Error('"all" requires a non-empty array');
+    const keys = Object.keys(rule);
+    const groupKeys = keys.filter((key) => key === 'all' || key === 'any' || key === 'not');
+    if (groupKeys.length > 0) {
+        if (keys.length !== 1) throw new Error('A logical group must contain exactly one operator');
+        if ('all' in rule) {
+            if (!Array.isArray(rule.all) || rule.all.length === 0) {
+                throw new Error('"all" requires a non-empty array');
+            }
+            return `(${rule.all.map((child) => compileNode(child, state, depth + 1)).join(' && ')})`;
         }
-        return `(${rule.all.map((child) => compileNode(child, state, depth + 1)).join(' && ')})`;
-    }
-    if ('any' in rule) {
-        if (!Array.isArray(rule.any) || rule.any.length === 0) {
-            throw new Error('"any" requires a non-empty array');
+        if ('any' in rule) {
+            if (!Array.isArray(rule.any) || rule.any.length === 0) {
+                throw new Error('"any" requires a non-empty array');
+            }
+            return `(${rule.any.map((child) => compileNode(child, state, depth + 1)).join(' || ')})`;
         }
-        return `(${rule.any.map((child) => compileNode(child, state, depth + 1)).join(' || ')})`;
-    }
-    if ('not' in rule) {
         return `(!${compileNode(rule.not, state, depth + 1)})`;
     }
 
-    const condition = rule as TxFilterConditionRule;
-    if (
-        typeof condition.field !== 'string' ||
-        typeof condition.op !== 'string' ||
-        !Object.prototype.hasOwnProperty.call(condition, 'value')
-    ) {
-        throw new Error('A condition requires field, op, and value');
+    if (keys.length !== 3 || !keys.includes('field') || !keys.includes('op') || !keys.includes('value')) {
+        throw new Error('A condition must contain exactly field, op, and value');
     }
-    return compileCondition(condition, state);
+    return compileCondition(rule as TxFilterConditionRule, state);
 }
 
 export function compileTxFilterRule(rule: TxFilterRule): CompiledTxFilter {
@@ -108,6 +104,5 @@ export function compileTxFilterRule(rule: TxFilterRule): CompiledTxFilter {
         `return function compiledTransactionFilter(tx) { return ${expression}; }`,
     ) as (constants: unknown[]) => CompiledTxFilter;
 
-    const predicate = factory(state.constants);
-    return (transaction: TransactionFilterContext): boolean => predicate(transaction);
+    return factory(state.constants);
 }
