@@ -14,6 +14,7 @@ import {
 } from '../mappers/txFilterResponseMapper';
 import type { ActiveTxFilter, TxFilterRule } from '../types/tx-filter.types';
 import { compileTxFilterRule } from './txFilterCompilerService';
+import { validateTxFilterAddresses } from './txFilterAddressValidationService';
 
 export class TxFilterSyncError extends Error {
     public readonly response: ReturnType<typeof mapTxFilterSyncFailureResponse>;
@@ -74,6 +75,8 @@ export function createTxFilterService() {
         isActive: boolean;
         rule: TxFilterRule;
     }) {
+        await validateTxFilterAddresses(data.rule);
+
         const filter = await withTxFilterMutationLock((transaction) =>
             insertTxFilter(
                 {
@@ -98,6 +101,8 @@ export function createTxFilterService() {
             rule?: TxFilterRule;
         },
     ) {
+        if (updates.rule) await validateTxFilterAddresses(updates.rule);
+
         const updated = await withTxFilterMutationLock(async (transaction) => {
             const current = await findTxFilterForUpdate(id, transaction);
             if (!current) return null;
