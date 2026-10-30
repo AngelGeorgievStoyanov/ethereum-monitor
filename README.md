@@ -60,7 +60,7 @@ The scanner saves its checkpoint in PostgreSQL and resumes from it after a resta
 - When creating a new scanner state without START_BLOCK, scanning starts after the current finalized block. Existing chain history is skipped.
 - Filter creation does not determine the initial checkpoint. When there are no active filters, the scanner waits without advancing the checkpoint. Once an active filter is available, scanning continues from the next unprocessed block. Newly created filters do not trigger an automatic historical backfill.
 - DynamicConfigService owns the in-memory active-filter cache. Each instance applies a content-based configuration version and logs it. Normal scanner batches use one consistent snapshot; reorg recovery refreshes its snapshot for each block. Local API mutations refresh the local instance immediately; other instances discover changes on their next 60-second refresh when the database is available. If a refresh fails, the last successfully applied cache is retained.
-- Invalid active filters are logged and excluded without blocking valid filters. Each invalid filter is retried once per minute and is automatically deactivated in the database after three consecutive failed attempts. Retry counters reset on process restart.
+- Invalid active filters are logged and excluded without blocking valid filters. Each invalid filter is retried once per minute. Retry counters reset on process restart. Automatic deactivation after three failed attempts is intended, but the current rule-signature comparison in the deactivation guard is incorrect; do not rely on automatic deactivation until that code issue is fixed. See docs/generic-transaction-filters.md.
 
 ### Filter capacity
 
