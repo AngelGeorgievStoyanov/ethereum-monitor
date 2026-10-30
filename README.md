@@ -2,6 +2,17 @@
 
 Monitors native ETH transfers and ERC-20 transfer events on an EVM-compatible network. Matching transfers are stored in PostgreSQL.
 
+## Project scope
+
+Ethereum Monitor is a **lightweight, single-network EVM monitoring application** built as a focused demonstration/interview project. It demonstrates continuous block scanning, native and ERC-20 transfer processing, configurable transaction filters, checkpoint persistence, and basic reorganization detection and recovery.
+
+It is not a production-ready monitoring platform and is not designed or validated for large-scale workloads, public multi-tenant use, high availability, or strict service-level guarantees. Its HTTP API is intended for local or otherwise trusted use; authentication and authorization are not implemented, so do not expose it directly to an untrusted network.
+
+The implementation deliberately favors a compact architecture over production infrastructure. It does not aim to provide horizontal scan throughput, independently scalable ingestion and filtering, durable event streaming, comprehensive operational monitoring, or production-grade disaster recovery.
+
+A production deployment or substantially larger workload would require a separate architecture and capacity review. Depending on requirements, responsibilities such as RPC ingestion, address monitoring, filter evaluation, persistence, and event delivery may need to be separated into independently scalable services, with appropriate queueing, access control, observability, redundancy, and operational safeguards. The current design and its limits should not be treated as a production blueprint.
+
+
 ## Setup
 
 Requirements: Node.js 24, npm, PostgreSQL, and an RPC endpoint for the network you want to monitor.
@@ -36,7 +47,7 @@ The application then creates and uses ethereum-sepolia if it does not already ex
 
 The PostgreSQL user in DATABASE_URL must be allowed to connect to the postgres administrative database and create databases. The name setting must contain 1-63 letters, numbers, hyphens, or underscores.
 
-For production, run npm run build and npm start. The API listens on port 8000.
+To run the compiled application locally, use npm run build followed by npm start. The API listens on port 8000. These commands describe how to run the build; they do not imply that the application is production-ready.
 
 The application creates missing tables at startup. It does not migrate existing table schemas; schema changes must be applied separately.
 
