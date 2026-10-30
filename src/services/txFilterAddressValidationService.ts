@@ -16,29 +16,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function getAddressValues(rule: TxFilterRule, result: Array<{ kind: AddressKind; value: string }>): void {
+function getAddressValues(
+    rule: TxFilterRule,
+    result: Array<{ kind: AddressKind; value: string }>,
+): void {
     if (!isRecord(rule)) return;
 
-    if (Array.isArray(rule.all)) {
-        for (const child of rule.all) getAddressValues(child, result);
+    const node = rule as Record<string, unknown>;
+
+    if (Array.isArray(node.all)) {
+        for (const child of node.all) getAddressValues(child as TxFilterRule, result);
         return;
     }
-    if (Array.isArray(rule.any)) {
-        for (const child of rule.any) getAddressValues(child, result);
+    if (Array.isArray(node.any)) {
+        for (const child of node.any) getAddressValues(child as TxFilterRule, result);
         return;
     }
-    if (rule.not) {
-        getAddressValues(rule.not as TxFilterRule, result);
+    if (node.not) {
+        getAddressValues(node.not as TxFilterRule, result);
         return;
     }
 
-    const field = rule.field;
-    const operator = rule.op;
+    const field = node.field;
+    const operator = node.op;
     if (field !== 'from' && field !== 'to' && field !== 'tokenAddress') return;
     if (!['eq', 'ne', 'in', 'notIn'].includes(String(operator))) return;
 
     const kind: AddressKind = field === 'tokenAddress' ? 'tokenContract' : 'address';
-    const values = Array.isArray(rule.value) ? rule.value : [rule.value];
+    const values = Array.isArray(node.value) ? node.value : [node.value];
 
     for (const value of values) {
         if (typeof value === 'string') result.push({ kind, value });
