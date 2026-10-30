@@ -1,6 +1,6 @@
 # Code Organization Conventions
 
-> **Project scope:** These are lightweight project guidelines for a demonstration/interview application, not a claim that every existing module already follows every rule. The current codebase contains some existing deviations (including services that call repository functions directly). Treat the guidelines as the intended direction for future changes and identify existing deviations explicitly during reviews. Do not add layers or abstractions solely to satisfy the document when they do not provide practical value. This project is not a production architecture; production or substantially larger workloads require a separate architecture review and may require splitting responsibilities into independently scalable components.
+> **Project scope:** These are lightweight project guidelines for a single-network EVM blockchain monitoring system, not a claim that every existing module already follows every rule. The current codebase contains some existing deviations (including services that call repository functions directly). Treat the guidelines as the intended direction for future changes and identify existing deviations explicitly during reviews. Do not add layers or abstractions solely to satisfy the document when they do not provide practical value. For a substantially larger system or production deployment, the architecture must be redesigned and the main responsibilities must be separated into independent services that can be scaled independently.
 
 
 ## 1. Controllers
