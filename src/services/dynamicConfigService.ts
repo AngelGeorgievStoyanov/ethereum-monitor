@@ -23,10 +23,10 @@ export function createDynamicConfigService() {
             loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]),
         );
         const configSignature = JSON.stringify(
-            Array.from(next.values()).map(({ id, description, rule }) => ({
+            Array.from(next.values()).map(({ id, description, ruleSignature }) => ({
                 id,
                 description,
-                rule,
+                ruleSignature,
             })),
         );
         const nextVersion = createHash('sha256')

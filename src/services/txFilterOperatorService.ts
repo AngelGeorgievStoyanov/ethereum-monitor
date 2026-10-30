@@ -1,40 +1,9 @@
 import { MAX_FILTER_ARRAY_VALUES } from '../constants/tx-filter.constants';
-import type { TxFilterFieldDefinition } from './txFilterFieldRegistry';
-
-export interface TxFilterOperatorDefinition {
-    template: string;
-    valueMode?: 'single' | 'set' | 'range';
-}
-
-const comparable =
-    '$actual !== null && $actual !== undefined && $expected !== null && $expected !== undefined';
-
-export const TX_FILTER_OPERATORS: Record<string, TxFilterOperatorDefinition> = {
-    eq: { template: '($actual === $expected)' },
-    ne: { template: '($actual !== null && $actual !== undefined && $actual !== $expected)' },
-    gt: { template: `(${comparable} && $actual > $expected)` },
-    gte: { template: `(${comparable} && $actual >= $expected)` },
-    lt: { template: `(${comparable} && $actual < $expected)` },
-    lte: { template: `(${comparable} && $actual <= $expected)` },
-    in: { template: '($constant.has($actual))', valueMode: 'set' },
-    notIn: {
-        template: '($actual !== null && $actual !== undefined && !$constant.has($actual))',
-        valueMode: 'set',
-    },
-    contains: { template: '($actual !== null && $actual !== undefined && $actual.includes($expected))' },
-    between: {
-        template:
-            '($actual !== null && $actual !== undefined && $lower !== null && $upper !== null && $actual >= $lower && $actual <= $upper)',
-        valueMode: 'range',
-    },
-};
-
-export function getTxFilterOperator(operator: string): TxFilterOperatorDefinition {
-    if (!Object.prototype.hasOwnProperty.call(TX_FILTER_OPERATORS, operator)) {
-        throw new Error(`Unsupported transaction filter operator "${operator}"`);
-    }
-    return TX_FILTER_OPERATORS[operator];
-}
+import type {
+    TxFilterFieldDefinition,
+    TxFilterOperatorName,
+} from './txFilterRegistry';
+import { getTxFilterOperator } from './txFilterRegistry';
 
 export function normalizeTxFilterValue(
     value: unknown,
@@ -80,17 +49,11 @@ export function validateOperatorValue(
     value: unknown,
     field: TxFilterFieldDefinition,
 ): void {
-    const definition = getTxFilterOperator(operator);
-
-    if (
-        ['gt', 'gte', 'lt', 'lte', 'between'].includes(operator) &&
-        !['number', 'bigint', 'date'].includes(field.type)
-    ) {
+    if (!field.operators.includes(operator as TxFilterOperatorName)) {
         throw new Error(`Operator "${operator}" is not supported for this field`);
     }
-    if (operator === 'contains' && field.type !== 'string') {
-        throw new Error('Operator "contains" is only supported for string fields');
-    }
+
+    const definition = getTxFilterOperator(operator);
 
     if (definition.valueMode === 'set') {
         if (!Array.isArray(value) || value.length === 0) {
@@ -102,6 +65,7 @@ export function validateOperatorValue(
         for (const item of value) normalizeTxFilterValue(item, field);
         return;
     }
+
     if (definition.valueMode === 'range') {
         if (!Array.isArray(value) || value.length !== 2) {
             throw new Error('Operator "between" requires an array with exactly two values');
@@ -110,8 +74,6 @@ export function validateOperatorValue(
         normalizeTxFilterValue(value[1], field);
         return;
     }
-    if (operator === 'contains' && typeof value !== 'string') {
-        throw new Error('Operator "contains" requires a string value');
-    }
+
     normalizeTxFilterValue(value, field);
 }

@@ -44,7 +44,10 @@ export class TxFilterSyncError extends Error {
 export function createTxFilterService() {
     let refreshDynamicConfig: (() => Promise<boolean>) | undefined;
     let activeTxFiltersCache: ActiveTxFilter[] = [];
-    const compiledFilters = new Map<number, { ruleSignature: string; predicate: ActiveTxFilter['predicate'] }>();
+    const compiledFilters = new Map<
+        number,
+        { ruleSignature: string; predicate: ActiveTxFilter['predicate'] }
+    >();
     const invalidFilterRetries = new Map<number, InvalidFilterRetryState>();
 
     function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void {

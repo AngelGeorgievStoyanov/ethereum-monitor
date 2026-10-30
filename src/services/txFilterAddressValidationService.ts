@@ -3,8 +3,8 @@ import { MAX_TX_FILTER_ADDRESSES } from '../constants/tx-filter.constants';
 import { TX_FILTER_ADDRESS_VALIDATION } from '../constants/tx-filter-address.constants';
 import type { TxFilterRule } from '../types/tx-filter.types';
 import { ValidationError } from '../utils/validationError';
-
-type AddressKind = 'address' | 'tokenContract';
+import { getTxFilterField, getTxFilterOperator, TX_FILTER_FIELDS } from './txFilterRegistry';
+import type { TxFilterAddressKind, TxFilterOperatorName } from './txFilterRegistry';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -12,7 +12,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function getAddressValues(
     rule: TxFilterRule,
-    result: Array<{ kind: AddressKind; value: string }>,
+    result: Array<{ kind: TxFilterAddressKind; value: string }>,
 ): void {
     if (!isRecord(rule)) return;
 
@@ -31,21 +31,28 @@ function getAddressValues(
         return;
     }
 
-    const field = node.field;
-    const operator = node.op;
-    if (field !== 'from' && field !== 'to' && field !== 'tokenAddress') return;
-    if (!['eq', 'ne', 'in', 'notIn'].includes(String(operator))) return;
+    if (
+        typeof node.field !== 'string' ||
+        typeof node.op !== 'string' ||
+        !Object.prototype.hasOwnProperty.call(TX_FILTER_FIELDS, node.field)
+    ) {
+        return;
+    }
 
-    const kind: AddressKind = field === 'tokenAddress' ? 'tokenContract' : 'address';
-    const values = Array.isArray(node.value) ? node.value : [node.value];
+    const field = getTxFilterField(node.field);
+    if (!field.addressKind || !field.operators.includes(node.op as TxFilterOperatorName)) return;
+
+    const operator = getTxFilterOperator(node.op);
+    const values =
+        operator.valueMode === 'set' && Array.isArray(node.value) ? node.value : [node.value];
 
     for (const value of values) {
-        if (typeof value === 'string') result.push({ kind, value });
+        if (typeof value === 'string') result.push({ kind: field.addressKind, value });
     }
 }
 
 export function validateTxFilterAddresses(rule: TxFilterRule): void {
-    const addresses: Array<{ kind: AddressKind; value: string }> = [];
+    const addresses: Array<{ kind: TxFilterAddressKind; value: string }> = [];
     getAddressValues(rule, addresses);
 
     const uniqueAddressValues = new Set(addresses.map(({ value }) => value.toLowerCase()));

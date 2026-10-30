@@ -7,12 +7,9 @@ import type {
     TxFilterConditionRule,
     TxFilterRule,
 } from '../types/tx-filter.types';
-import { getTxFilterField } from './txFilterFieldRegistry';
+import { getTxFilterField, getTxFilterOperator } from './txFilterRegistry';
 import { validateTxFilterRule } from './txFilterValidationService';
-import {
-    getTxFilterOperator,
-    normalizeTxFilterValue,
-} from './txFilterOperatorService';
+import { normalizeTxFilterValue } from './txFilterOperatorService';
 
 interface CompilationState {
     constants: unknown[];

@@ -3,7 +3,7 @@ import {
     MAX_FILTER_NODES,
 } from '../constants/tx-filter.constants';
 import type { TxFilterRule } from '../types/tx-filter.types';
-import { getTxFilterField } from './txFilterFieldRegistry';
+import { getTxFilterField } from './txFilterRegistry';
 import { validateOperatorValue } from './txFilterOperatorService';
 import { ValidationError } from '../utils/validationError';
 

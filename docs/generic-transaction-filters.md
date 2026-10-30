@@ -99,13 +99,12 @@ timestamp is represented in milliseconds since the Unix epoch.
 - gt, gte, lt, lte: numeric, BigInt, or date comparisons.
 - in, notIn: membership in an array (maximum 1000 values).
 - between: inclusive range with exactly two values.
-- contains: substring match for string fields.
 
-For eq, a null actual value is compared directly with the expected value. ne, notIn, and the comparison operators do not match when the actual value is null or undefined. contains also does not match null or undefined values. in checks whether the set contains the actual value; therefore, a null actual value can match if the supplied array contains null. between requires a non-null actual value and non-null bounds.
+For eq, a null actual value is compared directly with the expected value. ne, notIn, and the comparison operators do not match when the actual value is null or undefined. in checks whether the set contains the actual value; therefore, a null actual value can match if the supplied array contains null. between requires a non-null actual value and non-null bounds.
 
 ## Address validation and capacity
 
-Exact address values used with eq, ne, in, and notIn on the from, to, and tokenAddress fields are subject to the configured address format validation before a filter is created or its rule is updated. Partial substring values used with contains are not treated as complete addresses. These checks run only during filter mutations, not while scanning transfers.
+Address values used with eq, ne, in, and notIn on the from, to, and tokenAddress fields are subject to the configured address format validation before a filter is created or its rule is updated. These checks run only during filter mutations, not while scanning transfers.
 
 The independent settings are in src/constants/tx-filter-address.constants.ts:
 
@@ -146,7 +145,7 @@ Each instance calculates a content-based configuration version and logs the vers
 
 Each transfer context is passed to every active filter. All matching filters are retained for that transfer. When a filter is deleted, its previous matches keep the original filter ID and description and are marked as FILTER_DELETED for audit history. The scanner does not check activation blocks or interpret the JSON rule tree during matching.
 
-Generated code uses only field accessors and operator templates defined in source-controlled catalogs. Filter values are passed as constants and are never interpolated into executable source. The JavaScript function constructor requires Node.js dynamic code generation to be enabled.
+Generated code uses field accessors, supported field/operator combinations, and operator templates defined in one source-controlled registry. Filter values are passed as constants and are never interpolated into executable source. After compilation, runtime snapshots retain the filter ID, description, a SHA-256 rule signature, and the compiled predicate; the original rule JSON is not retained in the runtime filter object. The JavaScript function constructor requires Node.js dynamic code generation to be enabled.
 
 When no active filters exist, the scanner does not advance its processing checkpoint. When filters are activated, processing resumes from the next unprocessed block using the current active filter set. New filters do not trigger automatic historical backfill.
 

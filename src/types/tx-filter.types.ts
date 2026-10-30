@@ -16,7 +16,7 @@ export type CompiledTxFilter = (transaction: TransactionFilterContext) => boolea
 export interface ActiveTxFilter {
     id: number;
     description: string;
-    rule: TxFilterRule;
+    ruleSignature: string;
     predicate: CompiledTxFilter;
 }
 
