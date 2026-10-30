@@ -1,5 +1,8 @@
 # Generic transaction filters
 
+> **Project scope:** This filter engine is part of a lightweight, single-network blockchain monitoring demo/interview project. It evaluates rules against the transfer contexts currently produced by this application; it is not a general-purpose EVM transaction engine or a production-scale filtering platform. Larger workloads or production requirements need a separate architecture and capacity review, and may require independently scalable ingestion, filtering, and event-delivery components.
+
+
 Filters are created and updated through /api/tx-filters. Each filter stores one JSON rule in the TxFilters.rule JSONB column.
 
 ## Rule structure
