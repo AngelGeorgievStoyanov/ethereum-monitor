@@ -16,6 +16,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function getErrorCode(error: unknown): unknown {
+    return typeof error === 'object' && error !== null && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+}
+
 function getAddressValues(
     rule: TxFilterRule,
     result: Array<{ kind: AddressKind; value: string }>,
@@ -64,7 +70,10 @@ async function validateOnChainAddress(address: string): Promise<void> {
 
             // An address with no code and no transaction history is still a valid address.
         });
-    } catch {
+    } catch (error) {
+        if (getErrorCode(error) === 'INVALID_ARGUMENT') {
+            throw new ValidationError(`Invalid Ethereum address: ${address}`);
+        }
         throw new HttpError(503, 'On-chain address validation is temporarily unavailable');
     }
 }
@@ -94,10 +103,7 @@ async function validateOnChainTokenContract(address: string): Promise<void> {
             } catch (error) {
                 if (error instanceof ValidationError) throw error;
 
-                const code =
-                    typeof error === 'object' && error !== null && 'code' in error
-                        ? (error as { code?: unknown }).code
-                        : undefined;
+                const code = getErrorCode(error);
 
                 if (code === 'CALL_EXCEPTION' || code === 'BAD_DATA') {
                     throw new ValidationError(
@@ -109,6 +115,9 @@ async function validateOnChainTokenContract(address: string): Promise<void> {
         });
     } catch (error) {
         if (error instanceof ValidationError) throw error;
+        if (getErrorCode(error) === 'INVALID_ARGUMENT') {
+            throw new ValidationError(`Invalid Ethereum address: ${address}`);
+        }
         throw new HttpError(503, 'On-chain token validation is temporarily unavailable');
     }
 }
