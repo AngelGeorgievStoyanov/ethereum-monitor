@@ -1,4 +1,5 @@
 import {
+    countActiveTxFilters,
     createTxFilter as insertTxFilter,
     deleteTxFilterById,
     findActiveTxFilters,
@@ -7,6 +8,9 @@ import {
     findTxFilterForUpdate,
     withTxFilterMutationLock,
 } from '../repositories/txFilterRepository';
+import {
+    MAX_ACTIVE_TX_FILTERS,
+} from '../constants/tx-filter.constants';
 import { mapTxFilterListResponse, mapTxFilterResponse } from '../mappers/txFilterMapper';
 import {
     mapTxFilterSyncFailureResponse,
@@ -15,6 +19,7 @@ import {
 import type { ActiveTxFilter, TxFilterRule } from '../types/tx-filter.types';
 import { compileTxFilterRule } from './txFilterCompilerService';
 import { validateTxFilterAddresses } from './txFilterAddressValidationService';
+import { ValidationError } from '../utils/validationError';
 
 export class TxFilterSyncError extends Error {
     public readonly response: ReturnType<typeof mapTxFilterSyncFailureResponse>;
@@ -77,16 +82,25 @@ export function createTxFilterService() {
     }) {
         await validateTxFilterAddresses(data.rule);
 
-        const filter = await withTxFilterMutationLock((transaction) =>
-            insertTxFilter(
+        const filter = await withTxFilterMutationLock(async (transaction) => {
+            if (
+                data.isActive &&
+                (await countActiveTxFilters(transaction)) >= MAX_ACTIVE_TX_FILTERS
+            ) {
+                throw new ValidationError(
+                    `A maximum of ${MAX_ACTIVE_TX_FILTERS} active transaction filters is allowed`,
+                );
+            }
+
+            return insertTxFilter(
                 {
                     description: data.description,
                     isActive: data.isActive,
                     rule: data.rule,
                 },
                 transaction,
-            ),
-        );
+            );
+        });
 
         const result = mapTxFilterResponse(filter);
         await refreshAfterMutation(result, 'created');
@@ -101,11 +115,22 @@ export function createTxFilterService() {
             rule?: TxFilterRule;
         },
     ) {
-        if (updates.rule) await validateTxFilterAddresses(updates.rule);
+        if (updates.rule) validateTxFilterAddresses(updates.rule);
 
         const updated = await withTxFilterMutationLock(async (transaction) => {
             const current = await findTxFilterForUpdate(id, transaction);
             if (!current) return null;
+
+            if (
+                updates.isActive === true &&
+                !current.isActive &&
+                (await countActiveTxFilters(transaction)) >= MAX_ACTIVE_TX_FILTERS
+            ) {
+                throw new ValidationError(
+                    `A maximum of ${MAX_ACTIVE_TX_FILTERS} active transaction filters is allowed`,
+                );
+            }
+
             return persistTxFilter(id, updates, transaction);
         });
 
