@@ -1,6 +1,6 @@
 # Generic transaction filters
 
-> **Project scope:** This filter engine is part of a lightweight, single-network blockchain monitoring demo/interview project. It evaluates rules against the transfer contexts currently produced by this application; it is not a general-purpose EVM transaction engine or a production-scale filtering platform. Larger workloads or production requirements need a separate architecture and capacity review, and may require independently scalable ingestion, filtering, and event-delivery components.
+> **Project scope:** This filter engine is part of a lightweight, single-network EVM blockchain monitoring system. It evaluates rules against the transfer contexts currently produced by this application; it is not a general-purpose EVM transaction engine or a production-scale filtering platform. For a substantially larger system or production deployment, the architecture must be redesigned and the main responsibilities, including ingestion, filtering, persistence, and event delivery, must be separated into independent services that can be scaled independently.
 
 
 Filters are created and updated through /api/tx-filters. Each filter stores one JSON rule in the TxFilters.rule JSONB column.
