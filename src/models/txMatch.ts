@@ -4,7 +4,7 @@ import sequelize from '../database';
 interface TxMatchAttributes {
     id: number;
     txId: number;
-    txFilterId: number | null;
+    txFilterId: number;
     txFilterDescription: string | null;
     matchStatus: 'ACTIVE' | 'NOT_MATCHED' | 'FILTER_DELETED' | 'REORGED';
 }
@@ -20,7 +20,7 @@ class TxMatch
 {
     public id!: number;
     public txId!: number;
-    public txFilterId!: number | null;
+    public txFilterId!: number;
     public txFilterDescription!: string | null;
     public matchStatus!: 'ACTIVE' | 'NOT_MATCHED' | 'FILTER_DELETED' | 'REORGED';
 }
@@ -40,9 +40,7 @@ TxMatch.init(
         },
         txFilterId: {
             type: DataTypes.INTEGER,
-            allowNull: true,
-            references: { model: 'TxFilters', key: 'id' },
-            onDelete: 'SET NULL',
+            allowNull: false,
         },
         txFilterDescription: {
             type: DataTypes.STRING,
