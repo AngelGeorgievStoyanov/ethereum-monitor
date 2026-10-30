@@ -28,6 +28,13 @@ export const TX_FILTER_OPERATORS: Record<string, TxFilterOperatorDefinition> = {
     },
 };
 
+export function getTxFilterOperator(operator: string): TxFilterOperatorDefinition {
+    if (!Object.prototype.hasOwnProperty.call(TX_FILTER_OPERATORS, operator)) {
+        throw new Error(`Unsupported transaction filter operator "${operator}"`);
+    }
+    return TX_FILTER_OPERATORS[operator];
+}
+
 export function normalizeTxFilterValue(
     value: unknown,
     field: TxFilterFieldDefinition,
@@ -72,8 +79,7 @@ export function validateOperatorValue(
     value: unknown,
     field: TxFilterFieldDefinition,
 ): void {
-    const definition = TX_FILTER_OPERATORS[operator];
-    if (!definition) throw new Error(`Unsupported transaction filter operator "${operator}"`);
+    const definition = getTxFilterOperator(operator);
 
     if (
         ['gt', 'gte', 'lt', 'lte', 'between'].includes(operator) &&
@@ -86,7 +92,10 @@ export function validateOperatorValue(
     }
 
     if (definition.valueMode === 'set') {
-        if (!Array.isArray(value)) throw new Error(`Operator "${operator}" requires an array value`);
+        if (!Array.isArray(value) || value.length === 0) {
+            throw new Error(`Operator "${operator}" requires a non-empty array value`);
+        }
+        if (value.length > 1000) throw new Error('Filter arrays cannot contain more than 1000 values');
         for (const item of value) normalizeTxFilterValue(item, field);
         return;
     }

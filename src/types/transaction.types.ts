@@ -64,7 +64,6 @@ export interface StoredTxFilterRecord {
     id: number;
     description: string;
     isActive: boolean;
-    activeFromBlock: number | null;
     rule: TxFilterRule;
     createdAt: Date;
     updatedAt: Date;

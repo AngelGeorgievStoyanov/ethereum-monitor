@@ -9,7 +9,6 @@ export function mapTxFilterResponse(filter: TxFilterRecord): TxFilterResponse {
         id: filter.id,
         description: filter.description,
         isActive: filter.isActive,
-        activeFromBlock: filter.activeFromBlock,
         rule: filter.rule,
     };
 }

@@ -5,9 +5,8 @@ import type {
 } from '../types/tx-filter.types';
 import { getTxFilterField } from './txFilterFieldRegistry';
 import {
+    getTxFilterOperator,
     normalizeTxFilterValue,
-    TX_FILTER_OPERATORS,
-    validateOperatorValue,
 } from './txFilterOperatorService';
 
 const MAX_FILTER_DEPTH = 20;
@@ -35,11 +34,9 @@ function compileCondition(
     state: CompilationState,
 ): string {
     const field = getTxFilterField(condition.field);
-    const operator = TX_FILTER_OPERATORS[condition.op];
-    if (!operator) throw new Error(`Unsupported transaction filter operator "${condition.op}"`);
-    validateOperatorValue(condition.op, condition.value, field);
-
+    const operator = getTxFilterOperator(condition.op);
     const actual = field.accessor;
+
     if (operator.valueMode === 'set') {
         const values = (condition.value as unknown[]).map((value) =>
             normalizeTxFilterValue(value, field),
@@ -75,27 +72,14 @@ function compileNode(rule: TxFilterRule, state: CompilationState, depth: number)
     }
 
     const keys = Object.keys(rule);
-    const groupKeys = keys.filter((key) => key === 'all' || key === 'any' || key === 'not');
-    if (groupKeys.length > 0) {
-        if (keys.length !== 1) throw new Error('A logical group must contain exactly one operator');
-        if ('all' in rule) {
-            if (!Array.isArray(rule.all) || rule.all.length === 0) {
-                throw new Error('"all" requires a non-empty array');
-            }
-            return `(${rule.all.map((child) => compileNode(child, state, depth + 1)).join(' && ')})`;
-        }
-        if ('any' in rule) {
-            if (!Array.isArray(rule.any) || rule.any.length === 0) {
-                throw new Error('"any" requires a non-empty array');
-            }
-            return `(${rule.any.map((child) => compileNode(child, state, depth + 1)).join(' || ')})`;
-        }
-        if ('not' in rule) return `(!${compileNode(rule.not, state, depth + 1)})`;
-        throw new Error('Unknown logical group');
+    if (keys.length === 1 && 'all' in rule) {
+        return `(${rule.all.map((child) => compileNode(child, state, depth + 1)).join(' && ')})`;
     }
-
-    if (keys.length !== 3 || !keys.includes('field') || !keys.includes('op') || !keys.includes('value')) {
-        throw new Error('A condition must contain exactly field, op, and value');
+    if (keys.length === 1 && 'any' in rule) {
+        return `(${rule.any.map((child) => compileNode(child, state, depth + 1)).join(' || ')})`;
+    }
+    if (keys.length === 1 && 'not' in rule) {
+        return `(!${compileNode(rule.not, state, depth + 1)})`;
     }
     return compileCondition(rule as TxFilterConditionRule, state);
 }

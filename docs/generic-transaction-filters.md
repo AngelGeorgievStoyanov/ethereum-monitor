@@ -74,18 +74,18 @@ Address/hash/string fields configured as case-insensitive are normalized to lowe
 
 - `eq`, `ne`: equality and inequality.
 - `gt`, `gte`, `lt`, `lte`: comparisons.
-- `in`, `notIn`: membership in an array.
+- `in`, `notIn`: membership in an array (maximum 1000 values).
 - `between`: inclusive range with exactly two values.
 - `contains`: substring match for string fields.
 
-## Compilation and execution
+## Validation, compilation, and execution
 
-When Dynamic Config loads active filters, each rule is compiled once into a JavaScript predicate. Membership arrays are prepared as Sets and captured as constants by the generated function. The scanner only calls the compiled predicate for each transfer; it does not parse or traverse the rule tree.
+The complete rule tree is validated before a filter is saved. Validation checks the logical structure, field names, operators, value types, nesting depth (maximum 20), and node count (maximum 2000). Validation does not compile or execute the rule.
 
-Generated code uses only field accessors and operator templates defined in source-controlled catalogs. Filter values are passed as constants and are never interpolated into executable source.
+Dynamic Config loads only records where `isActive = true`. Each active rule is compiled once into a JavaScript predicate and cached. Membership arrays are prepared as Sets and captured as constants by the generated function.
 
-The compiler limits rule depth to 20 and total nodes to 2000. The JavaScript function constructor requires Node.js dynamic code generation to be enabled.
+Each transfer context is passed to every active filter. All matching filters are retained for that transfer. The scanner does not check activation blocks or interpret the JSON rule tree during matching.
 
-## Activation boundaries
+Generated code uses only field accessors and operator templates defined in source-controlled catalogs. Filter values are passed as constants and are never interpolated into executable source. The JavaScript function constructor requires Node.js dynamic code generation to be enabled.
 
-An active filter starts at the next block after the latest finalized block observed when the filter is created or its rule is changed. Updating a rule does not reevaluate old blocks. If there are no active filters, the scanner waits without advancing its checkpoint. When filters become active again, it starts from their activation boundary. A scanner pause is different: the checkpoint is preserved, and catch-up resumes from the next unprocessed block.
+When no active filters exist, the scanner does not advance its processing checkpoint. When filters are activated, processing resumes from the next unprocessed block using the current active filter set.

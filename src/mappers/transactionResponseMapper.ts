@@ -44,7 +44,6 @@ function mapTransactionResponse(
                       id: match.txFilter.id,
                       description: match.txFilter.description,
                       isActive: match.txFilter.isActive,
-                      activeFromBlock: match.txFilter.activeFromBlock,
                       rule: match.txFilter.rule,
                       createdAt: toIsoString(match.txFilter.createdAt),
                       updatedAt: toIsoString(match.txFilter.updatedAt),

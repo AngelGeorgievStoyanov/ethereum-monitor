@@ -1,6 +1,7 @@
 import type { TxFilterRule } from '../types/tx-filter.types';
 import { HttpError } from '../utils/httpError';
 import { parsePositiveId } from '../utils/parsePositiveId';
+import { validateTxFilterRule } from '../services/txFilterValidationService';
 
 export interface CreateTxFilterInput {
     description: string;
@@ -25,6 +26,7 @@ function validateRuleShape(rule: unknown): asserts rule is TxFilterRule {
     if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
         throw new HttpError(400, 'rule must be a JSON object');
     }
+    validateTxFilterRule(rule as TxFilterRule);
 }
 
 export function validateCreateTxFilterInput(body: unknown): CreateTxFilterInput {

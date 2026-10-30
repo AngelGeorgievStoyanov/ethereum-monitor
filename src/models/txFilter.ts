@@ -6,7 +6,6 @@ interface TxFilterAttributes {
     id: number;
     description: string;
     isActive: boolean;
-    activeFromBlock: number | null;
     rule: TxFilterRule;
 }
 
@@ -19,7 +18,6 @@ class TxFilter
     public id!: number;
     public description!: string;
     public isActive!: boolean;
-    public activeFromBlock!: number | null;
     public rule!: TxFilterRule;
 }
 
@@ -38,11 +36,6 @@ TxFilter.init(
             type: DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: true,
-        },
-        activeFromBlock: {
-            type: DataTypes.INTEGER,
-            allowNull: true,
-            defaultValue: null,
         },
         rule: {
             type: DataTypes.JSONB,

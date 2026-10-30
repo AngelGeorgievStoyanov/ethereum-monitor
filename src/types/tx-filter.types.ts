@@ -16,8 +16,6 @@ export type CompiledTxFilter = (transaction: TransactionFilterContext) => boolea
 export interface ActiveTxFilter {
     id: number;
     description: string;
-    isActive: boolean;
-    activeFromBlock: number | null;
     rule: TxFilterRule;
     predicate: CompiledTxFilter;
 }
@@ -26,6 +24,5 @@ export interface TxFilterRecord {
     id: number;
     description: string;
     isActive: boolean;
-    activeFromBlock: number | null;
     rule: TxFilterRule;
 }

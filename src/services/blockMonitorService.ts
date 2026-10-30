@@ -12,9 +12,8 @@ import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
 import { invalidateConfirmedBlockCache, processFinalizedBlocks } from './blockProcessor';
-import { updateScannerCheckpoint } from '../repositories/scannerStateRepository';
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
-import { getScannerControlState, isScannerPausePendingOrActive } from './scannerControlService';
+import { getScannerControlState } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
 
@@ -204,23 +203,8 @@ export function createBlockMonitorService() {
                         }
 
                         if (waitingForFilters) {
-                            const pausePendingOrActive = await isScannerPausePendingOrActive();
-                            if (!pausePendingOrActive) {
-                                const activationStartBlock = Math.min(
-                                    ...activeTxFilters.map(
-                                        (filter) => filter.activeFromBlock ?? finalized.number + 1,
-                                    ),
-                                );
-                                const activationCheckpoint = activationStartBlock - 1;
-                                if (state.lastProcessedBlock < activationCheckpoint) {
-                                    await updateScannerCheckpoint(state.id, activationCheckpoint);
-                                    state.lastProcessedBlock = activationCheckpoint;
-                                }
-                            }
                             console.log(
-                                pausePendingOrActive
-                                    ? `[Scanner] Active filters detected while paused; preserving checkpoint ${state.lastProcessedBlock}`
-                                    : `[Scanner] Active filters detected; starting at block ${state.lastProcessedBlock + 1}`,
+                                `[Scanner] Active filters detected; continuing from block ${state.lastProcessedBlock + 1}`,
                             );
                             waitingForFilters = false;
                         }

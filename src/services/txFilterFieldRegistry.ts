@@ -25,7 +25,9 @@ export const TX_FILTER_FIELDS: Record<string, TxFilterFieldDefinition> = {
 };
 
 export function getTxFilterField(field: string): TxFilterFieldDefinition {
+    if (!Object.prototype.hasOwnProperty.call(TX_FILTER_FIELDS, field)) {
+        throw new Error(`Unsupported transaction filter field "${field}"`);
+    }
     const definition = TX_FILTER_FIELDS[field];
-    if (!definition) throw new Error(`Unsupported transaction filter field "${field}"`);
     return definition;
 }

@@ -106,7 +106,7 @@ export async function processErc20Transfers({
                 transfer,
             );
             const matchingTxFilters = txFilters.filter((filter) =>
-                matchesTxFilter(context, filter, blockNumber),
+                matchesTxFilter(context, filter),
             );
             if (matchingTxFilters.length === 0 && !includeUnmatched) continue;
 
@@ -153,7 +153,7 @@ export async function processErc20Transfers({
                 transfer,
             );
             const matchingTxFilters = txFilters.filter((filter) =>
-                matchesTxFilter(context, filter, blockNumber),
+                matchesTxFilter(context, filter),
             );
             if (matchingTxFilters.length === 0 && !includeUnmatched) continue;
 
