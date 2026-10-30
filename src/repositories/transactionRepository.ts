@@ -252,7 +252,7 @@ export async function createTransfersBatch(
                 }
             >();
             for (const match of existingMatches) {
-                if (match.matchStatus === 'FILTER_DELETED' || match.txFilterId === null) continue;
+                if (match.matchStatus === 'FILTER_DELETED') continue;
                 const isMatching =
                     matchingFilterIdsByTxId.get(match.txId)?.has(match.txFilterId) ?? false;
                 const description = isMatching ? descriptionsById.get(match.txFilterId) : undefined;
