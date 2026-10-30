@@ -80,7 +80,7 @@ export function createTxFilterService() {
         isActive: boolean;
         rule: TxFilterRule;
     }) {
-        await validateTxFilterAddresses(data.rule);
+        validateTxFilterAddresses(data.rule);
 
         const filter = await withTxFilterMutationLock(async (transaction) => {
             if (
