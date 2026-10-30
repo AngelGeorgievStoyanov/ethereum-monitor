@@ -1,6 +1,5 @@
 import type {
     CompiledTxFilter,
-    TransactionFilterContext,
     TxFilterConditionRule,
     TxFilterRule,
 } from '../types/tx-filter.types';
