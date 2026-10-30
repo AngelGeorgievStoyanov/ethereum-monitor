@@ -4,13 +4,13 @@ Monitors native ETH transfers and ERC-20 transfer events on an EVM-compatible ne
 
 ## Project scope
 
-Ethereum Monitor is a **lightweight, single-network EVM monitoring application** built as a focused demonstration/interview project. It demonstrates continuous block scanning, native and ERC-20 transfer processing, configurable transaction filters, checkpoint persistence, and basic reorganization detection and recovery.
+Ethereum Monitor is a **lightweight, single-network EVM monitoring application** designed for a limited scope. It provides continuous block scanning, native and ERC-20 transfer processing, configurable transaction filters, checkpoint persistence, and basic reorganization detection and recovery.
 
 It is not a production-ready monitoring platform and is not designed or validated for large-scale workloads, public multi-tenant use, high availability, or strict service-level guarantees. Its HTTP API is intended for local or otherwise trusted use; authentication and authorization are not implemented, so do not expose it directly to an untrusted network.
 
 The implementation deliberately favors a compact architecture over production infrastructure. It does not aim to provide horizontal scan throughput, independently scalable ingestion and filtering, durable event streaming, comprehensive operational monitoring, or production-grade disaster recovery.
 
-A production deployment or substantially larger workload would require a separate architecture and capacity review. Depending on requirements, responsibilities such as RPC ingestion, address monitoring, filter evaluation, persistence, and event delivery may need to be separated into independently scalable services, with appropriate queueing, access control, observability, redundancy, and operational safeguards. The current design and its limits should not be treated as a production blueprint.
+For a substantially larger system or production deployment, the architecture must be redesigned. The main responsibilities, including RPC ingestion, address monitoring, filter evaluation, persistence, and event delivery, must be separated into independent services that can be scaled independently. The resulting architecture must also address queueing, access control, observability, redundancy, and operational safeguards. The current design should not be treated as a production blueprint.
 
 
 ## Setup
