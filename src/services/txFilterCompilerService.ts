@@ -13,7 +13,6 @@ import {
     normalizeTxFilterValue,
 } from './txFilterOperatorService';
 
-
 interface CompilationState {
     constants: unknown[];
     nodeCount: number;
