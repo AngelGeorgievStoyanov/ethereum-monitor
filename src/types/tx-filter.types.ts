@@ -1,32 +1,34 @@
+export type TxFilterValue = string | number | boolean | null | TxFilterValue[] | { [key: string]: TxFilterValue };
+
 export interface TxFilterConditionRule {
     field: string;
-    operator: string;
+    op: string;
     value: unknown;
 }
 
-export interface TxFilterGroupRule {
-    logic: 'AND' | 'OR';
-    conditions: TxFilterConditionRule[];
-    groups: TxFilterGroupRule[];
-}
+export type TxFilterRule =
+    | TxFilterConditionRule
+    | { all: TxFilterRule[] }
+    | { any: TxFilterRule[] }
+    | { not: TxFilterRule };
+
+export type TransactionFilterContext = Record<string, unknown>;
+
+export type CompiledTxFilter = (transaction: TransactionFilterContext) => boolean;
 
 export interface ActiveTxFilter {
     id: number;
     description: string;
     isActive: boolean;
     activeFromBlock: number | null;
-    rule: TxFilterGroupRule;
-}
-
-export interface TransactionFilterContext {
-    [field: string]: unknown;
+    rule: TxFilterRule;
+    predicate: CompiledTxFilter;
 }
 
 export interface TxFilterRecord {
     id: number;
     description: string;
-    from: string | null;
-    to: string | null;
     isActive: boolean;
     activeFromBlock: number | null;
+    rule: TxFilterRule;
 }

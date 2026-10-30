@@ -2,25 +2,26 @@ export type TxFilterFieldType = 'string' | 'number' | 'bigint' | 'date';
 
 export interface TxFilterFieldDefinition {
     type: TxFilterFieldType;
-    caseInsensitive?: boolean;
+    accessor: string;
+    normalize?: 'lowercase';
 }
 
 export const TX_FILTER_FIELDS: Record<string, TxFilterFieldDefinition> = {
-    txHash: { type: 'string', caseInsensitive: true },
-    transferType: { type: 'string', caseInsensitive: true },
-    tokenAddress: { type: 'string', caseInsensitive: true },
-    logIndex: { type: 'number' },
-    nonce: { type: 'number' },
-    blockHash: { type: 'string', caseInsensitive: true },
-    blockNumber: { type: 'number' },
-    transactionIndex: { type: 'number' },
-    from: { type: 'string', caseInsensitive: true },
-    to: { type: 'string', caseInsensitive: true },
-    value: { type: 'bigint' },
-    internalCount: { type: 'number' },
-    status: { type: 'string', caseInsensitive: true },
-    transactionType: { type: 'string', caseInsensitive: true },
-    timestamp: { type: 'date' },
+    txHash: { type: 'string', accessor: 'tx.txHash', normalize: 'lowercase' },
+    transferType: { type: 'string', accessor: 'tx.transferType', normalize: 'lowercase' },
+    tokenAddress: { type: 'string', accessor: 'tx.tokenAddress', normalize: 'lowercase' },
+    logIndex: { type: 'number', accessor: 'tx.logIndex' },
+    nonce: { type: 'number', accessor: 'tx.nonce' },
+    blockHash: { type: 'string', accessor: 'tx.blockHash', normalize: 'lowercase' },
+    blockNumber: { type: 'number', accessor: 'tx.blockNumber' },
+    transactionIndex: { type: 'number', accessor: 'tx.transactionIndex' },
+    from: { type: 'string', accessor: 'tx.from', normalize: 'lowercase' },
+    to: { type: 'string', accessor: 'tx.to', normalize: 'lowercase' },
+    value: { type: 'bigint', accessor: 'tx.value' },
+    internalCount: { type: 'number', accessor: 'tx.internalCount' },
+    status: { type: 'string', accessor: 'tx.status', normalize: 'lowercase' },
+    transactionType: { type: 'string', accessor: 'tx.transactionType', normalize: 'lowercase' },
+    timestamp: { type: 'date', accessor: 'tx.timestamp' },
 };
 
 export function getTxFilterField(field: string): TxFilterFieldDefinition {

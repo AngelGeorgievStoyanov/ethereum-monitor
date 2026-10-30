@@ -11,69 +11,55 @@ import {
     assignActiveFilterStartBlock,
     withTxFilterMutationLock,
 } from '../repositories/txFilterRepository';
-import {
-    findRuleForFilter,
-    findRulesForFilters,
-    saveRuleForFilter,
-} from '../repositories/txFilterRuleRepository';
 import { getNextFilterStartBlock } from './txFilterActivationService';
 import { mapTxFilterListResponse, mapTxFilterResponse } from '../mappers/txFilterMapper';
 import {
     mapTxFilterSyncFailureResponse,
     type TxFilterMutationOperation,
 } from '../mappers/txFilterResponseMapper';
-import type { ActiveTxFilter, TxFilterGroupRule } from '../types/tx-filter.types';
-import { validateTxFilterGroup } from './txFilterValidationService';
+import type { ActiveTxFilter, TxFilterRule } from '../types/tx-filter.types';
+import { validateTxFilterRule } from './txFilterValidationService';
+import { compileTxFilterRule } from './txFilterCompilerService';
 import { ValidationError } from '../utils/validationError';
 
 export class TxFilterSyncError extends Error {
     public readonly response: ReturnType<typeof mapTxFilterSyncFailureResponse>;
 
     constructor(operation: TxFilterMutationOperation, result: unknown) {
-        super(
-            'The filter change was saved to the database, but the scanner filters were not refreshed.',
-        );
+        super('The filter change was saved to the database, but the scanner filters were not refreshed.');
         this.name = 'TxFilterSyncError';
         this.response = mapTxFilterSyncFailureResponse(operation, result);
     }
 }
 
-interface LegacyTxFilterFields {
-    from?: string | null;
-    to?: string | null;
-}
-
-function legacyRule(txFilter: LegacyTxFilterFields): TxFilterGroupRule | null {
-    const conditions = [];
-    if (txFilter.from) conditions.push({ field: 'from', operator: 'eq', value: txFilter.from });
-    if (txFilter.to) conditions.push({ field: 'to', operator: 'eq', value: txFilter.to });
-    return conditions.length ? { logic: 'AND', conditions, groups: [] } : null;
-}
-
 export function createTxFilterService() {
     let refreshDynamicConfig: (() => Promise<boolean>) | undefined;
     let activeTxFiltersCache: ActiveTxFilter[] = [];
+
     function setDynamicConfigRefreshHandler(handler: () => Promise<boolean>): void {
         refreshDynamicConfig = handler;
     }
+
     async function refreshAfterMutation(
         result: unknown,
         operation: TxFilterMutationOperation,
     ): Promise<void> {
-        if (!refreshDynamicConfig || !(await refreshDynamicConfig()))
+        if (!refreshDynamicConfig || !(await refreshDynamicConfig())) {
             throw new TxFilterSyncError(operation, result);
+        }
     }
+
     async function loadActiveTxFilters(): Promise<ActiveTxFilter[]> {
         const activeFilters = await findActiveTxFilters();
-        const rulesByFilterId = await findRulesForFilters(activeFilters.map((filter) => filter.id));
         const next: ActiveTxFilter[] = [];
         let missingFiltersStartBlock: number | undefined;
+
         for (const filter of activeFilters) {
-            const rule = rulesByFilterId.get(filter.id) ?? legacyRule(filter);
-            if (!rule) continue;
+            validateTxFilterRule(filter.rule);
             if (filter.activeFromBlock === null || filter.activeFromBlock === undefined) {
-                if (missingFiltersStartBlock === undefined)
+                if (missingFiltersStartBlock === undefined) {
                     missingFiltersStartBlock = await getNextFilterStartBlock();
+                }
                 await assignActiveFilterStartBlock(filter.id, missingFiltersStartBlock);
                 filter.activeFromBlock = missingFiltersStartBlock;
             }
@@ -82,9 +68,11 @@ export function createTxFilterService() {
                 description: filter.description,
                 isActive: filter.isActive,
                 activeFromBlock: filter.activeFromBlock,
-                rule,
+                rule: filter.rule,
+                predicate: compileTxFilterRule(filter.rule),
             });
         }
+
         activeTxFiltersCache = next;
         return next;
     }
@@ -95,29 +83,15 @@ export function createTxFilterService() {
 
     async function getAllTxFilters() {
         const filters = await findAllTxFilters();
-        const rulesByFilterId = await findRulesForFilters(filters.map((filter) => filter.id));
-        return mapTxFilterListResponse(
-            filters,
-            new Map(
-                filters.map((filter) => [
-                    filter.id,
-                    rulesByFilterId.get(filter.id) ?? legacyRule(filter),
-                ]),
-            ),
-        );
+        return mapTxFilterListResponse(filters);
     }
 
     async function createTxFilter(data: {
         description: string;
-        from?: string | null;
-        to?: string | null;
         isActive: boolean;
-        rule?: TxFilterGroupRule;
+        rule: TxFilterRule;
     }) {
-        if (!data.rule && !data.from && !data.to) {
-            throw new ValidationError('A filter requires at least one condition');
-        }
-        if (data.rule) validateTxFilterGroup(data.rule);
+        validateTxFilterRule(data.rule);
 
         const filter = await withTxFilterMutationLock(async (transaction) => {
             const initialStartBlock = data.isActive
@@ -126,21 +100,19 @@ export function createTxFilterService() {
             const activeFromBlock = data.isActive
                 ? (initialStartBlock ?? (await getNextFilterStartBlock()))
                 : null;
-            const createdFilter = await insertTxFilter(
+
+            return insertTxFilter(
                 {
                     description: data.description,
-                    from: data.from ?? null,
-                    to: data.to ?? null,
                     isActive: data.isActive,
                     activeFromBlock,
+                    rule: data.rule,
                 },
                 transaction,
             );
-            if (data.rule) await saveRuleForFilter(createdFilter.id, data.rule, transaction);
-            return createdFilter;
         });
 
-        const result = mapTxFilterResponse(filter, data.rule ?? legacyRule(filter));
+        const result = mapTxFilterResponse(filter);
         await refreshAfterMutation(result, 'created');
         return result;
     }
@@ -149,34 +121,18 @@ export function createTxFilterService() {
         id: number,
         updates: {
             description?: string;
-            from?: string | null;
-            to?: string | null;
             isActive?: boolean;
-            rule?: TxFilterGroupRule | null;
+            rule?: TxFilterRule;
         },
     ) {
-        if (updates.rule) validateTxFilterGroup(updates.rule);
+        if (updates.rule !== undefined) validateTxFilterRule(updates.rule);
 
         const updated = await withTxFilterMutationLock(async (transaction) => {
             const current = await findTxFilterForUpdate(id, transaction);
             if (!current) return null;
 
-            const existingRule = updates.rule === undefined ? await findRuleForFilter(id) : null;
-            if (
-                updates.rule === null &&
-                !current.from &&
-                !current.to &&
-                !updates.from &&
-                !updates.to
-            ) {
-                throw new ValidationError('A filter requires at least one condition');
-            }
-
             const activatingOrChangingRule =
-                updates.isActive === true ||
-                updates.rule !== undefined ||
-                updates.from !== undefined ||
-                updates.to !== undefined;
+                updates.isActive === true || updates.rule !== undefined;
             const activeFromBlock =
                 updates.isActive === false
                     ? null
@@ -184,45 +140,36 @@ export function createTxFilterService() {
                       ? await getNextFilterStartBlock()
                       : current.activeFromBlock;
 
-            const filter = await persistTxFilter(
+            return persistTxFilter(
                 id,
                 {
                     ...(updates.description !== undefined
                         ? { description: updates.description }
                         : {}),
-                    ...(updates.from !== undefined ? { from: updates.from } : {}),
-                    ...(updates.to !== undefined ? { to: updates.to } : {}),
                     ...(updates.isActive !== undefined ? { isActive: updates.isActive } : {}),
+                    ...(updates.rule !== undefined ? { rule: updates.rule } : {}),
                     ...(activeFromBlock !== undefined ? { activeFromBlock } : {}),
                 },
                 transaction,
             );
-            if (!filter) return null;
-            if (updates.rule !== undefined) {
-                await saveRuleForFilter(id, updates.rule, transaction);
-            }
-            const rule =
-                updates.rule !== undefined
-                    ? (updates.rule ?? legacyRule(filter))
-                    : (existingRule ?? legacyRule(filter));
-            return { filter, rule };
         });
 
         if (!updated) return null;
-        const result = mapTxFilterResponse(updated.filter, updated.rule);
+        const result = mapTxFilterResponse(updated);
         await refreshAfterMutation(result, 'updated');
         return result;
     }
 
     async function removeTxFilter(id: number) {
-        const deleted = await withTxFilterMutationLock(async (transaction) => {
-            return deleteTxFilterById(id, transaction);
-        });
-        if (deleted > 0)
+        const deleted = await withTxFilterMutationLock(async (transaction) =>
+            deleteTxFilterById(id, transaction),
+        );
+        if (deleted > 0) {
             await refreshAfterMutation(
                 { message: 'Transaction filter deleted', deleted: true },
                 'deleted',
             );
+        }
         return deleted;
     }
 

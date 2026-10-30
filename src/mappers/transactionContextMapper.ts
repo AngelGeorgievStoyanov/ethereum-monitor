@@ -17,21 +17,21 @@ export function mapTransactionFilterContext(
     transfer: TransferContextMetadata,
 ) {
     return {
-        txHash: tx.hash,
+        txHash: tx.hash.toLowerCase(),
         transferType: transfer.transferType,
-        tokenAddress: transfer.tokenAddress ?? null,
+        tokenAddress: transfer.tokenAddress?.toLowerCase() ?? null,
         logIndex: transfer.logIndex,
         nonce: tx.nonce,
-        blockHash: receipt.blockHash,
+        blockHash: receipt.blockHash.toLowerCase(),
         blockNumber,
         transactionIndex: Number(BigInt(receipt.transactionIndex)),
-        from: transfer.from,
-        to: transfer.to,
-        value: transfer.value,
+        from: transfer.from.toLowerCase(),
+        to: transfer.to.toLowerCase(),
+        value: BigInt(transfer.value),
         internalCount: null,
         status: getTransactionStatus(receipt),
         transactionType: tx.type?.toString() ?? null,
-        timestamp: new Date(blockTimestamp * 1000),
+        timestamp: blockTimestamp * 1000,
     };
 }
 
