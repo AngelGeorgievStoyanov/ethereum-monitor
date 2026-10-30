@@ -103,7 +103,7 @@ For eq, a null actual value is compared directly with the expected value. ne, no
 
 ## Address validation
 
-Address values used by the from, to, and tokenAddress fields are validated before a filter is created or its rule is updated. The checks run only during filter mutations, not while scanning transfers.
+Exact address values used with eq, ne, in, and notIn on the from, to, and tokenAddress fields are validated before a filter is created or its rule is updated. Partial substring values used with contains are not treated as complete addresses. The checks run only during filter mutations, not while scanning transfers.
 
 The settings are independent in src/constants/tx-filter-address.constants.ts:
 
