@@ -50,6 +50,14 @@ The scanner saves its checkpoint in PostgreSQL and resumes from it after a resta
 - Filter creation does not determine the initial checkpoint. When there are no active filters, the scanner waits without advancing the checkpoint. Once an active filter is available, scanning continues from the next unprocessed block. Newly created filters do not trigger an automatic historical backfill.
 - DynamicConfigService owns the in-memory active-filter cache. It loads active filters before scanner startup, refreshes the cache every 60 seconds, and refreshes after filter changes through the API. If a refresh fails, the last valid cache is retained.
 
+### Filter capacity
+
+The default limits are 20 unique addresses per filter and 50 active filters. Only active filters count toward the active-filter limit; inactive filters do not. The limits are defined in src/constants/tx-filter.constants.ts and can be adjusted for the deployment.
+
+Address format validation uses ethers.isAddress and can be independently enabled or disabled for from/to addresses and tokenAddress in src/constants/tx-filter-address.constants.ts. Filter address validation does not make RPC calls.
+
+These limits are intended for a lightweight filter feature. If the application needs to monitor substantially more addresses or a much larger number of active filters, do not simply increase the limits. Use a separate address-monitoring microservice with a message queue or event bus. That service can manage large address subscriptions, batch and schedule RPC work, apply independent rate limits, and publish detected events for the transaction scanner or downstream consumers. This keeps high-volume address monitoring isolated from the main scanner.
+
 ## Block processing and recovery
 
 The scanner checks block and receipt consistency before saving data. Block history, transfers, filter matches, and the checkpoint are saved in a database transaction. The checkpoint advances only after the writes succeed.
