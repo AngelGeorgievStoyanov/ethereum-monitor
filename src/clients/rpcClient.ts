@@ -139,6 +139,7 @@ export function createRpcClient() {
             endpointIndex: number;
             block: Awaited<ReturnType<JsonRpcProvider['getBlock']>> | null;
             error: string | null;
+            durationMs: number;
         }> = [];
 
         // Consensus requests are deliberately sequential to avoid increasing RPC pressure.
