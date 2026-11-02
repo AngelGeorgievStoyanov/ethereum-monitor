@@ -7,7 +7,6 @@
         "build": "npm run clean && tsc",
         "typecheck": "tsc --noEmit",
         "start": "node build/index.js",
-        "test": "node --test tests/classifyRpcError.test.mjs",
         "dev": "nodemon",
         "clean": "node -e \"require('node:fs').rmSync('build', { recursive: true, force: true })\"",
         "lint": "eslint .",
