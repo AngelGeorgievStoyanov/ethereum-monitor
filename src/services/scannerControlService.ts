@@ -7,6 +7,7 @@ import {
     mapScannerControlResponse,
     mapScannerResumeResponse,
 } from '../mappers/scannerControlMapper';
+import { updateScannerRuntimeContext } from './metricsAggregatorService';
 import type {
     ScannerControlRecord,
     ScannerControlState,
@@ -52,9 +53,12 @@ export async function getScannerControlState(): Promise<ScannerControlState> {
 
     if (isTemporaryPauseExpired(record)) {
         await resumeScanner();
+        updateScannerRuntimeContext({ paused: false, pauseMode: null });
         return toControlState(null);
     }
-    return toControlState(record);
+    const control = toControlState(record);
+    updateScannerRuntimeContext({ paused: control.paused, pauseMode: control.mode });
+    return control;
 }
 
 export async function requestScannerPause(
@@ -75,6 +79,7 @@ export async function requestScannerPause(
         scannerPauseUntil: pauseUntil,
     });
 
+    updateScannerRuntimeContext({ paused, pauseMode: mode });
     console.log(
         paused
             ? `[Scanner] Persisted pause (${mode}); checkpoint will be preserved`
@@ -107,6 +112,7 @@ export async function shouldPauseBeforeBlock(
             scannerPauseTargetBlock: null,
             scannerPauseUntil: pauseUntil,
         });
+        updateScannerRuntimeContext({ paused: true, pauseMode: record.mode });
 
         const resumeMessage = pauseUntil
             ? `; auto-resume in ${record.pauseDurationMinutes} minute(s)`
@@ -130,6 +136,7 @@ export async function resumeScanner(): Promise<void> {
         scannerPauseTargetBlock: null,
         scannerPauseDurationMinutes: SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
     });
+    updateScannerRuntimeContext({ paused: false, pauseMode: null });
     if (wasPaused) {
         console.log('[Scanner] Persisted resume; catch-up will continue from the saved checkpoint');
     }
