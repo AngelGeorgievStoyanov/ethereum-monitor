@@ -11,10 +11,10 @@
 
 ## Scanner status snapshots
 
-- During scanner startup, after scanner ownership and persistent scanner state are initialized, the application loads the initial pause/control state, checkpoint/recovery state, and latest rescan job from PostgreSQL and publishes one complete status snapshot.
+- During application startup, after database and Dynamic Config initialization, the application loads the initial pause/control state, checkpoint/recovery state, and latest rescan job from PostgreSQL and publishes a status snapshot before the HTTP server starts. After scanner ownership is acquired and scanner state is initialized, the snapshot is refreshed with the scanner runtime state.
 - Pause/resume changes update the status snapshot immediately after the database write.
 - The scanner's existing control refresh cycle continues checking the persistent pause state so changes made by another application instance are detected. This is the only recurring PostgreSQL read required for status synchronization.
-- Checkpoint and recovery state are published from the scanner's in-memory state after processing and recovery work.
+- The existing scanner main loop republishes its runtime context during normal polling. Checkpoint and recovery state are published from the scanner's in-memory state after processing and recovery work; the stall check continues to expose stale progress through the last-processed timestamp.
 - Rescan job creation, progress, completion, failure, and recovery handoff publish the updated job summary.
 - Lock loss and reacquisition publish scanner running state immediately.
 - On lock reacquisition, persistent scanner state is loaded again and the status snapshot is refreshed.
@@ -41,7 +41,7 @@ The current runtime snapshot includes:
 - A logical RPC operation is one scanner-level operation. For example, `getBlockAndReceipts` is one logical operation containing separate `eth_getBlockByNumber` and `eth_getBlockReceipts` requests.
 - Request totals and endpoint statistics count actual endpoint requests. Logical-operation statistics count the outer operation once and track its retries/failovers separately.
 - A retry is an additional attempt of the same logical operation. An endpoint failover is an operation attempt moved to another configured endpoint.
-- RPC error extraction and classification are centralized in `src/utils/classifyRpcError.ts`; category names, HTTP/JSON-RPC codes, message patterns, and nested error depth are maintained in `src/constants/rpc-error.constants.ts`.
+- RPC error extraction and classification are centralized in `src/utils/classifyRpcError.ts`; category names, HTTP/JSON-RPC codes and code ranges, message-property names, nested-property names, message patterns, and nested error depth are maintained in `src/constants/rpc-error.constants.ts`.
 
 ## Historical runtime retention
 
@@ -50,7 +50,7 @@ History is bounded in memory using generic retention settings in `src/constants/
 - Metric samples are retained for up to 24 hours, subject to per-category memory safety limits.
 - The configured sample limits are capacity safeguards, not an assumption about how many blocks a network produces.
 - Analytics windows are configured centrally and currently include `1h`, `3h`, `6h`, `9h`, `12h`, and `24h`.
-- Network-independent one-minute buckets retain throughput, lag, RPC failure/latency, database query, filter evaluation, and batch timing aggregates. Charts use these buckets rather than relying on a fixed number of block samples.
+- Network-independent one-minute buckets retain throughput, lag, RPC failure/latency, database query, filter evaluation, and batch timing aggregates. Throughput, RPC, component-latency, and lag charts use the selected window's buckets rather than relying on a fixed number of block samples.
 - An `available` window returns all history available in the current process, up to the retention period.
 - Each analytics response reports requested duration, available duration, history start time, and whether the requested window is complete or partial.
 - A process that has been running for 40 minutes can therefore return 40 minutes of partial data for a 1-hour window and complete 30/40-minute analysis through the `available` window. It does not need to run for 24 hours.
@@ -75,7 +75,7 @@ The response includes the current metrics snapshot, block samples, lag samples, 
 - Active catch-up duration, blocks/sec, transactions/sec, lag reduction, and lag reduction/sec are calculated from the current session state. Final lag reduction is initial lag minus actual final lag.
 - An ETA is shown only after at least 10 seconds and while the measured net lag-reduction rate is positive. Finalized-chain growth rate is also exposed separately.
 - Processing batch samples report the actual block range, number of blocks, transaction count, total batch duration, and database write duration.
-- Database query metrics use Sequelize benchmark timings and classify statements as reads, writes, or other operations. They measure successful query durations; persistence failures are counted separately where the persistence service reports them.
+- Database query metrics use Sequelize benchmark timings and classify statements as reads, writes, or other operations. Successful query durations are measured centrally. Sequelize persistence errors from transaction creation, block-batch persistence, and rescan reconciliation are counted separately; arbitrary failed read queries outside those persistence paths are not yet comprehensively counted.
 - Filter metrics are emitted by the shared filter predicate wrapper, so evaluation counts and duration represent actual predicate invocations rather than an estimate based on transaction count.
 
 Metrics collection is in-process and non-persistent. It must never block scanner progress or issue extra RPC requests.
