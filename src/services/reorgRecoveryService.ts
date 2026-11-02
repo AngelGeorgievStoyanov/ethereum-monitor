@@ -121,39 +121,43 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
 
     if (originalCheckpoint > 0) {
         for (const range of iterateBlockRangeBatches({
-        fromBlock: lowestBlock,
-        toBlock: originalCheckpoint - 1,
-        batchSize: REORG_ANCESTOR_BATCH_SIZE,
-        direction: 'backward',
-    })) {
-        const storedBlocks = await findCanonicalBlockIdentitiesInRange(
-            range.fromBlock,
-            range.toBlock,
-        );
-        const storedBlocksByNumber = new Map(
-            storedBlocks.map((block) => [block.blockNumber, block]),
-        );
-
-        for (let blockNumber = range.toBlock; blockNumber >= range.fromBlock; blockNumber -= 1) {
-            const storedBlock = storedBlocksByNumber.get(blockNumber);
-            if (!storedBlock) {
-                throw new ReorgRecoverySafetyError(
-                    `Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`,
-                );
-            }
-
-            const currentBlock = await getReorgVerifiedBlock(
-                blockNumber,
-                'common ancestor search',
+            fromBlock: lowestBlock,
+            toBlock: originalCheckpoint - 1,
+            batchSize: REORG_ANCESTOR_BATCH_SIZE,
+            direction: 'backward',
+        })) {
+            const storedBlocks = await findCanonicalBlockIdentitiesInRange(
+                range.fromBlock,
+                range.toBlock,
             );
-            if (sameBlock(storedBlock, currentBlock)) {
-                ancestor = storedBlock;
-                ancestorDepth = originalCheckpoint - blockNumber;
-                break;
-            }
-        }
+            const storedBlocksByNumber = new Map(
+                storedBlocks.map((storedBlock) => [storedBlock.blockNumber, storedBlock]),
+            );
 
-        if (ancestor) break;
+            for (
+                let blockNumber = range.toBlock;
+                blockNumber >= range.fromBlock;
+                blockNumber -= 1
+            ) {
+                const storedBlock = storedBlocksByNumber.get(blockNumber);
+                if (!storedBlock) {
+                    throw new ReorgRecoverySafetyError(
+                        `Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`,
+                    );
+                }
+
+                const currentBlock = await getReorgVerifiedBlock(
+                    blockNumber,
+                    'common ancestor search',
+                );
+                if (sameBlock(storedBlock, currentBlock)) {
+                    ancestor = storedBlock;
+                    ancestorDepth = originalCheckpoint - blockNumber;
+                    break;
+                }
+            }
+
+            if (ancestor) break;
         }
     }
 
