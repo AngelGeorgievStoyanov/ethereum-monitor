@@ -1,9 +1,15 @@
 import {
     RPC_ERROR_CATEGORIES,
+    RPC_ERROR_CODE_KEYS,
     RPC_ERROR_HTTP_STATUS,
+    RPC_ERROR_HTTP_STATUS_RANGE,
     RPC_ERROR_JSON_CODES,
+    RPC_ERROR_JSON_CODE_RANGE,
     RPC_ERROR_MAX_NESTED_DEPTH,
+    RPC_ERROR_MESSAGE_KEYS,
     RPC_ERROR_MESSAGE_PATTERNS,
+    RPC_ERROR_NESTED_KEYS,
+    RPC_ERROR_STATUS_KEYS,
 } from '../constants/rpc-error.constants';
 
 export type RpcErrorCategory =
@@ -23,56 +29,94 @@ type ErrorDetails = {
     rpcCodes: number[];
 };
 
+function addNumericValue(target: number[], value: unknown): void {
+    if (typeof value !== 'number' && typeof value !== 'string') return;
+    if (String(value).trim() === '') return;
+    const numericValue = Number(value);
+    if (Number.isInteger(numericValue)) target.push(numericValue);
+}
+
 function collectErrorDetails(error: unknown): ErrorDetails {
     const details: ErrorDetails = { messages: [], httpStatuses: [], rpcCodes: [] };
-    const visited = new Set<unknown>();
+    const visited = new Set<object>();
     const queue: Array<{ value: unknown; depth: number }> = [{ value: error, depth: 0 }];
 
     while (queue.length > 0) {
         const current = queue.shift();
         if (!current || current.depth > RPC_ERROR_MAX_NESTED_DEPTH) continue;
         const value = current.value;
-        if (value === null || value === undefined || visited.has(value)) continue;
+        if (value === null || value === undefined) continue;
+
         if (typeof value === 'string') {
             const trimmed = value.trim();
-            if (trimmed) {
-                details.messages.push(trimmed);
-                const httpStatusMatch = trimmed.match(/\b(?:HTTP(?: status)?|status(?: code)?|response)\s*[:=]?\s*(\d{3})\b/i);
-                if (httpStatusMatch) details.httpStatuses.push(Number(httpStatusMatch[1]));
-                const rpcCodeMatch = trimmed.match(/\bcode\s*[:=]\s*(-32\d{3,4})\b/i);
-                if (rpcCodeMatch) details.rpcCodes.push(Number(rpcCodeMatch[1]));
-                if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && current.depth < RPC_ERROR_MAX_NESTED_DEPTH) {
-                    try {
-                        queue.push({ value: JSON.parse(trimmed), depth: current.depth + 1 });
-                    } catch {
-                        // Keep the original text when it is not valid JSON.
-                    }
+            if (!trimmed) continue;
+            details.messages.push(trimmed);
+
+            const httpStatusMatch = trimmed.match(
+                /\\b(?:HTTP(?: status)?|status(?: code)?|response)\\s*[:=]?\\s*(\\d{3})\\b/i,
+            );
+            if (httpStatusMatch) addNumericValue(details.httpStatuses, httpStatusMatch[1]);
+
+            const rpcCodeMatch = trimmed.match(/\\bcode\\s*[:=]?\\s*(-\\d{4,5})\\b/i);
+            if (rpcCodeMatch) addNumericValue(details.rpcCodes, rpcCodeMatch[1]);
+
+            if (
+                (trimmed.startsWith('{') || trimmed.startsWith('[')) &&
+                current.depth < RPC_ERROR_MAX_NESTED_DEPTH
+            ) {
+                try {
+                    queue.push({ value: JSON.parse(trimmed), depth: current.depth + 1 });
+                } catch {
+                    // Keep the original text when it is not valid JSON.
                 }
             }
             continue;
         }
+
         if (typeof value !== 'object') {
             details.messages.push(String(value));
             continue;
         }
 
+        if (visited.has(value)) continue;
         visited.add(value);
+
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                queue.push({ value: item, depth: current.depth + 1 });
+            }
+            continue;
+        }
+
         const record = value as Record<string, unknown>;
-        if (typeof record.message === 'string') details.messages.push(record.message);
-        if (typeof record.reason === 'string') details.messages.push(record.reason);
 
-        const status = Number(record.status ?? record.statusCode ?? record.status_code);
-        if (Number.isInteger(status) && status >= 100 && status <= 599) {
-            details.httpStatuses.push(status);
+        for (const key of RPC_ERROR_MESSAGE_KEYS) {
+            if (typeof record[key] === 'string') details.messages.push(record[key] as string);
         }
 
-        const code = Number(record.code);
-        if (Number.isInteger(code)) {
-            if (code <= -32000 || code >= -32768) details.rpcCodes.push(code);
-            else if (code >= 100 && code <= 599) details.httpStatuses.push(code);
+        for (const key of RPC_ERROR_STATUS_KEYS) {
+            addNumericValue(details.httpStatuses, record[key]);
         }
 
-        for (const key of ['cause', 'error', 'response', 'data', 'body', 'result', 'info', 'details', 'originalError', 'payload']) {
+        for (const key of RPC_ERROR_CODE_KEYS) {
+            const numericCode: number[] = [];
+            addNumericValue(numericCode, record[key]);
+            for (const code of numericCode) {
+                if (
+                    code >= RPC_ERROR_JSON_CODE_RANGE.MIN &&
+                    code <= RPC_ERROR_JSON_CODE_RANGE.MAX
+                ) {
+                    details.rpcCodes.push(code);
+                } else if (
+                    code >= RPC_ERROR_HTTP_STATUS_RANGE.MIN &&
+                    code <= RPC_ERROR_HTTP_STATUS_RANGE.MAX
+                ) {
+                    details.httpStatuses.push(code);
+                }
+            }
+        }
+
+        for (const key of RPC_ERROR_NESTED_KEYS) {
             if (record[key] !== undefined && record[key] !== value) {
                 queue.push({ value: record[key], depth: current.depth + 1 });
             }
@@ -92,13 +136,19 @@ export function classifyRpcError(error: unknown): RpcErrorClassification {
     let category: RpcErrorCategory = RPC_ERROR_CATEGORIES.UNKNOWN;
 
     if (
-        details.httpStatuses.some((status) => RPC_ERROR_HTTP_STATUS.RATE_LIMIT.includes(status as 429)) ||
-        details.rpcCodes.some((code) => RPC_ERROR_JSON_CODES.RATE_LIMIT.includes(code as -32005)) ||
+        details.httpStatuses.some((status) =>
+            RPC_ERROR_HTTP_STATUS.RATE_LIMIT.includes(status as 429),
+        ) ||
+        details.rpcCodes.some((code) =>
+            RPC_ERROR_JSON_CODES.RATE_LIMIT.includes(code as -32005),
+        ) ||
         hasPattern(RPC_ERROR_MESSAGE_PATTERNS.RATE_LIMIT)
     ) {
         category = RPC_ERROR_CATEGORIES.RATE_LIMIT;
     } else if (
-        details.httpStatuses.some((status) => RPC_ERROR_HTTP_STATUS.TIMEOUT.includes(status as 408 | 504)) ||
+        details.httpStatuses.some((status) =>
+            RPC_ERROR_HTTP_STATUS.TIMEOUT.includes(status as 408 | 504),
+        ) ||
         hasPattern(RPC_ERROR_MESSAGE_PATTERNS.TIMEOUT)
     ) {
         category = RPC_ERROR_CATEGORIES.TIMEOUT;
@@ -118,7 +168,8 @@ export function classifyRpcError(error: unknown): RpcErrorClassification {
         category = RPC_ERROR_CATEGORIES.RPC;
     }
 
-    const retryable = category === RPC_ERROR_CATEGORIES.RATE_LIMIT ||
+    const retryable =
+        category === RPC_ERROR_CATEGORIES.RATE_LIMIT ||
         category === RPC_ERROR_CATEGORIES.TIMEOUT ||
         category === RPC_ERROR_CATEGORIES.NETWORK ||
         category === RPC_ERROR_CATEGORIES.PROVIDER;
