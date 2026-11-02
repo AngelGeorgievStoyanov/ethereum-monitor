@@ -94,7 +94,7 @@ export function classifyRpcError(error: unknown): RpcErrorClassification {
     ) {
         category = RPC_ERROR_CATEGORIES.RATE_LIMIT;
     } else if (
-        details.httpStatuses.some((status) => RPC_ERROR_HTTP_STATUS.TIMEOUT.includes(status as 504)) ||
+        details.httpStatuses.some((status) => RPC_ERROR_HTTP_STATUS.TIMEOUT.includes(status as 408 | 504)) ||
         hasPattern(RPC_ERROR_MESSAGE_PATTERNS.TIMEOUT)
     ) {
         category = RPC_ERROR_CATEGORIES.TIMEOUT;
@@ -102,7 +102,7 @@ export function classifyRpcError(error: unknown): RpcErrorClassification {
         category = RPC_ERROR_CATEGORIES.NETWORK;
     } else if (
         details.httpStatuses.some((status) =>
-            RPC_ERROR_HTTP_STATUS.PROVIDER.includes(status as 502 | 503),
+            RPC_ERROR_HTTP_STATUS.PROVIDER.includes(status as 500 | 502 | 503),
         ) ||
         hasPattern(RPC_ERROR_MESSAGE_PATTERNS.PROVIDER)
     ) {
