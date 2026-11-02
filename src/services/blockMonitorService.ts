@@ -166,6 +166,7 @@ export function createBlockMonitorService() {
 
                 if (needsStateReload) {
                     state = await initializeScannerState();
+                    await refreshScannerStatusSnapshot();
                     waitingForFilters = dynamicConfigService.getTxFilters().length === 0;
                     waitingForPause = false;
                     needsStateReload = false;
@@ -256,6 +257,15 @@ export function createBlockMonitorService() {
                                     dynamicConfigService.getTxFilterSnapshot(),
                                 );
                                 updateScannerRuntimeContext({ lastProcessedBlock: state.lastProcessedBlock });
+                                dynamicConfigService.updateScannerStatusSnapshot({
+                                    lastProcessedBlock: state.lastProcessedBlock,
+                                    reorgRecoveryActive: state.reorgRecoveryActive,
+                                    reorgRecoveryBlocked: state.reorgRecoveryBlocked,
+                                    reorgRecoveryBlockReason: state.reorgRecoveryBlockReason,
+                                    reorgRecoveryStableBlocks: state.reorgRecoveryStableBlocks,
+                                    reorgRecoveryStartBlock: state.reorgRecoveryStartBlock,
+                                    reorgRecoveryTargetBlock: state.reorgRecoveryTargetBlock,
+                                });
                             }
                         } finally {
                             processingFinalizedBlocks = false;
