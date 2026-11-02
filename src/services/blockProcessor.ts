@@ -19,7 +19,7 @@ import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { isScannerLockHeld } from './scannerLockService';
 import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
-import { recordProcessingBatch } from './metricsAggregatorService';
+import { recordDatabaseFailure, recordProcessingBatch } from './metricsAggregatorService';
 
 type ConfirmedBlock = CanonicalBlockIdentity;
 
@@ -155,13 +155,19 @@ export async function processFinalizedBlocks(
             }
 
             const databaseWriteStartedAt = Date.now();
-            const committedCheckpoint = await persistProcessedBlockBatch({
-                candidates,
-                blocks: processedBlockRecords,
-                scannerStateId: state.id,
-                expectedCheckpoint,
-                newCheckpoint: blockNumbers[blockNumbers.length - 1],
-            });
+            let committedCheckpoint: number;
+            try {
+                committedCheckpoint = await persistProcessedBlockBatch({
+                    candidates,
+                    blocks: processedBlockRecords,
+                    scannerStateId: state.id,
+                    expectedCheckpoint,
+                    newCheckpoint: blockNumbers[blockNumbers.length - 1],
+                });
+            } catch (error) {
+                recordDatabaseFailure('persistProcessedBlockBatch', formatError(error));
+                throw error;
+            }
             const databaseWriteDurationMs = Date.now() - databaseWriteStartedAt;
 
             if (committedCheckpoint !== blockNumbers[blockNumbers.length - 1]) {
