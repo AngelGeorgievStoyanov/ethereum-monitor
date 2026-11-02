@@ -55,6 +55,7 @@ History is bounded in memory using generic retention settings in `src/constants/
 - Each analytics response reports requested duration, available duration, history start time, and whether the requested window is complete or partial.
 - A process that has been running for 40 minutes can therefore return 40 minutes of partial data for a 1-hour window and complete 30/40-minute analysis through the `available` window. It does not need to run for 24 hours.
 - Analytics snapshots are prepared by the metrics aggregator and published to Dynamic Config on the configured refresh interval. The analytics endpoint only selects and returns the requested snapshot.
+- Summary counters and breakdown tables are calculated for the selected window from minute buckets, including processing throughput, RPC request/error/retry/failover counts, database query counts/failures, filter evaluations, RPC methods, database query types, and per-filter performance. Percentile latency uses the retained raw RPC request samples for the selected window.
 
 ## Endpoints
 
