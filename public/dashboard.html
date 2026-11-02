@@ -47,6 +47,14 @@
         .muted { color: #91a0b8; }
         .chart { width: 100%; height: 190px; display: block; }
         .chart-legend { display: flex; gap: 18px; color: #91a0b8; font-size: 11px; }
+        .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        select { border: 1px solid #334155; border-radius: 8px; padding: 8px 10px; background: #0d1627; color: #dbe4f2; }
+        .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+        .metric-tile { min-width: 0; padding: 13px; border: 1px solid #26354d; border-radius: 12px; background: #0d1627; }
+        .metric-tile .value { font-size: 22px; }
+        .table-empty { color: #91a0b8; text-align: center; }
+        @media (max-width: 850px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 560px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #60a5fa; }
         .legend-dot.db { background: #a78bfa; }
         .error { display: none; padding: 12px 14px; margin: 0 0 14px; border: 1px solid #7f1d1d; border-radius: 10px; background: #451a1a66; color: #fecaca; font-size: 13px; }
@@ -67,7 +75,7 @@
     <div id="connectionError" class="error"></div>
     <section class="grid">
         <article class="card"><div class="label">Last processed block</div><div class="value" id="checkpoint">—</div><div class="hint" id="lastProcessedAt">Waiting for data</div></article>
-        <article class="card"><div class="label">Latest finalized block</div><div class="value" id="finalized">—</div><div class="hint">Reported by RPC</div></article>
+        <article class="card"><div class="label">Latest finalized block</div><div class="value" id="finalized">—</div><div class="hint">Last value published by the scanner</div></article>
         <article class="card"><div class="label">Block lag</div><div class="value" id="lag">—</div><div class="hint">Finalized minus checkpoint</div></article>
         <article class="card"><div class="label">Active filters</div><div class="value" id="activeFilters">—</div><div class="hint">Loaded in the current process</div></article>
     </section>
@@ -111,7 +119,64 @@
         <div class="table-wrap">
             <table><thead><tr><th>Endpoint</th><th>Attempts</th><th>Success rate</th><th>Avg. latency</th><th>Failures</th><th>Last failure</th></tr></thead><tbody id="rpcRows"><tr><td colspan="6" class="muted">Waiting for data</td></tr></tbody></table>
         </div>
-        <p class="hint">RPC counters include all calls made through the RPC client, including status checks and recovery diagnostics. Counters reset when the process restarts.</p>
+        <p class="hint">Counts represent actual RPC endpoint attempts made by scanner and recovery operations. Dashboard requests do not generate RPC calls. Counters reset when the process restarts.</p>
+    </section>
+
+    <section class="panel">
+        <div class="panel-heading">
+            <h2>Runtime analytics</h2>
+            <select id="analyticsWindow" aria-label="Analytics time window">
+                <option value="1h">Last hour</option>
+                <option value="6h">Last 6 hours</option>
+                <option value="24h">Last 24 hours</option>
+            </select>
+        </div>
+        <div class="metric-grid">
+            <div class="metric-tile"><div class="label">Blocks / second</div><div class="value" id="analyticsBlocksPerSecond">—</div></div>
+            <div class="metric-tile"><div class="label">Transactions / second</div><div class="value" id="analyticsTransactionsPerSecond">—</div></div>
+            <div class="metric-tile"><div class="label">Net lag reduction / sec</div><div class="value" id="lagReductionRate">—</div></div>
+            <div class="metric-tile"><div class="label">Estimated catch-up</div><div class="value" id="catchUpEta">—</div></div>
+        </div>
+        <div class="metric-grid" style="margin-top:12px">
+            <div class="metric-tile"><div class="label">RPC 429 / rate limits</div><div class="value" id="rpc429">—</div></div>
+            <div class="metric-tile"><div class="label">RPC timeouts</div><div class="value" id="rpcTimeouts">—</div></div>
+            <div class="metric-tile"><div class="label">RPC average latency</div><div class="value" id="rpcAverageLatency">—</div></div>
+            <div class="metric-tile"><div class="label">RPC P95 latency</div><div class="value" id="rpcP95Latency">—</div></div>
+        </div>
+        <div class="metric-grid" style="margin-top:12px">
+            <div class="metric-tile"><div class="label">Transactions / block</div><div class="value" id="avgTransactionsPerBlock">—</div></div>
+            <div class="metric-tile"><div class="label">Catch-up cap</div><div class="value" id="catchUpCap">—</div></div>
+            <div class="metric-tile"><div class="label">Max parallel blocks</div><div class="value" id="parallelBlocks">—</div></div>
+            <div class="metric-tile"><div class="label">DB write failures</div><div class="value" id="databaseFailures">—</div></div>
+        </div>
+        <div class="layout">
+            <section>
+                <h2>Lag history</h2>
+                <svg id="lagChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Scanner lag history chart"></svg>
+                <div class="hint" id="analyticsRetention">Waiting for analytics data</div>
+            </section>
+            <section>
+                <h2>Recent catch-up sessions</h2>
+                <div class="table-wrap">
+                    <table><thead><tr><th>Started</th><th>Blocks</th><th>Transactions</th><th>Duration</th><th>Blocks/sec</th><th>Status</th></tr></thead><tbody id="catchUpRows"><tr><td colspan="6" class="muted">Waiting for data</td></tr></tbody></table>
+                </div>
+            </section>
+        </div>
+        <div class="layout">
+            <section>
+                <h2>RPC method breakdown</h2>
+                <div class="table-wrap">
+                    <table><thead><tr><th>Method</th><th>Requests</th><th>Failures</th><th>Avg. latency</th></tr></thead><tbody id="rpcMethodRows"><tr><td colspan="4" class="muted">Waiting for data</td></tr></tbody></table>
+                </div>
+            </section>
+            <section>
+                <h2>Recent RPC errors</h2>
+                <div class="table-wrap">
+                    <table><thead><tr><th>Time</th><th>Method</th><th>Type</th><th>Message</th></tr></thead><tbody id="rpcErrorRows"><tr><td colspan="4" class="muted">Waiting for data</td></tr></tbody></table>
+                </div>
+            </section>
+        </div>
+        <div class="hint" id="lastBatchSummary">No processing batch recorded</div>
     </section>
 
     <div class="layout">
@@ -141,10 +206,12 @@
 (() => {
     const $ = (id) => document.getElementById(id);
     let requestInProgress = false;
+    let analyticsRequestInProgress = false;
     let lastData = null;
     const number = (value) => value === null || value === undefined ? '—' : Number(value).toLocaleString();
     const duration = (value) => value === null || value === undefined ? '—' : Math.round(value) + ' ms';
     const setText = (id, value) => { $(id).textContent = value; };
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>\"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[character]));
     const setPipeline = (id, text, state) => {
         const element = $(id);
         element.textContent = text;
@@ -240,6 +307,69 @@
         setText('updatedAt', 'Last update: ' + new Date(data.checkedAt).toLocaleTimeString());
         $('connectionError').style.display = 'none';
     }
+    function drawLagChart(samples) {
+        const svg = $('lagChart');
+        const width = 700, height = 190, pad = 24;
+        if (!samples || samples.length === 0) {
+            svg.innerHTML = '<text x="350" y="96" text-anchor="middle" fill="#718096" font-size="13">No lag samples retained</text>';
+            return;
+        }
+        const values = samples.slice(-120);
+        const max = Math.max(1, ...values.map((item) => Number(item.lagBlocks || 0)));
+        const x = (index) => pad + (values.length === 1 ? (width - pad * 2) / 2 : index * (width - pad * 2) / (values.length - 1));
+        const y = (value) => height - pad - (Number(value || 0) / max) * (height - pad * 2);
+        const line = values.map((item, index) => (index === 0 ? 'M' : 'L') + x(index).toFixed(1) + ',' + y(item.lagBlocks).toFixed(1)).join(' ');
+        const grid = [0, 1, 2, 3].map((i) => {
+            const gy = pad + i * (height - pad * 2) / 3;
+            return '<line x1="' + pad + '" y1="' + gy + '" x2="' + (width - pad) + '" y2="' + gy + '" stroke="#263249" stroke-dasharray="3 5"/>';
+        }).join('');
+        svg.innerHTML = grid + '<path d="' + line + '" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    }
+    function renderAnalytics(data) {
+        const current = data.current || {};
+        const processing = current.processing || {};
+        const rpc = current.rpc || {};
+        const catchUp = current.catchUp || {};
+        const scanner = current.scanner || {};
+        const database = current.database || {};
+        setText('analyticsBlocksPerSecond', processing.blocksPerSecondLastMinute ?? '—');
+        setText('analyticsTransactionsPerSecond', processing.transactionsPerSecondLastMinute ?? '—');
+        setText('lagReductionRate', catchUp.lagReductionBlocksPerSecond === null || catchUp.lagReductionBlocksPerSecond === undefined ? '—' : catchUp.lagReductionBlocksPerSecond);
+        setText('catchUpEta', catchUp.estimatedRemainingSeconds === null || catchUp.estimatedRemainingSeconds === undefined ? '—' : Math.round(catchUp.estimatedRemainingSeconds) + 's');
+        setText('rpc429', number(rpc.rateLimitErrors));
+        setText('rpcTimeouts', number(rpc.timeoutErrors));
+        setText('rpcAverageLatency', duration(rpc.averageLatencyMs));
+        setText('rpcP95Latency', duration(rpc.latencyP95Ms));
+        setText('avgTransactionsPerBlock', number(processing.averageTransactionsPerBlock));
+        setText('catchUpCap', number(scanner.maxBlocksPerCatchup));
+        setText('parallelBlocks', number(scanner.maxParallelBlocks));
+        setText('databaseFailures', number(database.failures));
+        drawLagChart(data.lagSamples);
+        const retention = data.retention || {};
+        setText('analyticsRetention', 'Retained samples: ' + number(retention.blockSamples) + ' blocks · ' + number(retention.lagSamples) + ' lag · ' + number(retention.rpcEvents) + ' RPC · ' + number(retention.batches) + ' batches');
+        const sessions = (data.catchUpSessions || []).slice(-10).reverse();
+        $('catchUpRows').innerHTML = sessions.map((item) => '<tr><td>' + (item.startedAt ? new Date(item.startedAt).toLocaleTimeString() : '—') + '</td><td>' + number(item.processedBlocks) + '</td><td>' + number(item.processedTransactions) + '</td><td>' + duration(item.durationMs) + '</td><td>' + number(item.blocksPerSecond) + '</td><td>' + escapeHtml(item.status) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No catch-up sessions retained</td></tr>';
+        const methods = (rpc.methods || []).slice(-15);
+        $('rpcMethodRows').innerHTML = methods.map((item) => '<tr><td>' + escapeHtml(item.method) + '</td><td>' + number(item.requests) + '</td><td>' + number(item.failures) + '</td><td>' + duration(item.requests ? item.totalDurationMs / item.requests : null) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No RPC methods reported</td></tr>';
+        const errors = (data.rpcEvents || []).filter((item) => item.outcome === 'failure').slice(-12).reverse();
+        $('rpcErrorRows').innerHTML = errors.map((item) => '<tr><td>' + (item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '—') + '</td><td>' + escapeHtml(item.method) + '</td><td>' + escapeHtml(item.failureKind) + '</td><td>' + escapeHtml(item.message) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No RPC errors in this window</td></tr>';
+        const batch = (data.batches || []).slice(-1)[0];
+        setText('lastBatchSummary', batch ? 'Last batch: blocks ' + number(batch.startBlock) + '–' + number(batch.endBlock) + ' · ' + number(batch.transactions) + ' transactions · ' + duration(batch.durationMs) + ' total · ' + duration(batch.databaseWriteDurationMs) + ' DB write' : 'No processing batch recorded');
+    }
+    async function refreshAnalytics() {
+        if (analyticsRequestInProgress || document.visibilityState === 'hidden') return;
+        analyticsRequestInProgress = true;
+        try {
+            const window = $('analyticsWindow').value;
+            const response = await fetch('/api/scanner/analytics?window=' + encodeURIComponent(window), { cache: 'no-store' });
+            if (!response.ok) throw new Error('Analytics endpoint returned HTTP ' + response.status);
+            renderAnalytics(await response.json());
+        } catch (error) {
+            setText('analyticsRetention', 'Analytics unavailable: ' + (error instanceof Error ? error.message : String(error)));
+        } finally {
+            analyticsRequestInProgress = false;
+        }
+    }
     async function refresh() {
         if (requestInProgress || document.visibilityState === 'hidden') return;
         requestInProgress = true;
@@ -259,8 +389,11 @@
         }
     }
     refresh();
+    refreshAnalytics();
     window.setInterval(refresh, 5000);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+    window.setInterval(refreshAnalytics, 30000);
+    $('analyticsWindow').addEventListener('change', refreshAnalytics);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); refreshAnalytics(); } });
 })();
 </script>
 </body>
