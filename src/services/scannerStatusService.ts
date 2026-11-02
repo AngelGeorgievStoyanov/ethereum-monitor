@@ -16,7 +16,7 @@ export async function getScannerStatusResponse() {
     ]);
 
     const runtimeMetrics = getScannerRuntimeMetrics() as {
-        scanner?: { uptimeSeconds?: number; activeFiltersCount?: number };
+        scanner?: { running?: boolean; uptimeSeconds?: number; activeFiltersCount?: number };
         recovery?: Record<string, number>;
         chain?: { latestFinalizedBlock?: number | null; latestFinalizedAt?: string | null; lastProcessedBlock?: number | null; lagBlocks?: number | null; rpcAvailable?: boolean | null };
         rpc?: { endpoints?: Array<{ index: number; attempts: number; successes: number; failures: number; retryableFailures: number; totalDurationMs: number; lastFailureAt: string | null }> };
@@ -37,6 +37,7 @@ export async function getScannerStatusResponse() {
 
     const response = mapScannerStatusResponse({
         control,
+        scannerRunning: runtimeMetrics?.scanner?.running ?? false,
         state,
         rescanJob,
         recoveryMetrics: (runtimeMetrics?.recovery as ReturnType<typeof getRecoveryMetrics> | undefined) ?? getRecoveryMetrics(),
