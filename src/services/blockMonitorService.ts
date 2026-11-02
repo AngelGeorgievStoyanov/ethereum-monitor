@@ -19,7 +19,7 @@ import { refreshScannerStatusSnapshot } from './scannerStatusService';
 import { getScannerControlState } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
-import { recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
+import { markScannerStopped, recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
 
 let processingFinalizedBlocks = false;
 let manualRescanReserved = false;
@@ -154,7 +154,7 @@ export function createBlockMonitorService() {
         while (true) {
             try {
                 if (!(await isScannerLockHeld())) {
-                    updateScannerRuntimeContext({ running: false });
+                    markScannerStopped();
                     dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: false });
                     needsStateReload = true;
                     while (!(await tryAcquireScannerLock())) {
@@ -171,6 +171,7 @@ export function createBlockMonitorService() {
                 if (needsStateReload) {
                     state = await initializeScannerState();
                     await refreshScannerStatusSnapshot();
+                    dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
                     waitingForFilters = dynamicConfigService.getTxFilters().length === 0;
                     waitingForPause = false;
                     needsStateReload = false;
