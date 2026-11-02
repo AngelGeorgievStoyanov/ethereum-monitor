@@ -20,10 +20,12 @@ type RpcInput = RpcMetricEventInput;
 const MAX_BLOCK_SAMPLES = 10000;
 const MAX_RPC_EVENTS = 1000;
 const MAX_CATCHUP_SESSIONS = 50;
+const MAX_BATCH_SAMPLES = 1000;
 const startedAt = new Date().toISOString();
 const blockSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
+const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const endpointTotals = new Map<number, { attempts: number; successes: number; failures: number; retryableFailures: number; durationMs: number; lastFailureAt: string | null }>();
 const rpcTotals = {
     totalRequests: 0,
@@ -47,6 +49,9 @@ let scannerRunning = false;
 let scannerPaused = false;
 let pauseMode: string | null = null;
 let activeFiltersCount = 0;
+let maxBlocksPerCatchup = 0;
+let maxParallelBlocks = 1;
+let parallelProcessingLagBlocks = 0;
 let catchUpActive = false;
 let publishTimer: ReturnType<typeof setTimeout> | undefined;
 let totalProcessedBlocks = 0;
@@ -68,6 +73,7 @@ function trimSamples(now: number): void {
     while (blockSamples.length > 0 && (blockSamples.length > MAX_BLOCK_SAMPLES || now - blockSamples[0].timestampMs > 86400000)) blockSamples.shift();
     while (rpcEvents.length > MAX_RPC_EVENTS) rpcEvents.shift();
     while (catchUpSessions.length > MAX_CATCHUP_SESSIONS) catchUpSessions.shift();
+    while (batchSamples.length > MAX_BATCH_SAMPLES) batchSamples.shift();
 }
 
 function getSnapshot() {
@@ -104,7 +110,7 @@ function getSnapshot() {
     return {
         startedAt,
         updatedAt: new Date(now).toISOString(),
-        scanner: { running: scannerRunning, paused: scannerPaused, pauseMode, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount },
+        scanner: { running: scannerRunning, paused: scannerPaused, pauseMode, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount, maxBlocksPerCatchup, maxParallelBlocks, parallelProcessingLagBlocks },
         chain: { latestFinalizedBlock, latestFinalizedAt, lastProcessedBlock, lastProcessedAt, lagBlocks, rpcAvailable },
         processing: {
             processedBlocks: totalProcessedBlocks,
@@ -240,12 +246,16 @@ export function recordRpcRequest(input: RpcInput): void {
 export function updateScannerRuntimeContext(input: {
     running?: boolean; paused?: boolean; pauseMode?: string | null; activeFiltersCount?: number;
     lastProcessedBlock?: number | null; recovery?: Record<string, number>;
+    maxBlocksPerCatchup?: number; maxParallelBlocks?: number; parallelProcessingLagBlocks?: number;
 }): void {
     if (input.running !== undefined) scannerRunning = input.running;
     if (input.paused !== undefined) scannerPaused = input.paused;
     if (input.pauseMode !== undefined) pauseMode = input.pauseMode;
     if (input.activeFiltersCount !== undefined) activeFiltersCount = input.activeFiltersCount;
     if (input.lastProcessedBlock !== undefined) lastProcessedBlock = input.lastProcessedBlock;
+    if (input.maxBlocksPerCatchup !== undefined) maxBlocksPerCatchup = input.maxBlocksPerCatchup;
+    if (input.maxParallelBlocks !== undefined) maxParallelBlocks = input.maxParallelBlocks;
+    if (input.parallelProcessingLagBlocks !== undefined) parallelProcessingLagBlocks = input.parallelProcessingLagBlocks;
     if (input.recovery) recoveryMetrics = { ...input.recovery };
     publish();
 }
@@ -254,12 +264,33 @@ export function getScannerRuntimeMetrics() {
     return getDynamicConfigService().getRuntimeMetricsSnapshot();
 }
 
+
+export function recordProcessingBatch(input: {
+    startBlock: number;
+    endBlock: number;
+    blocks: number;
+    transactions: number;
+    durationMs: number;
+}): void {
+    const now = Date.now();
+    batchSamples.push({
+        ...input,
+        timestamp: new Date(now).toISOString(),
+        timestampMs: now,
+        blocksPerSecond: input.durationMs > 0 ? Number((input.blocks * 1000 / input.durationMs).toFixed(2)) : 0,
+        transactionsPerSecond: input.durationMs > 0 ? Number((input.transactions * 1000 / input.durationMs).toFixed(2)) : 0,
+    });
+    trimSamples(now);
+    publish();
+}
+
 export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsResponse {
     const now = Date.now();
     const since = now - Math.max(60000, Math.min(windowMs, 86400000));
     const selectedBlocks = blockSamples.filter((sample) => sample.timestampMs >= since);
     const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
     const selectedSessions = catchUpSessions.filter((session) => session.startedAtMs >= since);
+    const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
     const current = getSnapshot();
     const response: ScannerAnalyticsResponse = {
         generatedAt: new Date(now).toISOString(),
@@ -268,6 +299,15 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
         blockSamples: selectedBlocks.map(({ timestampMs: _timestampMs, ...sample }) => sample),
         rpcEvents: selectedRpc.map(({ timestampMs: _timestampMs, ...event }) => event),
         catchUpSessions: selectedSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
+        batches: selectedBatches.map(({ timestampMs: _timestampMs, ...sample }) => sample),
+        retention: {
+            oldestBlockSampleAt: (blockSamples[0]?.timestamp as string | undefined) ?? null,
+            oldestRpcEventAt: (rpcEvents[0]?.timestamp as string | undefined) ?? null,
+            blockSamples: blockSamples.length,
+            rpcEvents: rpcEvents.length,
+            catchUpSessions: catchUpSessions.length,
+            batches: batchSamples.length,
+        },
     };
     getDynamicConfigService().publishRuntimeAnalytics(response);
     return getDynamicConfigService().getRuntimeAnalyticsSnapshot() as ScannerAnalyticsResponse;
