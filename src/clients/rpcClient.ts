@@ -3,7 +3,7 @@ import { RpcTransactionReceipt } from '../types/evm-rpc.types';
 import { RPC_ENDPOINT_TIMEOUT_MS } from '../constants/evm-rpc.constants';
 import { env } from '../config/env';
 import { formatError } from '../utils/formatError';
-import { recordRpcRequest } from '../services/metricsAggregatorService';
+import { publishRpcMetricEvent } from '../metrics/metricsEventBus';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
     let timer: ReturnType<typeof setTimeout>;
@@ -100,11 +100,11 @@ export function createRpcClient() {
                     RPC_ENDPOINT_TIMEOUT_MS,
                 );
                 recordEndpointSuccess(endpoint, startedAt);
-                recordRpcRequest({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
+                publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
                 return result;
             } catch (error) {
                 recordEndpointFailure(endpoint, startedAt, error);
-                recordRpcRequest({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
+                publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
                 lastError = error;
                 if (!isRetryableEndpointError(error)) throw error;
 
@@ -139,10 +139,10 @@ export function createRpcClient() {
                 );
                 if (block) {
                     recordEndpointSuccess(endpoint, startedAt);
-                    recordRpcRequest({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
+                    publishRpcMetricEvent({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
                 } else {
                     recordEndpointFailure(endpoint, startedAt);
-                    recordRpcRequest({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: 'EMPTY_BLOCK' });
+                    publishRpcMetricEvent({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: 'EMPTY_BLOCK' });
                 }
                 results.push({
                     endpointIndex: endpoint.index,
@@ -152,7 +152,7 @@ export function createRpcClient() {
             } catch (error) {
                 const message = formatError(error);
                 recordEndpointFailure(endpoint, startedAt, error);
-                recordRpcRequest({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message, retryable: isRetryableEndpointError(error) });
+                publishRpcMetricEvent({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message, retryable: isRetryableEndpointError(error) });
                 results.push({ endpointIndex: endpoint.index, block: null, error: message });
             }
         }
@@ -179,7 +179,7 @@ export function createRpcClient() {
                 );
                 if (block?.number !== undefined && block.hash) {
                     recordEndpointSuccess(endpoint, startedAt);
-                    recordRpcRequest({ method: 'getBlock(finalized,diagnostic)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
+                    publishRpcMetricEvent({ method: 'getBlock(finalized,diagnostic)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
                     results.push({
                         endpointIndex: endpoint.index,
                         blockNumber: block.number,
@@ -188,7 +188,7 @@ export function createRpcClient() {
                     });
                 } else {
                     recordEndpointFailure(endpoint, startedAt);
-                    recordRpcRequest({ method: 'getBlock(finalized,diagnostic)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: 'EMPTY_FINALIZED_BLOCK' });
+                    publishRpcMetricEvent({ method: 'getBlock(finalized,diagnostic)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: 'EMPTY_FINALIZED_BLOCK' });
                     results.push({
                         endpointIndex: endpoint.index,
                         blockNumber: block?.number ?? null,
@@ -199,7 +199,7 @@ export function createRpcClient() {
             } catch (error) {
                 const message = formatError(error);
                 recordEndpointFailure(endpoint, startedAt, error);
-                recordRpcRequest({ method: 'getBlock(finalized,diagnostic)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message });
+                publishRpcMetricEvent({ method: 'getBlock(finalized,diagnostic)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message });
                 results.push({
                     endpointIndex: endpoint.index,
                     blockNumber: null,
