@@ -6,7 +6,7 @@ import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.con
 import { classifyRpcError } from '../utils/classifyRpcError';
 import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
 import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
-import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS } from '../constants/scanner-metrics.constants';
+import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -38,6 +38,82 @@ const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> 
 const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const finalizedSamples: Array<{ timestampMs: number; blockNumber: number }> = [];
 const lagSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
+type MinuteMetricBucket = {
+    timestamp: string;
+    timestampMs: number;
+    processedBlocks: number;
+    processedTransactions: number;
+    blockDurationMsTotal: number;
+    blockFilterDurationMsTotal: number;
+    databaseBatchWriteDurationMsTotal: number;
+    rpcRequests: number;
+    rpcFailures: number;
+    rpcRateLimitErrors: number;
+    rpcTimeoutErrors: number;
+    rpcDurationMsTotal: number;
+    databaseQueries: number;
+    databaseReads: number;
+    databaseWrites: number;
+    databaseDurationMsTotal: number;
+    filterEvaluations: number;
+    filterMatches: number;
+    filterFailures: number;
+    predicateDurationMsTotal: number;
+    lagBlocksSum: number;
+    lagSamples: number;
+    latestLagBlocks: number | null;
+    processingBatches: number;
+    batchDurationMsTotal: number;
+};
+const minuteBuckets: MinuteMetricBucket[] = [];
+
+function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
+    const bucketTimestampMs = Math.floor(timestampMs / METRICS_BUCKET_INTERVAL_MS) * METRICS_BUCKET_INTERVAL_MS;
+    let bucket = minuteBuckets[minuteBuckets.length - 1];
+    if (!bucket || bucket.timestampMs !== bucketTimestampMs) {
+        bucket = {
+            timestamp: new Date(bucketTimestampMs).toISOString(),
+            timestampMs: bucketTimestampMs,
+            processedBlocks: 0,
+            processedTransactions: 0,
+            blockDurationMsTotal: 0,
+            blockFilterDurationMsTotal: 0,
+            databaseBatchWriteDurationMsTotal: 0,
+            rpcRequests: 0,
+            rpcFailures: 0,
+            rpcRateLimitErrors: 0,
+            rpcTimeoutErrors: 0,
+            rpcDurationMsTotal: 0,
+            databaseQueries: 0,
+            databaseReads: 0,
+            databaseWrites: 0,
+            databaseDurationMsTotal: 0,
+            filterEvaluations: 0,
+            filterMatches: 0,
+            filterFailures: 0,
+            predicateDurationMsTotal: 0,
+            lagBlocksSum: 0,
+            lagSamples: 0,
+            latestLagBlocks: null,
+            processingBatches: 0,
+            batchDurationMsTotal: 0,
+        };
+        minuteBuckets.push(bucket);
+    }
+    while (minuteBuckets.length > 0 && (
+        minuteBuckets.length > METRICS_MAX_BUCKETS ||
+        timestampMs - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS
+    )) minuteBuckets.shift();
+    return bucket;
+}
+
+function recordMinuteLag(timestampMs: number, lagBlocks: number | null): void {
+    if (lagBlocks === null) return;
+    const bucket = getMinuteBucket(timestampMs);
+    bucket.lagBlocksSum += lagBlocks;
+    bucket.lagSamples += 1;
+    bucket.latestLagBlocks = lagBlocks;
+}
 const endpointTotals = new Map<number, { attempts: number; successes: number; failures: number; retryableFailures: number; durationMs: number; lastFailureAt: string | null }>();
 const rpcOperationTotals = {
     totalOperations: 0,
@@ -162,6 +238,7 @@ function trimSamples(now: number): void {
     while (batchSamples.length > 0 && (batchSamples.length > METRICS_SAMPLE_LIMITS.batches || now - batchSamples[0].timestampMs > METRICS_RETENTION_MS)) batchSamples.shift();
     while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > METRICS_RETENTION_MS) finalizedSamples.shift();
     while (lagSamples.length > 0 && (lagSamples.length > METRICS_SAMPLE_LIMITS.lag || now - lagSamples[0].timestampMs > METRICS_RETENTION_MS)) lagSamples.shift();
+    while (minuteBuckets.length > 0 && (minuteBuckets.length > METRICS_MAX_BUCKETS || now - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS)) minuteBuckets.shift();
 }
 
 function getSnapshot() {
@@ -348,7 +425,9 @@ export function recordFinalizedBlock(blockNumber: number): void {
     trimSamples(Date.now());
     rpcAvailable = true;
     const lag = lastProcessedBlock === null ? null : Math.max(0, blockNumber - lastProcessedBlock);
-    lagSamples.push({ timestamp: latestFinalizedAt, timestampMs: Date.now(), latestFinalizedBlock: blockNumber, lastProcessedBlock, lagBlocks: lag });
+    const finalizedTimestampMs = Date.now();
+    lagSamples.push({ timestamp: latestFinalizedAt, timestampMs: finalizedTimestampMs, latestFinalizedBlock: blockNumber, lastProcessedBlock, lagBlocks: lag });
+    recordMinuteLag(finalizedTimestampMs, lag);
     if (lag !== null && lag > SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS && !catchUpActive) {
         const now = Date.now();
         catchUpSessions.push({
@@ -389,6 +468,13 @@ export function recordProcessedBlock(input: BlockInput): void {
     lastProcessedAt = timestamp;
     const currentLag = latestFinalizedBlock === null ? null : Math.max(0, latestFinalizedBlock - lastProcessedBlock);
     lagSamples.push({ timestamp, timestampMs: now, latestFinalizedBlock, lastProcessedBlock, lagBlocks: currentLag });
+    const minuteBucket = getMinuteBucket(now);
+    minuteBucket.processedBlocks += 1;
+    minuteBucket.processedTransactions += input.transactionCount;
+    minuteBucket.blockDurationMsTotal += input.blockDurationMs;
+    minuteBucket.blockFilterDurationMsTotal += input.filterMatchingDurationMs;
+    minuteBucket.databaseBatchWriteDurationMsTotal += input.databaseWriteDurationMs;
+    recordMinuteLag(now, currentLag);
     const session = catchUpSessions[catchUpSessions.length - 1];
     if (session?.status === 'running') {
         session.processedBlocks = Number(session.processedBlocks) + 1;
@@ -417,6 +503,12 @@ export function recordRpcRequest(input: RpcInput): void {
     } else rpcTotals.successes += 1;
     rpcTotals.totalRequests += 1;
     rpcTotals.totalDurationMs += input.durationMs;
+    const rpcBucket = getMinuteBucket(now);
+    rpcBucket.rpcRequests += 1;
+    rpcBucket.rpcDurationMsTotal += input.durationMs;
+    if (input.outcome === 'failure') rpcBucket.rpcFailures += 1;
+    if (failureKind === 'rateLimit') rpcBucket.rpcRateLimitErrors += 1;
+    if (failureKind === 'timeout') rpcBucket.rpcTimeoutErrors += 1;
     const endpoint = endpointTotals.get(input.endpointIndex) ?? { attempts: 0, successes: 0, failures: 0, retryableFailures: 0, durationMs: 0, lastFailureAt: null as string | null };
     endpoint.attempts += 1;
     endpoint.durationMs += input.durationMs;
@@ -521,6 +613,9 @@ export function recordProcessingBatch(input: {
     });
     databaseMetrics.writes += 1;
     databaseMetrics.totalWriteDurationMs += input.databaseWriteDurationMs;
+    const bucket = getMinuteBucket(now);
+    bucket.processingBatches += 1;
+    bucket.batchDurationMsTotal += input.durationMs;
     trimSamples(now);
     publish();
 }
@@ -549,6 +644,7 @@ function buildScannerAnalytics(
     const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
     const selectedSessions = catchUpSessions.filter((session) => session.startedAtMs >= since);
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
+    const selectedMinuteBuckets = minuteBuckets.filter((bucket) => bucket.timestampMs >= since);
 
     return {
         generatedAt: new Date(now).toISOString(),
@@ -565,6 +661,7 @@ function buildScannerAnalytics(
         rpcEvents: selectedRpc.map(({ timestampMs: _timestampMs, ...event }) => event),
         catchUpSessions: selectedSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
         batches: selectedBatches.map(({ timestampMs: _timestampMs, ...sample }) => sample),
+        minuteBuckets: selectedMinuteBuckets.map(({ timestampMs: _timestampMs, ...bucket }) => bucket),
         retention: {
             oldestBlockSampleAt: (blockSamples[0]?.timestamp as string | undefined) ?? null,
             oldestRpcEventAt: (rpcEvents[0]?.timestamp as string | undefined) ?? null,
@@ -621,6 +718,11 @@ function recordFilterEvaluation(input: FilterMetricEvent): void {
     if (input.failed) filter.failures += 1;
     filter.totalDurationMs += input.durationMs;
     filterMetrics.byFilter[key] = filter;
+    const bucket = getMinuteBucket(Date.now());
+    bucket.filterEvaluations += 1;
+    if (input.matched) bucket.filterMatches += 1;
+    if (input.failed) bucket.filterFailures += 1;
+    bucket.predicateDurationMsTotal += input.durationMs;
     publish();
 }
 
@@ -639,6 +741,11 @@ function recordDatabaseQuery(input: DatabaseMetricEvent): void {
     operation.totalDurationMs += input.durationMs;
     operation.maxDurationMs = Math.max(operation.maxDurationMs, input.durationMs);
     databaseQueryTotals.byOperation[input.queryType] = operation;
+    const bucket = getMinuteBucket(Date.now());
+    bucket.databaseQueries += 1;
+    if (input.operation === 'read') bucket.databaseReads += 1;
+    if (input.operation === 'write') bucket.databaseWrites += 1;
+    bucket.databaseDurationMsTotal += input.durationMs;
     publish();
 }
 
