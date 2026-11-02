@@ -433,6 +433,7 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
             oldestBlockSampleAt: (blockSamples[0]?.timestamp as string | undefined) ?? null,
             oldestRpcEventAt: (rpcEvents[0]?.timestamp as string | undefined) ?? null,
             blockSamples: blockSamples.length,
+            lagSamples: lagSamples.length,
             rpcEvents: rpcEvents.length,
             catchUpSessions: catchUpSessions.length,
             batches: batchSamples.length,
