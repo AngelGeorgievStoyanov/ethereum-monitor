@@ -26,6 +26,7 @@ The current snapshot includes:
 All history is bounded in memory:
 
 - Up to 10,000 block samples, with samples older than 24 hours removed.
+- Up to 1,000 lag samples.
 - Up to 1,000 RPC request events.
 - Up to 1,000 processing batch samples.
 - Up to 50 catch-up sessions.
