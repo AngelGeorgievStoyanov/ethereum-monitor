@@ -84,7 +84,6 @@ async function runManualRescanInternal({
     let blocksProcessed = 0;
     let currentBlock = fromBlock - 1;
     let lastProgressReported = 0;
-    let cachedBatchStart = -1;
     const canonicalIdentities = new Map<number, CanonicalBlockIdentity>();
 
     const reportProgress = async (): Promise<void> => {
@@ -105,7 +104,6 @@ async function runManualRescanInternal({
                 for (const identity of batch) {
                     canonicalIdentities.set(identity.blockNumber, identity);
                 }
-                cachedBatchStart = blockNumber;
             }
 
             const storedBlock = canonicalIdentities.get(blockNumber);
@@ -117,7 +115,13 @@ async function runManualRescanInternal({
             canonicalIdentities.delete(blockNumber);
 
             const fetched = await fetchBlockForProcessing(blockNumber);
-            if (!matchesBlock(storedBlock, fetched.block)) {
+            const fetchedIdentity = {
+                blockNumber: fetched.block.number,
+                blockHash: fetched.block.hash,
+                parentHash: fetched.block.parentHash,
+            };
+
+            if (!matchesBlock(storedBlock, fetchedIdentity)) {
                 const consensusBlock = await getBlockWithConsensus(blockNumber, 'manual rescan');
                 if (!matchesBlock(storedBlock, consensusBlock)) {
                     recordReorgDetected();
