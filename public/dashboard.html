@@ -416,11 +416,8 @@
     }
     function renderAnalytics(data) {
         const current = data.current || {};
-        const processing = current.processing || {};
-        const rpc = current.rpc || {};
         const catchUp = current.catchUp || {};
         const scanner = current.scanner || {};
-        const database = current.database || {};
         const windowMetrics = data.windowMetrics || {};
         const windowProcessing = windowMetrics.processing || {};
         const windowRpc = windowMetrics.rpc || {};
@@ -433,7 +430,6 @@
             windowSelect.value = data.window;
         }
         const runtime = current.runtime || {};
-        const filters = current.filters || {};
         setText('analyticsBlocksPerSecond', windowProcessing.blocksPerSecond ?? '—');
         setText('analyticsTransactionsPerSecond', windowProcessing.transactionsPerSecond ?? '—');
         setText('lagReductionRate', catchUp.lagReductionBlocksPerSecond === null || catchUp.lagReductionBlocksPerSecond === undefined ? '—' : catchUp.lagReductionBlocksPerSecond);
