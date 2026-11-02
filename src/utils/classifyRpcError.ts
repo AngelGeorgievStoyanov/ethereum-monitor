@@ -53,11 +53,11 @@ function collectErrorDetails(error: unknown): ErrorDetails {
             details.messages.push(trimmed);
 
             const httpStatusMatch = trimmed.match(
-                /\\b(?:HTTP(?: status)?|status(?: code)?|response)\\s*[:=]?\\s*(\\d{3})\\b/i,
+                /\b(?:HTTP(?: status)?|status(?: code)?|response)\s*[:=]?\s*(\d{3})\b/i,
             );
             if (httpStatusMatch) addNumericValue(details.httpStatuses, httpStatusMatch[1]);
 
-            const rpcCodeMatch = trimmed.match(/\\bcode\\s*[:=]?\\s*(-\\d{4,5})\\b/i);
+            const rpcCodeMatch = trimmed.match(/\bcode\s*[:=]?\s*(-\d{4,5})\b/i);
             if (rpcCodeMatch) addNumericValue(details.rpcCodes, rpcCodeMatch[1]);
 
             if (
