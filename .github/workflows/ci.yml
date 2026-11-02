@@ -28,5 +28,7 @@ jobs:
         run: npm run lint
       - name: Build TypeScript
         run: npm run build
+      - name: Test RPC error classification
+        run: npm test
       - name: Audit dependencies
         run: npm audit --audit-level=high
