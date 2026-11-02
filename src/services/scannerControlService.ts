@@ -8,6 +8,7 @@ import {
     mapScannerResumeResponse,
 } from '../mappers/scannerControlMapper';
 import { updateScannerRuntimeContext } from './metricsAggregatorService';
+import { getDynamicConfigService } from './dynamicConfigService';
 import type {
     ScannerControlRecord,
     ScannerControlState,
@@ -27,6 +28,15 @@ async function loadControlRecord(): Promise<ScannerControlRecord> {
     const record = await findScannerControlRecord(SCANNER_ID);
     if (!record) throw new Error('Scanner state is not initialized yet');
     return record;
+}
+
+function publishControlSnapshot(control: ScannerControlState): void {
+    getDynamicConfigService().updateScannerStatusSnapshot({
+        paused: control.paused,
+        mode: control.mode,
+        pauseRequestedAtBlock: control.pauseRequestedAtBlock,
+        pauseUntil: control.pauseUntil,
+    });
 }
 
 function isTemporaryPauseExpired(record: ScannerControlRecord): boolean {
@@ -49,15 +59,22 @@ export async function isScannerPausePendingOrActive(): Promise<boolean> {
 
 export async function getScannerControlState(): Promise<ScannerControlState> {
     const record = await findScannerControlRecord(SCANNER_ID);
-    if (!record) return toControlState(null);
+    if (!record) {
+        const control = toControlState(null);
+        publishControlSnapshot(control);
+        return control;
+    }
 
     if (isTemporaryPauseExpired(record)) {
         await resumeScanner();
         updateScannerRuntimeContext({ paused: false, pauseMode: null });
-        return toControlState(null);
+        const control = toControlState(null);
+        publishControlSnapshot(control);
+        return control;
     }
     const control = toControlState(record);
     updateScannerRuntimeContext({ paused: control.paused, pauseMode: control.mode });
+    publishControlSnapshot(control);
     return control;
 }
 
@@ -80,6 +97,7 @@ export async function requestScannerPause(
     });
 
     updateScannerRuntimeContext({ paused, pauseMode: mode });
+    publishControlSnapshot({ paused, mode, pauseRequestedAtBlock: atBlock, pauseUntil: pauseUntil?.getTime() ?? null });
     console.log(
         paused
             ? `[Scanner] Persisted pause (${mode}); checkpoint will be preserved`
@@ -113,6 +131,7 @@ export async function shouldPauseBeforeBlock(
             scannerPauseUntil: pauseUntil,
         });
         updateScannerRuntimeContext({ paused: true, pauseMode: record.mode });
+        publishControlSnapshot({ paused: true, mode: record.mode, pauseRequestedAtBlock: record.pauseRequestedAtBlock, pauseUntil: pauseUntil?.getTime() ?? null });
 
         const resumeMessage = pauseUntil
             ? `; auto-resume in ${record.pauseDurationMinutes} minute(s)`
@@ -137,6 +156,7 @@ export async function resumeScanner(): Promise<void> {
         scannerPauseDurationMinutes: SCANNER_DEFAULT_PAUSE_DURATION_MINUTES,
     });
     updateScannerRuntimeContext({ paused: false, pauseMode: null });
+    publishControlSnapshot({ paused: false, mode: null, pauseRequestedAtBlock: null, pauseUntil: null });
     if (wasPaused) {
         console.log('[Scanner] Persisted resume; catch-up will continue from the saved checkpoint');
     }
