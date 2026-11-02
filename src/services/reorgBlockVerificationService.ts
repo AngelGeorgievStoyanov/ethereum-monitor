@@ -8,13 +8,16 @@ import {
     fetchBlockForProcessing,
     type FetchedBlockForProcessing,
 } from './blockProcessingService';
-import { fetchBlockDataFromVerifiedBlock } from './evmBlockDataService';
+
 import {
     CONSENSUS_LOG_INTERVAL_MS,
     CONSENSUS_MAX_RETRIES,
     CONSENSUS_RETRY_INTERVAL_MS,
 } from '../constants/scanner.constants';
-import { evmRpcClient } from './evmBlockDataService';
+import {
+    evmRpcClient,
+    fetchBlockDataFromVerifiedBlock,
+} from './evmBlockDataService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 
