@@ -203,3 +203,60 @@ When reviewing or changing code, check that:
 Organize the application into clear layers with explicit responsibilities. Services coordinate operations, repositories handle persistence, clients encapsulate external communication, and mappers control data transformations.
 
 The goal is not to maximize the number of files or abstractions. The goal is predictable, readable, maintainable code that can evolve without unnecessary coupling or mixed responsibilities.
+
+## 14. Runtime behavior and performance rules
+
+These rules document the approved runtime design. They are intended to prevent future changes from reintroducing unnecessary database or RPC work, weakening reorganization safety, or moving calculations into Dynamic Config.
+
+### Scanner
+
+- The application is designed to run as a single scanner instance. Do not add a Scanner advisory lock or multi-instance coordination mechanism unless the deployment architecture explicitly changes.
+- Keep the normal Scanner polling interval at the configured `SCANNER_POLL_INTERVAL_MS` (currently 4000 ms). Do not reduce or increase it based on guesswork; use runtime metrics first.
+- Keep finalized catch-up bounded by `MAX_BLOCKS_PER_FINALIZED_CATCHUP` (currently 100 blocks per cycle).
+- When the scanner is close to the finalized head (lag at or below `SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS`, currently 100), process one block at a time. When further behind, parallel processing may use up to `SCANNER_MAX_PARALLEL_BLOCKS` (currently 3).
+- Keep checkpoint and other frequently needed scanner state in memory where safe. The database transaction must remain the final integrity guard: verify the expected checkpoint and parent-hash continuity before committing processed data.
+- Do not add a database read on every polling cycle merely to reload a checkpoint already held in the active runtime state.
+
+### Dynamic configuration and scanner controls
+
+- Dynamic Config is a passive in-memory snapshot store. It must not calculate business state, derive metrics, or own scanner/recovery decisions. The responsible service calculates state and publishes the resulting snapshot.
+- Scanner Pause/Resume is persisted to PostgreSQL and read into Dynamic Config at startup and every `SCANNER_CONTROL_FAST_REFRESH_INTERVAL_MS` (currently 30000 ms).
+- The Scanner reads the in-memory pause snapshot; it must not query PostgreSQL on every block or polling cycle for Pause/Resume.
+- If a periodic pause-state refresh fails, retain the last successfully loaded state. Do not replace it with a guessed default or stop the scanner solely because a later refresh failed.
+- A Pause/Resume request is not an immediate in-memory switch. It is applied by the next successful refresh.
+- Active transaction filters are loaded into an in-memory cache and refreshed according to `TX_FILTER_CACHE_REFRESH_INTERVAL_MS` (currently 60000 ms), as well as after successful local filter mutations. A failed refresh must not discard the last successfully loaded filter configuration.
+- Keep refresh intervals and processing limits in the appropriate files under `src/constants/`; do not scatter hardcoded timing or batch values through services.
+
+### Manual Rescan
+
+- Load stored canonical block identities in batches using `RESCAN_BLOCK_IDENTITY_BATCH_SIZE` (currently 100), rather than querying the database separately for every block.
+- Use the shared `iterateBlockRangeBatches` utility for forward or backward inclusive block-range pagination when the same batching behavior is needed by multiple workflows.
+- Fetch each block and its receipts once for normal Rescan processing, then pass the fetched data through processing. Do not fetch the same block again unless a mismatch requires verification.
+- Normal Rescan does not run strict provider consensus for every block. First compare the fetched block identity with the stored canonical identity. Invoke strict consensus only when a mismatch is detected.
+- A mismatch confirmed by strict consensus is a reorganization signal and must follow the existing Reorg Recovery handoff. If consensus confirms the stored identity but the initially fetched response disagrees, stop conservatively; do not silently process a different provider response.
+- Persist and publish Rescan progress every `RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS` blocks (currently 50), and always publish the final progress on completion or failure. The interval batches progress updates only: it does not mean that block payloads, transactions, or receipts are accumulated in memory. Only progress values such as the current block and processed-block count are accumulated between updates.
+- Keep progress logging frequency separate from progress persistence frequency; use the dedicated constants in `src/constants/rescan.constants.ts`.
+
+### Reorganization detection and recovery
+
+- Strict provider consensus is reserved for a detected block-identity mismatch / reorganization verification. Do not add consensus calls to normal Scanner processing or normal Rescan processing.
+- Strict consensus means every configured RPC provider must agree on the block identity. Do not replace this with majority voting.
+- Keep the ancestor search bounded by `MAX_REORG_LOOKBACK_BLOCKS` (currently 100) and query stored identities in backward batches of `REORG_ANCESTOR_BATCH_SIZE` (currently 10). Search backward from the block immediately before the mismatching checkpoint and stop at the first confirmed common ancestor.
+- Reuse the in-memory checkpoint/canonical-identity cache where valid to avoid redundant database reads, but never remove the transactional checkpoint and parent-hash integrity checks.
+- Keep Recovery state transitions and rollback/reprocessing decisions in the Recovery workflow. Do not move these decisions into Dynamic Config.
+- When optimizing Recovery RPC calls, preserve strict all-provider identity verification. The approved data-reuse approach is to obtain one full block response from one provider and identity-only responses from the other providers, compare all identities, and reuse the already fetched full block after consensus succeeds. Do not fetch three full copies of the block merely for consensus. This optimization must not weaken provider agreement requirements; receipts remain a separate processing input and must not be assumed to be included in the block response.
+- Do not claim this RPC response-reuse optimization is implemented until the RPC client and Recovery call path actually return and consume the full block response without fetching it again.
+
+### Metrics and analytics
+
+- Metrics aggregation/publishing runs at `METRICS_PUBLISH_INTERVAL_MS` (currently 10000 ms).
+- Scanner analytics refreshes at `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms).
+- Dashboard polling and RPC event collection are separate concerns; do not change their cadence merely to change the metrics snapshot publishing interval.
+- Dynamic Config stores the latest metrics and analytics snapshots. Aggregation and calculations remain in the metrics/analytics services.
+
+### Constants and code style
+
+- Put scanner, Rescan, Recovery, and metrics timing/batch/limit values in their relevant files under `src/constants/`.
+- Use plain numeric literals without numeric separators (for example, `60000`, not `60_000`).
+- When changing a runtime interval or batch size, update the relevant constant and any runtime/status documentation that exposes the value. Avoid duplicating the same value as a separate hardcoded literal.
+
