@@ -75,7 +75,7 @@
     <div id="connectionError" class="error"></div>
     <section class="grid">
         <article class="card"><div class="label">Last processed block</div><div class="value" id="checkpoint">—</div><div class="hint" id="lastProcessedAt">Waiting for data</div></article>
-        <article class="card"><div class="label">Latest finalized block</div><div class="value" id="finalized">—</div><div class="hint">Last value published by the scanner</div></article>
+        <article class="card"><div class="label">Latest finalized block</div><div class="value" id="finalized">—</div><div class="hint" id="finalizedAt">Waiting for scanner update</div></article>
         <article class="card"><div class="label">Block lag</div><div class="value" id="lag">—</div><div class="hint">Finalized minus checkpoint</div></article>
         <article class="card"><div class="label">Active filters</div><div class="value" id="activeFilters">—</div><div class="hint">Loaded in the current process</div></article>
     </section>
@@ -261,7 +261,8 @@
         const recovery = data.recoveryMetrics || {};
         const lag = data.lagBlocks;
         let label = 'RUNNING', statusClass = 'ok';
-        if (!data.rpcAvailable) { label = 'RPC UNAVAILABLE'; statusClass = 'bad'; }
+        if (!data.rpcAvailable && data.latestFinalizedBlock === null) { label = 'RPC STATUS UNKNOWN'; statusClass = 'warn'; }
+        else if (!data.rpcAvailable) { label = 'RPC UNAVAILABLE'; statusClass = 'bad'; }
         else if (data.reorgRecoveryBlocked) { label = 'RECOVERY BLOCKED'; statusClass = 'bad'; }
         else if (data.reorgRecoveryActive) { label = 'REORG RECOVERY'; statusClass = 'warn'; }
         else if (data.paused) { label = 'PAUSED'; statusClass = 'warn'; }
@@ -274,9 +275,10 @@
         setText('checkpoint', number(data.lastProcessedBlock));
         setText('lastProcessedAt', ago(metrics.lastProcessedAt));
         setText('finalized', number(data.latestFinalizedBlock));
+        setText('finalizedAt', data.latestFinalizedAt ? 'Last scanner update ' + ago(data.latestFinalizedAt) : 'No finalized block received yet');
         setText('lag', number(lag));
         setText('activeFilters', number(data.activeFiltersCount));
-        setPipeline('rpcState', data.rpcAvailable ? 'Available' : 'Unavailable', data.rpcAvailable ? 'state' : '');
+        setPipeline('rpcState', data.latestFinalizedBlock === null ? 'Not checked yet' : data.rpcAvailable ? 'Available · ' + ago(data.latestFinalizedAt) : 'Unavailable', data.rpcAvailable ? 'state' : '');
         setPipeline('processingState', data.paused ? 'Paused' : data.reorgRecoveryActive ? 'Recovery in progress' : label, statusClass === 'bad' ? '' : 'state');
         setPipeline('filterState', number(data.activeFiltersCount) + ' active filters', data.activeFiltersCount > 0 ? 'state' : '');
         setPipeline('databaseState', 'Checkpoint persisted: ' + number(data.lastProcessedBlock), 'state');
