@@ -67,6 +67,12 @@ let totalErc20TransferLogsSeen = 0;
 let totalErc20Matches = 0;
 let totalErc20FailedAttemptsSeen = 0;
 let totalErc20FailedAttemptsMatched = 0;
+let totalFetchDurationMs = 0;
+let totalGetBlockDurationMs = 0;
+let totalGetBlockReceiptsDurationMs = 0;
+let totalFilterMatchingDurationMs = 0;
+let totalBlockDurationMs = 0;
+let totalDatabaseWriteDurationMs = 0;
 const databaseMetrics = { writes: 0, failures: 0, totalWriteDurationMs: 0, lastErrorAt: null as string | null, lastError: null as string | null };
 let recoveryMetrics: Record<string, number> = {};
 
@@ -131,6 +137,12 @@ function getSnapshot() {
             totalErc20Matches,
             totalErc20FailedAttemptsSeen,
             totalErc20FailedAttemptsMatched,
+            totalFetchDurationMs,
+            totalGetBlockDurationMs,
+            totalGetBlockReceiptsDurationMs,
+            totalFilterMatchingDurationMs,
+            totalBlockDurationMs,
+            totalDatabaseWriteDurationMs,
             blocksPerSecondLastMinute: Number((recent.length / 60).toFixed(2)),
             transactionsPerSecondLastMinute: Number((recentTransactions / 60).toFixed(2)),
             averageTransactionsPerBlock: totalProcessedBlocks ? Number((totalTransactions / totalProcessedBlocks).toFixed(1)) : 0,
@@ -208,6 +220,12 @@ export function recordProcessedBlock(input: BlockInput): void {
     totalErc20Matches += input.erc20Matches;
     totalErc20FailedAttemptsSeen += input.erc20FailedAttemptsSeen;
     totalErc20FailedAttemptsMatched += input.erc20FailedAttemptsMatched;
+    totalFetchDurationMs += input.fetchDurationMs;
+    totalGetBlockDurationMs += input.getBlockDurationMs;
+    totalGetBlockReceiptsDurationMs += input.getBlockReceiptsDurationMs;
+    totalFilterMatchingDurationMs += input.filterMatchingDurationMs;
+    totalBlockDurationMs += input.blockDurationMs;
+    totalDatabaseWriteDurationMs += input.databaseWriteDurationMs;
     lastProcessedBlock = input.blockNumber;
     lastProcessedAt = timestamp;
     const session = catchUpSessions[catchUpSessions.length - 1];
@@ -278,6 +296,51 @@ export function updateScannerRuntimeContext(input: {
     if (input.parallelProcessingLagBlocks !== undefined) parallelProcessingLagBlocks = input.parallelProcessingLagBlocks;
     if (input.recovery) recoveryMetrics = { ...input.recovery };
     publish();
+}
+
+
+export function getBlockProcessingMetrics() {
+    const now = Date.now();
+    const recent = blockSamples.filter((sample) => now - sample.timestampMs <= 60000);
+    const recentTotal = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
+    const average = (key: string) => recent.length ? Number((recentTotal(key) / recent.length).toFixed(1)) : null;
+    const last = blockSamples[blockSamples.length - 1];
+    return {
+        processedBlocks: totalProcessedBlocks,
+        totalTransactions: totalProcessedTransactions,
+        totalNativeTransfersSeen,
+        totalNativeMatches,
+        totalErc20TransferLogsSeen,
+        totalErc20Matches,
+        totalErc20FailedAttemptsSeen,
+        totalErc20FailedAttemptsMatched,
+        totalFetchDurationMs,
+        totalGetBlockDurationMs,
+        totalGetBlockReceiptsDurationMs,
+        totalFilterMatchingDurationMs,
+        totalBlockDurationMs,
+        totalDatabaseWriteDurationMs,
+        lastProcessedBlock,
+        lastProcessedAt,
+        lastBlockDurationMs: last ? Number(last.blockDurationMs) : null,
+        blocksProcessedLastMinute: recent.length,
+        blocksPerSecondLastMinute: Number((recent.length / 60).toFixed(2)),
+        averageBlockDurationLastMinuteMs: average('blockDurationMs'),
+        averageFetchDurationLastMinuteMs: average('fetchDurationMs'),
+        averageDatabaseWriteDurationLastMinuteMs: average('databaseWriteDurationMs'),
+        recentBlocks: blockSamples.slice(-30).map((sample) => ({
+            blockNumber: Number(sample.blockNumber),
+            processedAt: String(sample.timestamp),
+            blockDurationMs: Number(sample.blockDurationMs),
+            fetchDurationMs: Number(sample.fetchDurationMs),
+            filterMatchingDurationMs: Number(sample.filterMatchingDurationMs),
+            databaseWriteDurationMs: Number(sample.databaseWriteDurationMs),
+            nativeTransfersSeen: Number(sample.nativeTransfersSeen),
+            nativeMatches: Number(sample.nativeMatches),
+            erc20TransferLogsSeen: Number(sample.erc20TransferLogsSeen),
+            erc20Matches: Number(sample.erc20Matches),
+        })),
+    };
 }
 
 export function getScannerRuntimeMetrics() {
