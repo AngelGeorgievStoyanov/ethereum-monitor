@@ -183,16 +183,19 @@
             <section>
                 <h2>Processing rate · blocks / minute</h2>
                 <svg id="throughputChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Blocks processed per minute"></svg>
+                <div class="chart-legend"><span><i class="legend-dot"></i>Blocks / minute</span></div>
             </section>
             <section>
                 <h2>RPC failures per minute</h2>
                 <svg id="rpcFailureChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="RPC failures per minute"></svg>
+                <div class="chart-legend"><span><i class="legend-dot" style="background:#fb7185"></i>All failures</span><span><i class="legend-dot" style="background:#fbbf24"></i>Rate limits</span></div>
             </section>
         </div>
         <div class="layout">
             <section>
                 <h2>Average component latency</h2>
                 <svg id="componentLatencyChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Average RPC, filter, and database latency"></svg>
+                <div class="chart-legend"><span><i class="legend-dot"></i>RPC request</span><span><i class="legend-dot db"></i>Filter evaluation</span><span><i class="legend-dot" style="background:#34d399"></i>Database query</span></div>
             </section>
             <section>
                 <h2>Lag history</h2>
