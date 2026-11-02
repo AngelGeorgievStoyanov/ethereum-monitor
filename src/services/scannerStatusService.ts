@@ -7,20 +7,44 @@ import { getRecoveryMetrics } from './recoveryMetrics';
 import { getBlockProcessingMetrics } from './scannerMetrics';
 import { getDynamicConfigService } from './dynamicConfigService';
 import { mapScannerStatusResponse } from '../mappers/scannerStatusMapper';
+import type { ScannerStatusResponse } from '../types/scanner-status.types';
 
-export async function getScannerStatusResponse() {
+type RuntimeStatusMetrics = {
+    scanner?: { running?: boolean; uptimeSeconds?: number; activeFiltersCount?: number };
+    recovery?: Record<string, number>;
+    chain?: {
+        latestFinalizedBlock?: number | null;
+        latestFinalizedAt?: string | null;
+        lastProcessedBlock?: number | null;
+        lagBlocks?: number | null;
+        rpcAvailable?: boolean | null;
+    };
+    rpc?: {
+        endpoints?: Array<{
+            index: number;
+            attempts: number;
+            successes: number;
+            failures: number;
+            retryableFailures: number;
+            totalDurationMs: number;
+            lastFailureAt: string | null;
+        }>;
+    };
+};
+
+/**
+ * Loads persistent scanner state and publishes a ready-to-read runtime snapshot.
+ * This function is called during scanner initialization and by the scanner's
+ * existing periodic refresh cycle, never by the Dashboard request path.
+ */
+export async function refreshScannerStatusSnapshot(): Promise<ScannerStatusResponse> {
     const [control, state, rescanJob] = await Promise.all([
         getScannerControlState(),
         findScannerStatusState(SCANNER_ID),
         findLatestScannerRescanJob(),
     ]);
 
-    const runtimeMetrics = getScannerRuntimeMetrics() as {
-        scanner?: { running?: boolean; uptimeSeconds?: number; activeFiltersCount?: number };
-        recovery?: Record<string, number>;
-        chain?: { latestFinalizedBlock?: number | null; latestFinalizedAt?: string | null; lastProcessedBlock?: number | null; lagBlocks?: number | null; rpcAvailable?: boolean | null };
-        rpc?: { endpoints?: Array<{ index: number; attempts: number; successes: number; failures: number; retryableFailures: number; totalDurationMs: number; lastFailureAt: string | null }> };
-    } | null;
+    const runtimeMetrics = getScannerRuntimeMetrics() as RuntimeStatusMetrics | null;
     const latestFinalizedBlock = runtimeMetrics?.chain?.latestFinalizedBlock ?? null;
     const latestFinalizedAt = runtimeMetrics?.chain?.latestFinalizedAt ?? null;
     const rpcAvailable = runtimeMetrics?.chain?.rpcAvailable ?? false;
@@ -40,9 +64,13 @@ export async function getScannerStatusResponse() {
         scannerRunning: runtimeMetrics?.scanner?.running ?? false,
         state,
         rescanJob,
-        recoveryMetrics: (runtimeMetrics?.recovery as ReturnType<typeof getRecoveryMetrics> | undefined) ?? getRecoveryMetrics(),
+        recoveryMetrics:
+            (runtimeMetrics?.recovery as ReturnType<typeof getRecoveryMetrics> | undefined) ??
+            getRecoveryMetrics(),
         processingMetrics: getBlockProcessingMetrics(),
-        activeFiltersCount: runtimeMetrics?.scanner?.activeFiltersCount ?? getDynamicConfigService().getTxFilters().length,
+        activeFiltersCount:
+            runtimeMetrics?.scanner?.activeFiltersCount ??
+            getDynamicConfigService().getTxFilters().length,
         processUptimeSeconds: runtimeMetrics?.scanner?.uptimeSeconds ?? Math.floor(process.uptime()),
         latestFinalizedBlock,
         latestFinalizedAt,
@@ -51,6 +79,18 @@ export async function getScannerStatusResponse() {
         rpcMetrics,
         checkedAt: new Date().toISOString(),
     });
+
     getDynamicConfigService().publishScannerStatus(response);
-    return getDynamicConfigService().getScannerStatusSnapshot() as typeof response;
+    return response;
+}
+
+/**
+ * Dashboard reads only this in-memory snapshot. It performs no database or RPC calls.
+ */
+export function getScannerStatusResponse(): ScannerStatusResponse {
+    const snapshot = getDynamicConfigService().getScannerStatusSnapshot();
+    if (!snapshot) {
+        throw new Error('Scanner status is still initializing');
+    }
+    return snapshot as ScannerStatusResponse;
 }
