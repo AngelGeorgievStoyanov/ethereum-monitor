@@ -17,10 +17,52 @@ export const RPC_ERROR_JSON_CODES = {
     RATE_LIMIT: [-32005],
 } as const;
 
+export const RPC_ERROR_JSON_CODE_RANGE = {
+    MIN: -32768,
+    MAX: -32000,
+} as const;
+
+export const RPC_ERROR_HTTP_STATUS_RANGE = {
+    MIN: 100,
+    MAX: 599,
+} as const;
+
+export const RPC_ERROR_MESSAGE_KEYS = [
+    'message',
+    'reason',
+    'shortMessage',
+    'statusText',
+    'error_description',
+    'description',
+] as const;
+
+export const RPC_ERROR_STATUS_KEYS = [
+    'status',
+    'statusCode',
+    'status_code',
+    'httpStatus',
+    'http_status',
+] as const;
+
+export const RPC_ERROR_CODE_KEYS = ['code', 'errorCode', 'error_code'] as const;
+
+export const RPC_ERROR_NESTED_KEYS = [
+    'cause',
+    'error',
+    'response',
+    'data',
+    'body',
+    'result',
+    'info',
+    'details',
+    'originalError',
+    'payload',
+] as const;
+
 export const RPC_ERROR_MESSAGE_PATTERNS = {
     RATE_LIMIT: [
-        /\b429\b/i,
-        /rate[\s_-]*limit/i,
+        /\\b429\\b/i,
+        /rate[\\s_-]*limit/i,
         /too many requests/i,
         /request limit exceeded/i,
         /quota exceeded/i,
@@ -32,7 +74,7 @@ export const RPC_ERROR_MESSAGE_PATTERNS = {
         /exceeded.*requests/i,
     ],
     TIMEOUT: [
-        /timed?\s*out/i,
+        /timed?\\s*out/i,
         /timeout/i,
         /deadline exceeded/i,
         /etimedout/i,
@@ -61,7 +103,7 @@ export const RPC_ERROR_MESSAGE_PATTERNS = {
     RPC: [
         /json.?rpc/i,
         /execution reverted/i,
-        /\brevert(?:ed)?\b/i,
+        /\\brevert(?:ed)?\\b/i,
         /invalid params/i,
         /method not found/i,
     ],
