@@ -12,7 +12,9 @@ import { getDynamicConfigService } from './dynamicConfigService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
-import { invalidateConfirmedBlockCache, processFinalizedBlocks } from './blockProcessor';
+import { registerScannerState } from './scannerStateService';
+import { processFinalizedBlocks } from './blockProcessor';
+import { invalidateConfirmedBlockCache } from './scannerCheckpointCache';
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
 import { refreshScannerStatusSnapshot } from './scannerStatusService';
 import { processReorgRecovery } from './reorgRecoveryService';
@@ -98,6 +100,7 @@ export function createBlockMonitorService() {
         try {
             await markInterruptedRescanJobs();
             state = await initializeScannerState();
+            registerScannerState(state);
             await refreshScannerStatusSnapshot();
             updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });
             dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
@@ -211,6 +214,7 @@ export function createBlockMonitorService() {
                             const recoveryHandled = await processReorgRecovery(
                                 state,
                                 finalizedCatchupTarget,
+                                finalized.hash ?? '',
                                 () => dynamicConfigService.getTxFilterSnapshot(),
                             );
                             if (recoveryHandled) {

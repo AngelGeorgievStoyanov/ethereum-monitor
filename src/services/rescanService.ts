@@ -74,18 +74,8 @@ async function runManualRescanInternal({
     let blocksProcessed = 0;
 
     for (let blockNumber = fromBlock; blockNumber <= checkpoint; blockNumber += 1) {
-        const currentState = await findScannerRescanState(scannerStateId);
-        if (!currentState) throw new Error('Scanner state is not initialized');
-        if (currentState.lastProcessedBlock !== checkpoint) {
-            throw new Error(
-                `Scanner checkpoint changed during rescan: expected ${checkpoint}, found ${currentState.lastProcessedBlock}`,
-            );
-        }
-        if (currentState.reorgRecoveryActive || currentState.reorgRecoveryBlocked) {
-            throw new Error(
-                'Manual rescan stopped because reorg recovery became active or blocked',
-            );
-        }
+        // The reconciliation transaction rechecks and locks ScannerState before writing.
+        // A separate read here would duplicate that per-block database check.
 
         const storedBlock = await findCanonicalBlockIdentity(blockNumber);
         if (!storedBlock) {

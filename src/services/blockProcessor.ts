@@ -1,6 +1,5 @@
 import type { ScannerRuntimeState } from '../types/scanner-state.types';
 import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
-import { refreshScannerState } from './scannerStateService';
 import {
     REORG_RECOVERY_STABLE_BLOCKS,
     SCANNER_MAX_PARALLEL_BLOCKS,
@@ -13,8 +12,12 @@ import { BlockReceiptConsistencyError } from './evmBlockDataService';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import { recordReorgDetected } from './recoveryMetrics';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
-import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import type { CanonicalBlockIdentity } from '../repositories/blockRepository';
+import {
+    cacheConfirmedCheckpointBlock,
+    getConfirmedCheckpointBlock,
+    invalidateConfirmedBlockCache,
+} from './scannerCheckpointCache';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
@@ -22,32 +25,7 @@ import { recordProcessingBatch } from './metricsAggregatorService';
 
 type ConfirmedBlock = CanonicalBlockIdentity;
 
-let lastConfirmedBlock: ConfirmedBlock | null = null;
 let lastLoggedFilterConfigVersion = '';
-
-async function getConfirmedCheckpointBlock(checkpoint: number): Promise<ConfirmedBlock | null> {
-    if (checkpoint < 0) return null;
-
-    if (lastConfirmedBlock?.blockNumber === checkpoint) {
-        return lastConfirmedBlock;
-    }
-
-    const persistedBlock = await findCanonicalBlockIdentity(checkpoint);
-
-    if (persistedBlock) {
-        lastConfirmedBlock = persistedBlock;
-        return persistedBlock;
-    }
-
-    // A fresh checkpoint without a persisted block has no trusted in-memory hash yet.
-    // Do not issue an extra RPC call solely to seed the connectivity check.
-    lastConfirmedBlock = null;
-    return null;
-}
-
-export function invalidateConfirmedBlockCache(): void {
-    lastConfirmedBlock = null;
-}
 
 function validateBatchConnectivity(
     previousBlock: ConfirmedBlock | null,
@@ -159,13 +137,16 @@ export async function processFinalizedBlocks(
             if (committedCheckpoint !== blockNumbers[blockNumbers.length - 1]) {
                 state.lastProcessedBlock = committedCheckpoint;
                 // The checkpoint changed; never keep a cache for a different range.
-                lastConfirmedBlock = null;
+                invalidateConfirmedBlockCache();
                 continue;
             }
 
             state.lastProcessedBlock = committedCheckpoint;
             // Advance the in-memory checkpoint only after the DB transaction has committed.
-            lastConfirmedBlock = processedBlockRecords[processedBlockRecords.length - 1] ?? null;
+            cacheConfirmedCheckpointBlock(
+                processedBlockRecords[processedBlockRecords.length - 1] ?? null,
+                committedCheckpoint,
+            );
             const perBlockDatabaseWriteDurationMs = Math.ceil(
                 databaseWriteDurationMs / preparedBlocks.length,
             );
@@ -205,7 +186,6 @@ export async function processFinalizedBlocks(
                         state.lastProcessedBlock,
                         error.blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
                     );
-                    await refreshScannerState(state);
                     console.warn(
                         `[Reorg] Block/receipt consistency failure at block ${error.blockNumber}; recovery scheduled from checkpoint ${state.lastProcessedBlock}`,
                     );

@@ -5,9 +5,8 @@ import {
     SCANNER_ID,
 } from '../constants/scanner.constants';
 import type { ScannerRuntimeState } from '../types/scanner-state.types';
-import { refreshScannerState } from './scannerStateService';
+import { refreshScannerState, updateScannerRuntimeState } from './scannerStateService';
 import {
-    hasCanonicalBlocks,
     markReorgRecoveryBlocked,
     markReorgRecoveryPending as persistReorgRecoveryPending,
     rollbackToCommonAncestor,
@@ -20,6 +19,10 @@ import { BlockReceiptConsistencyError, evmRpcClient } from './evmBlockDataServic
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
 import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
+import {
+    getConfirmedCheckpointBlock,
+    hasCanonicalHistoryForCheckpoint,
+} from './scannerCheckpointCache';
 import {
     findScannerStatusState,
     unblockScannerReorgRecovery,
@@ -47,6 +50,10 @@ export async function retryBlockedReorgRecovery(): Promise<RetryBlockedReorgReco
     const unblocked = await unblockScannerReorgRecovery(SCANNER_ID);
     if (!unblocked) return { kind: 'state-changed' };
 
+    updateScannerRuntimeState({
+        reorgRecoveryBlocked: false,
+        reorgRecoveryBlockReason: null,
+    });
     return { kind: 'unblocked', response: mapReorgRecoveryRetryResponse(state) };
 }
 
@@ -59,6 +66,7 @@ class ReorgRecoverySafetyError extends Error {
 
 let singleProviderReorgWarningLogged = false;
 let lastLoggedRecoveryFilterConfigVersion = '';
+let lastVerifiedFinalizedHead = '';
 
 function logSingleProviderReorgMode(): void {
     if (evmRpcClient.getEndpointCount() !== 1 || singleProviderReorgWarningLogged) return;
@@ -84,6 +92,15 @@ export async function markReorgRecoveryPending(
     targetBlock = checkpoint + REORG_RECOVERY_STABLE_BLOCKS,
 ): Promise<void> {
     await persistReorgRecoveryPending(scannerStateId, checkpoint, targetBlock);
+    lastVerifiedFinalizedHead = '';
+    updateScannerRuntimeState({
+        reorgRecoveryActive: true,
+        reorgRecoveryBlocked: false,
+        reorgRecoveryBlockReason: null,
+        reorgRecoveryStableBlocks: 0,
+        reorgRecoveryStartBlock: checkpoint,
+        reorgRecoveryTargetBlock: targetBlock,
+    });
 }
 
 async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void> {
@@ -127,7 +144,16 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
 
-    await refreshScannerState(state);
+    lastVerifiedFinalizedHead = '';
+    Object.assign(state, {
+        lastProcessedBlock: rollback.checkpoint,
+        reorgRecoveryActive: true,
+        reorgRecoveryStableBlocks: 0,
+        reorgRecoveryStartBlock: null,
+        reorgRecoveryTargetBlock:
+            state.reorgRecoveryTargetBlock ?? originalCheckpoint + REORG_RECOVERY_STABLE_BLOCKS,
+    });
+    updateScannerRuntimeState(state);
     recordReorgAncestorFound(ancestorDepth);
     console.warn(
         `[Reorg] Common ancestor=${ancestor.blockNumber}; marked ${rollback.orphanedBlockCount} block(s) as reorged; checkpoint rolled back to ${rollback.checkpoint}`,
@@ -137,9 +163,9 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
 async function processReorgRecoveryInternal(
     state: ScannerRuntimeState,
     finalizedBlockNumber: number,
+    finalizedBlockHash: string,
     getActiveTxFilters: () => TxFilterConfigSnapshot,
 ): Promise<boolean> {
-    await refreshScannerState(state);
     if (state.reorgRecoveryBlocked) return true;
     if (state.reorgRecoveryActive) logSingleProviderReorgMode();
     if (state.lastProcessedBlock < 0 && !state.reorgRecoveryActive) return false;
@@ -147,15 +173,22 @@ async function processReorgRecoveryInternal(
     if (state.reorgRecoveryActive && state.reorgRecoveryStartBlock !== null) {
         await findAncestorAndRollback(state);
     } else if (!state.reorgRecoveryActive) {
-        const storedCheckpoint = await findCanonicalBlockIdentity(state.lastProcessedBlock);
+        const finalizedHeadKey = finalizedBlockHash.toLowerCase() || String(finalizedBlockNumber);
+        if (lastVerifiedFinalizedHead === finalizedHeadKey) return false;
+
+        const storedCheckpoint = await getConfirmedCheckpointBlock(state.lastProcessedBlock);
         if (!storedCheckpoint) {
-            if (!(await hasCanonicalBlocks())) return false; // Fresh scanner baseline: no block has been persisted yet.
+            if (!(await hasCanonicalHistoryForCheckpoint(state.lastProcessedBlock))) {
+                lastVerifiedFinalizedHead = finalizedHeadKey;
+                return false; // Fresh scanner baseline: no canonical block history exists yet.
+            }
             throw new ReorgRecoverySafetyError(
                 `Canonical block history is missing at checkpoint ${state.lastProcessedBlock}`,
             );
         }
 
-        // Cheaply check the checkpoint with the selected provider during normal scanning.
+        // Verify once per distinct finalized head. Newly processed checkpoints are already
+        // checked through their fetched block data and parent-hash continuity.
         // If it disagrees, the verification service selects single-provider verification or strict consensus.
         const currentCheckpoint = await evmRpcClient.getBlock(state.lastProcessedBlock);
         if (!currentCheckpoint)
@@ -164,7 +197,10 @@ async function processReorgRecoveryInternal(
             blockHash: currentCheckpoint.hash ?? '',
             parentHash: currentCheckpoint.parentHash,
         });
-        if (primaryMatches) return false;
+        if (primaryMatches) {
+            lastVerifiedFinalizedHead = finalizedHeadKey;
+            return false;
+        }
 
         const verifiedCheckpoint = await getReorgVerifiedBlock(
             state.lastProcessedBlock,
@@ -176,6 +212,7 @@ async function processReorgRecoveryInternal(
                     ? `[Reorg] Provider P1's follow-up read matches stored history at checkpoint ${state.lastProcessedBlock}; continuing normal scan`
                     : `[Reorg] Primary provider disagreed at checkpoint ${state.lastProcessedBlock}, but configured providers agree with stored history; continuing normal scan`,
             );
+            lastVerifiedFinalizedHead = finalizedHeadKey;
             return false;
         }
 
@@ -185,7 +222,6 @@ async function processReorgRecoveryInternal(
         );
         recordReorgDetected();
         await markReorgRecoveryPending(state.id, state.lastProcessedBlock);
-        await refreshScannerState(state);
         await findAncestorAndRollback(state);
     }
 
@@ -215,7 +251,6 @@ async function processReorgRecoveryInternal(
                 state.lastProcessedBlock,
                 blockNumber + REORG_RECOVERY_STABLE_BLOCKS,
             );
-            await refreshScannerState(state);
             await findAncestorAndRollback(state);
             continue;
         }
@@ -293,6 +328,42 @@ async function processReorgRecoveryInternal(
     return true;
 }
 
+interface LocalBlockedRecoveryUpdate {
+    reason: string;
+    initializeRecovery?: boolean;
+    preserveStartBlock?: boolean;
+    stableBlocks: number;
+}
+
+function updateLocalBlockedState(
+    state: ScannerRuntimeState,
+    input: LocalBlockedRecoveryUpdate,
+): void {
+    const updates: Partial<ScannerRuntimeState> = {};
+
+    if (input.initializeRecovery) {
+        if (!state.reorgRecoveryActive) {
+            updates.reorgRecoveryActive = true;
+            updates.reorgRecoveryStartBlock = state.lastProcessedBlock;
+            updates.reorgRecoveryTargetBlock = state.lastProcessedBlock + input.stableBlocks;
+            updates.reorgRecoveryStableBlocks = 0;
+        }
+    } else {
+        updates.reorgRecoveryActive = true;
+        if (!input.preserveStartBlock && state.reorgRecoveryStartBlock === null) {
+            updates.reorgRecoveryStartBlock = state.lastProcessedBlock;
+        }
+        if (state.reorgRecoveryTargetBlock === null) {
+            updates.reorgRecoveryTargetBlock = state.lastProcessedBlock + input.stableBlocks;
+        }
+    }
+
+    updates.reorgRecoveryBlocked = true;
+    updates.reorgRecoveryBlockReason = input.reason.slice(0, 500);
+    Object.assign(state, updates);
+    updateScannerRuntimeState(updates);
+}
+
 async function markVerificationRecoveryBlocked(
     state: ScannerRuntimeState,
     error: BlockVerificationUnavailableError,
@@ -309,7 +380,12 @@ async function markVerificationRecoveryBlocked(
         preserveStartBlock: true,
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
-    await refreshScannerState(state);
+    updateLocalBlockedState(state, {
+        reason: `${reasonPrefix}:${error.operation}:block=${error.blockNumber}`,
+        initializeRecovery: true,
+        preserveStartBlock: true,
+        stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
+    });
     console.error(
         `[Reorg] CRITICAL: recovery is blocked because block verification failed; block=${error.blockNumber}; operation=${error.operation}; reason=${error.message}. Explicit operator retry is required.`,
     );
@@ -326,7 +402,10 @@ async function markReceiptConsistencyRecoveryBlocked(
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
 
-    await refreshScannerState(state);
+    updateLocalBlockedState(state, {
+        reason: `RECEIPT_CONSISTENCY:block=${error.blockNumber}:${error.message}`,
+        stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
+    });
     console.error(
         `[Reorg] CRITICAL: recovery blocked after receipt inconsistency at block ${error.blockNumber}. Automatic retries stopped; check RPC provider consistency before explicitly retrying recovery.`,
     );
@@ -335,10 +414,16 @@ async function markReceiptConsistencyRecoveryBlocked(
 export async function processReorgRecovery(
     state: ScannerRuntimeState,
     finalizedBlockNumber: number,
+    finalizedBlockHash: string,
     getActiveTxFilters: () => TxFilterConfigSnapshot,
 ): Promise<boolean> {
     try {
-        return await processReorgRecoveryInternal(state, finalizedBlockNumber, getActiveTxFilters);
+        return await processReorgRecoveryInternal(
+            state,
+            finalizedBlockNumber,
+            finalizedBlockHash,
+            getActiveTxFilters,
+        );
     } catch (error) {
         if (error instanceof BlockVerificationUnavailableError) {
             await markVerificationRecoveryBlocked(state, error);
@@ -365,7 +450,10 @@ async function markRecoverySafetyBlocked(
         reason: `SAFETY:${error.message}`,
         stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
     });
-    await refreshScannerState(state);
+    updateLocalBlockedState(state, {
+        reason: `SAFETY:${error.message}`,
+        stableBlocks: REORG_RECOVERY_STABLE_BLOCKS,
+    });
     console.error(
         `[Reorg] CRITICAL: recovery blocked for safety; ${error.message}. Explicit operator intervention is required.`,
     );
