@@ -4,6 +4,7 @@ import {
 } from '../repositories/blockRepository';
 import {
     RESCAN_BLOCK_IDENTITY_BATCH_SIZE,
+    RESCAN_CANDIDATE_BATCH_SIZE,
     RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS,
     RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS,
 } from '../constants/rescan.constants';
@@ -166,6 +167,9 @@ async function runManualRescanInternal({
 
                 for (const candidate of prepared.candidates) {
                     pendingCandidates.push(candidate);
+                    if (pendingCandidates.length >= RESCAN_CANDIDATE_BATCH_SIZE) {
+                        await flushPendingCandidates();
+                    }
                 }
                 currentBlock = blockNumber;
                 blocksProcessed += 1;
