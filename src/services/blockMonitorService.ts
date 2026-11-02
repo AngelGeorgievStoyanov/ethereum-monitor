@@ -259,17 +259,17 @@ export function createBlockMonitorService() {
                                 await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
                                     dynamicConfigService.getTxFilterSnapshot(),
                                 );
-                                updateScannerRuntimeContext({ lastProcessedBlock: state.lastProcessedBlock });
-                                dynamicConfigService.updateScannerStatusSnapshot({
-                                    lastProcessedBlock: state.lastProcessedBlock,
-                                    reorgRecoveryActive: state.reorgRecoveryActive,
-                                    reorgRecoveryBlocked: state.reorgRecoveryBlocked,
-                                    reorgRecoveryBlockReason: state.reorgRecoveryBlockReason,
-                                    reorgRecoveryStableBlocks: state.reorgRecoveryStableBlocks,
-                                    reorgRecoveryStartBlock: state.reorgRecoveryStartBlock,
-                                    reorgRecoveryTargetBlock: state.reorgRecoveryTargetBlock,
-                                });
                             }
+                            updateScannerRuntimeContext({ lastProcessedBlock: state.lastProcessedBlock });
+                            dynamicConfigService.updateScannerStatusSnapshot({
+                                lastProcessedBlock: state.lastProcessedBlock,
+                                reorgRecoveryActive: state.reorgRecoveryActive,
+                                reorgRecoveryBlocked: state.reorgRecoveryBlocked,
+                                reorgRecoveryBlockReason: state.reorgRecoveryBlockReason,
+                                reorgRecoveryStableBlocks: state.reorgRecoveryStableBlocks,
+                                reorgRecoveryStartBlock: state.reorgRecoveryStartBlock,
+                                reorgRecoveryTargetBlock: state.reorgRecoveryTargetBlock,
+                            });
                         } finally {
                             processingFinalizedBlocks = false;
                         }
