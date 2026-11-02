@@ -58,6 +58,7 @@ let totalProcessedBlocks = 0;
 let totalProcessedTransactions = 0;
 let totalNativeMatches = 0;
 let totalErc20Matches = 0;
+const databaseMetrics = { writes: 0, failures: 0, totalWriteDurationMs: 0, lastErrorAt: null as string | null, lastError: null as string | null };
 let recoveryMetrics: Record<string, number> = {};
 
 function publish(): void {
@@ -138,6 +139,7 @@ function getSnapshot() {
             endpoints,
         },
         catchUp: { active: catchUpActive, sessions: catchUpSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session) },
+        database: { ...databaseMetrics, averageWriteDurationMs: databaseMetrics.writes ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1)) : null },
         recovery: { ...recoveryMetrics },
         recentRpcErrors: rpcEvents.filter((event) => event.outcome === 'failure').slice(-100).map(({ timestampMs: _timestampMs, ...event }) => event),
         recentBlocks: blockSamples.slice(-30).map(({ timestampMs: _timestampMs, ...sample }) => sample),
@@ -281,6 +283,14 @@ export function recordProcessingBatch(input: {
         transactionsPerSecond: input.durationMs > 0 ? Number((input.transactions * 1000 / input.durationMs).toFixed(2)) : 0,
     });
     trimSamples(now);
+    publish();
+}
+
+
+export function recordDatabaseFailure(operation: string, message: string): void {
+    databaseMetrics.failures += 1;
+    databaseMetrics.lastErrorAt = new Date().toISOString();
+    databaseMetrics.lastError = (operation + ': ' + message).slice(0, 500);
     publish();
 }
 
