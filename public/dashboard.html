@@ -195,7 +195,7 @@
             <section>
                 <h2>Average component latency</h2>
                 <svg id="componentLatencyChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Average RPC, filter, and database latency"></svg>
-                <div class="chart-legend"><span><i class="legend-dot"></i>RPC request</span><span><i class="legend-dot db"></i>Filter evaluation</span><span><i class="legend-dot" style="background:#34d399"></i>Database query</span></div>
+                <div class="chart-legend"><span><i class="legend-dot"></i>RPC request</span><span><i class="legend-dot db"></i>Filter evaluation</span><span><i class="legend-dot" style="background:#34d399"></i>Database query</span><span><i class="legend-dot" style="background:#fbbf24"></i>Batch DB write / block</span></div>
             </section>
             <section>
                 <h2>Lag history</h2>
@@ -457,6 +457,7 @@
             { color: '#60a5fa', value: (bucket) => bucket.rpcRequests ? bucket.rpcDurationMsTotal / bucket.rpcRequests : 0 },
             { color: '#a78bfa', value: (bucket) => bucket.filterEvaluations ? bucket.predicateDurationMsTotal / bucket.filterEvaluations : 0 },
             { color: '#34d399', value: (bucket) => bucket.databaseQueries ? bucket.databaseDurationMsTotal / bucket.databaseQueries : 0 },
+            { color: '#fbbf24', value: (bucket) => bucket.processedBlocks ? bucket.databaseBatchWriteDurationMsTotal / bucket.processedBlocks : 0 },
         ], 'No component latency samples in this window');
         drawLagChart(data.lagSamples);
         const retention = data.retention || {};
