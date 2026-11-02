@@ -3,7 +3,7 @@ import { getDynamicConfigService } from './dynamicConfigService';
 import { subscribeToRpcMetricEvents, subscribeToRpcOperationMetricEvents, type RpcMetricEventInput, type RpcOperationMetricEvent } from '../metrics/metricsEventBus';
 import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
 import { classifyRpcError } from '../utils/classifyRpcError';
-import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW } from '../constants/scanner-metrics.constants';
+import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -70,6 +70,7 @@ let maxParallelBlocks = 1;
 let parallelProcessingLagBlocks = 0;
 let catchUpActive = false;
 let publishTimer: ReturnType<typeof setTimeout> | undefined;
+let lastAnalyticsPublishedAt = 0;
 let totalProcessedBlocks = 0;
 let totalProcessedTransactions = 0;
 let totalNativeTransfersSeen = 0;
@@ -101,7 +102,13 @@ function publish(): void {
     if (publishTimer) return;
     publishTimer = setTimeout(() => {
         publishTimer = undefined;
-        getDynamicConfigService().publishRuntimeMetrics(getSnapshot());
+        const now = Date.now();
+        const currentSnapshot = getSnapshot();
+        getDynamicConfigService().publishRuntimeMetrics(currentSnapshot);
+        if (now - lastAnalyticsPublishedAt >= METRICS_ANALYTICS_REFRESH_INTERVAL_MS) {
+            publishScannerAnalyticsSnapshots(currentSnapshot);
+            lastAnalyticsPublishedAt = now;
+        }
     }, 1000);
     publishTimer.unref?.();
 }
@@ -457,7 +464,11 @@ export function recordDatabaseFailure(operation: string, message: string): void 
     publish();
 }
 
-export function getScannerAnalytics(windowMs = DEFAULT_METRICS_WINDOW.durationMs, windowLabel = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
+function buildScannerAnalytics(
+    windowMs: number,
+    windowLabel: string,
+    current: ReturnType<typeof getSnapshot>,
+): ScannerAnalyticsResponse {
     const now = Date.now();
     const requestedWindowMs = windowLabel === 'available'
         ? METRICS_RETENTION_MS
@@ -469,8 +480,8 @@ export function getScannerAnalytics(windowMs = DEFAULT_METRICS_WINDOW.durationMs
     const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
     const selectedSessions = catchUpSessions.filter((session) => session.startedAtMs >= since);
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
-    const current = getSnapshot();
-    const response: ScannerAnalyticsResponse = {
+
+    return {
         generatedAt: new Date(now).toISOString(),
         window: windowLabel,
         requestedWindowMs,
@@ -495,8 +506,32 @@ export function getScannerAnalytics(windowMs = DEFAULT_METRICS_WINDOW.durationMs
             batches: batchSamples.length,
         },
     };
-    getDynamicConfigService().publishRuntimeAnalytics(response);
-    return getDynamicConfigService().getRuntimeAnalyticsSnapshot() as ScannerAnalyticsResponse;
+}
+
+function publishScannerAnalyticsSnapshots(current: ReturnType<typeof getSnapshot>): void {
+    const snapshots: Record<string, ScannerAnalyticsResponse> = {};
+    for (const window of METRICS_TIME_WINDOWS) {
+        snapshots[window.value] = buildScannerAnalytics(window.durationMs, window.value, current);
+    }
+    snapshots.available = buildScannerAnalytics(METRICS_RETENTION_MS, 'available', current);
+    getDynamicConfigService().publishRuntimeAnalytics(snapshots);
+}
+
+export function getScannerAnalytics(windowLabel = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
+    const snapshots = getDynamicConfigService().getRuntimeAnalyticsSnapshot() as
+        | Record<string, ScannerAnalyticsResponse>
+        | null;
+    if (snapshots?.[windowLabel]) return snapshots[windowLabel];
+
+    // The first request can arrive before the first scheduled metrics publication.
+    const current = getSnapshot();
+    publishScannerAnalyticsSnapshots(current);
+    const initializedSnapshots = getDynamicConfigService().getRuntimeAnalyticsSnapshot() as
+        | Record<string, ScannerAnalyticsResponse>
+        | null;
+    const snapshot = initializedSnapshots?.[windowLabel];
+    if (!snapshot) throw new Error(`Analytics window "${windowLabel}" is not configured`);
+    return snapshot;
 }
 
 function recordRpcOperation(input: RpcOperationMetricEvent): void {
