@@ -1,4 +1,5 @@
 import type { RecoveryMetrics } from '../types/scanner-status.types';
+import { updateScannerRuntimeContext } from './metricsAggregatorService';
 
 const metrics: RecoveryMetrics = {
     reorgCount: 0,
@@ -14,18 +15,25 @@ const metrics: RecoveryMetrics = {
 
 let recoveryStartedAt: number | null = null;
 
+function publishRecoveryMetrics(): void {
+    updateScannerRuntimeContext({ recovery: metrics });
+}
+
 export function recordReorgDetected(): void {
     metrics.reorgCount += 1;
     recoveryStartedAt = Date.now();
+    publishRecoveryMetrics();
 }
 
 export function recordReorgAncestorFound(depth: number): void {
     metrics.reorgDepthLast = depth;
     metrics.reorgDepthMax = Math.max(metrics.reorgDepthMax, depth);
+    publishRecoveryMetrics();
 }
 
 export function recordReorgBlockReprocessed(): void {
     metrics.reorgBlocksReprocessedTotal += 1;
+    publishRecoveryMetrics();
 }
 
 export function recordReorgRecoveryCompleted(): void {
@@ -33,22 +41,27 @@ export function recordReorgRecoveryCompleted(): void {
         metrics.reorgRecoveryDurationMsLast = Date.now() - recoveryStartedAt;
     }
     recoveryStartedAt = null;
+    publishRecoveryMetrics();
 }
 
 export function recordReorgConsensusFailure(): void {
     metrics.reorgConsensusFailuresTotal += 1;
+    publishRecoveryMetrics();
 }
 
 export function recordRescanStarted(): void {
     metrics.rescanRunsTotal += 1;
+    publishRecoveryMetrics();
 }
 
 export function recordRescanBlockProcessed(): void {
     metrics.rescanBlocksProcessedTotal += 1;
+    publishRecoveryMetrics();
 }
 
 export function recordRescanFailure(): void {
     metrics.rescanFailuresTotal += 1;
+    publishRecoveryMetrics();
 }
 
 export function getRecoveryMetrics(): RecoveryMetrics {
