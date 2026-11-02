@@ -112,8 +112,12 @@ export function accumulateBlockMetrics(
         getBlockReceiptsDurationMs: metrics.getBlockReceiptsDurationMs,
         filterMatchingDurationMs: metrics.filterMatchingDurationMs,
         databaseWriteDurationMs: metrics.databaseWriteDurationMs,
+        nativeTransfersSeen: metrics.nativeTransfersSeen,
         nativeMatches: metrics.nativeMatches,
+        erc20TransferLogsSeen: metrics.erc20TransferLogsSeen,
         erc20Matches: metrics.erc20Matches,
+        erc20FailedAttemptsSeen: metrics.erc20FailedAttemptsSeen,
+        erc20FailedAttemptsMatched: metrics.erc20FailedAttemptsMatched,
     });
 
     recentBlocks.push({
