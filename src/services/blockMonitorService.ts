@@ -1,6 +1,8 @@
 import type { ScannerRuntimeState } from '../types/scanner-state.types';
 import {
     MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+    SCANNER_MAX_PARALLEL_BLOCKS,
+    SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
     SCANNER_CONTROL_REFRESH_INTERVAL_MS,
     SCANNER_POLL_INTERVAL_MS,
     SCANNER_STALL_CHECK_INTERVAL_MS,
@@ -103,7 +105,7 @@ export function createBlockMonitorService() {
             console.log('[Scanner] Acquired PostgreSQL advisory lock');
             await markInterruptedRescanJobs();
             state = await initializeScannerState();
-            updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length });
+            updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });
         } catch (error) {
             scannerStarted = false;
             throw error;
@@ -169,7 +171,7 @@ export function createBlockMonitorService() {
 
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
-                updateScannerRuntimeContext({ running: true, activeFiltersCount: activeTxFilters.length, lastProcessedBlock: state.lastProcessedBlock });
+                updateScannerRuntimeContext({ running: true, activeFiltersCount: activeTxFilters.length, lastProcessedBlock: state.lastProcessedBlock, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });
 
                 if (activeTxFilters.length === 0) {
                     if (!waitingForFilters) {
@@ -192,7 +194,7 @@ export function createBlockMonitorService() {
                         waitingForPause = true;
                     } else {
                         waitingForPause = false;
-                        let finalized;
+                        let finalized: Awaited<ReturnType<typeof evmRpcClient.getBlock>>;
                         try {
                             finalized = await evmRpcClient.getBlock('finalized');
                             if (!finalized) throw new Error('Unable to resolve the latest finalized block');
