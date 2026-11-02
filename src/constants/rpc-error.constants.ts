@@ -24,6 +24,10 @@ export const RPC_ERROR_MESSAGE_PATTERNS = {
         /request limit exceeded/i,
         /quota exceeded/i,
         /throughput limit/i,
+        /compute units?.*(capacity|limit|exceeded)/i,
+        /requests? per second/i,
+        /request quota/i,
+        /daily request.*exceeded/i,
         /exceeded.*requests/i,
     ],
     TIMEOUT: [
@@ -35,6 +39,8 @@ export const RPC_ERROR_MESSAGE_PATTERNS = {
     NETWORK: [
         /econnreset/i,
         /econnrefused/i,
+        /econnaborted/i,
+        /enetunreach/i,
         /ehostunreach/i,
         /enotfound/i,
         /eai_again/i,
@@ -49,10 +55,12 @@ export const RPC_ERROR_MESSAGE_PATTERNS = {
         /temporarily unavailable/i,
         /provider.*(unavailable|overloaded)/i,
         /upstream.*(error|unavailable)/i,
+        /internal server error/i,
     ],
     RPC: [
         /json.?rpc/i,
         /execution reverted/i,
+        /\brevert(?:ed)?\b/i,
         /invalid params/i,
         /method not found/i,
     ],
