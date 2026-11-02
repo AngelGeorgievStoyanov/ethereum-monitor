@@ -105,6 +105,24 @@ function publish(): void {
         const now = Date.now();
         const currentSnapshot = getSnapshot();
         getDynamicConfigService().publishRuntimeMetrics(currentSnapshot);
+        const runtime = currentSnapshot as {
+            scanner: { running: boolean; uptimeSeconds: number; activeFiltersCount: number };
+            chain: { latestFinalizedBlock: number | null; latestFinalizedAt: string | null; lagBlocks: number | null; rpcAvailable: boolean | null };
+            rpc: { endpoints: Array<Record<string, unknown>> };
+            recovery: Record<string, number>;
+        };
+        getDynamicConfigService().updateScannerStatusSnapshot({
+            scannerRunning: runtime.scanner.running,
+            processUptimeSeconds: runtime.scanner.uptimeSeconds,
+            activeFiltersCount: runtime.scanner.activeFiltersCount,
+            latestFinalizedBlock: runtime.chain.latestFinalizedBlock,
+            latestFinalizedAt: runtime.chain.latestFinalizedAt,
+            lagBlocks: runtime.chain.lagBlocks,
+            rpcAvailable: runtime.chain.rpcAvailable ?? false,
+            rpcMetrics: runtime.rpc.endpoints,
+            recoveryMetrics: runtime.recovery,
+            processingMetrics: getBlockProcessingMetrics(),
+        });
         if (now - lastAnalyticsPublishedAt >= METRICS_ANALYTICS_REFRESH_INTERVAL_MS) {
             publishScannerAnalyticsSnapshots(currentSnapshot);
             lastAnalyticsPublishedAt = now;
