@@ -45,16 +45,14 @@ export async function createTxFilter(
 }
 
 export async function updateTxFilter(
-    id: number,
+    filter: TxFilter,
     updates: {
         description?: string;
         isActive?: boolean;
         rule?: TxFilterRule;
     },
-    transaction?: SequelizeTransaction,
-): Promise<TxFilterRecord | null> {
-    const filter = await TxFilter.findByPk(id, transaction ? { transaction } : undefined);
-    if (!filter) return null;
+    transaction: SequelizeTransaction,
+): Promise<TxFilterRecord> {
 
     if (updates.description !== undefined) filter.description = updates.description;
     if (updates.isActive !== undefined) filter.isActive = updates.isActive;
@@ -113,9 +111,8 @@ export async function deactivateInvalidTxFilter(
 export async function findTxFilterForUpdate(
     id: number,
     transaction: SequelizeTransaction,
-): Promise<TxFilterRecord | null> {
-    const filter = await TxFilter.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-    return filter ? toTxFilterRecord(filter) : null;
+): Promise<TxFilter | null> {
+    return TxFilter.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
 }
 
 export async function withTxFilterMutationLock<T>(

@@ -85,6 +85,7 @@ export async function persistProcessedBlockBatchTransaction({
 
         if (blocks.length > 0) {
             const previousCanonicalBlock = await Block.findOne({
+                attributes: ['blockHash'],
                 where: { blockNumber: expectedCheckpoint, status: 'CANONICAL' },
                 transaction,
             });

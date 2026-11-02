@@ -75,8 +75,10 @@ export async function updateScannerRescanJob(
         >
     >,
 ): Promise<ScannerRescanJobSummary | null> {
-    const job = await ScannerRescanJob.findByPk(id);
-    if (!job) return null;
-    await job.update(updates);
-    return toSummary(job);
+    const [updatedCount, updatedJobs] = await ScannerRescanJob.update(updates, {
+        where: { id },
+        returning: true,
+    });
+    if (updatedCount === 0 || !updatedJobs[0]) return null;
+    return toSummary(updatedJobs[0]);
 }

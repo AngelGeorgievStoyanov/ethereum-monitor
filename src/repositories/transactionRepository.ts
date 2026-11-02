@@ -96,6 +96,7 @@ export async function createTransfersBatch(
             ).values(),
         ];
         const lookup = {
+            attributes: ['id', 'txHash', 'transferType', 'blockHash', 'logIndex'],
             where: { [Op.or]: identityConditions },
             transaction: dbTransaction,
         };
@@ -224,6 +225,13 @@ export async function createTransfersBatch(
                 txIds.length === 0
                     ? []
                     : await TxMatch.findAll({
+                          attributes: [
+                              'id',
+                              'txId',
+                              'txFilterId',
+                              'txFilterDescription',
+                              'matchStatus',
+                          ],
                           where: { txId: { [Op.in]: txIds } },
                           transaction: dbTransaction,
                       });
@@ -257,6 +265,13 @@ export async function createTransfersBatch(
                     matchingFilterIdsByTxId.get(match.txId)?.has(match.txFilterId) ?? false;
                 const description = isMatching ? descriptionsById.get(match.txFilterId) : undefined;
                 const matchStatus = isMatching ? 'ACTIVE' : 'NOT_MATCHED';
+                const descriptionChanged =
+                    isMatching &&
+                    description !== undefined &&
+                    description !== match.txFilterDescription;
+
+                if (match.matchStatus === matchStatus && !descriptionChanged) continue;
+
                 const key = `${matchStatus}:${match.txFilterId}:${description ?? ''}`;
                 const group: {
                     ids: number[];

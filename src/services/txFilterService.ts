@@ -232,7 +232,7 @@ export function createTxFilterService() {
                 );
             }
 
-            return persistTxFilter(id, updates, transaction);
+            return persistTxFilter(current, updates, transaction);
         });
 
         if (!updated) return null;
