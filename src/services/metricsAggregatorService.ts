@@ -390,7 +390,7 @@ function getSnapshot() {
                 const processedBlocks = Number(session.processedBlocks ?? 0);
                 const processedTransactions = Number(session.processedTransactions ?? 0);
                 const finalLagBlocks = lagBlocks ?? Number(session.initialLagBlocks);
-                const lagReductionBlocks = Math.max(0, Number(session.initialLagBlocks) - finalLagBlocks);
+                const lagReductionBlocks = Number(session.initialLagBlocks) - finalLagBlocks;
                 return {
                     ...session,
                     durationMs,
@@ -432,7 +432,7 @@ function completeCatchUp(status: 'completed' | 'interrupted'): void {
     const finalLagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
         ? Math.max(0, latestFinalizedBlock - lastProcessedBlock)
         : Number(session.initialLagBlocks);
-    const lagReductionBlocks = Math.max(0, Number(session.initialLagBlocks) - finalLagBlocks);
+    const lagReductionBlocks = Number(session.initialLagBlocks) - finalLagBlocks;
     session.finalLagBlocks = finalLagBlocks;
     session.lagReductionBlocks = lagReductionBlocks;
     session.lagReductionPerSecond = durationMs > 0 ? Number((lagReductionBlocks * 1000 / durationMs).toFixed(2)) : 0;
@@ -541,7 +541,7 @@ export function recordRpcRequest(input: RpcInput): void {
     if (input.outcome === 'success') endpoint.successes += 1;
     else {
         endpoint.failures += 1;
-        if (input.retryable) endpoint.retryableFailures += 1;
+        if (input.retryable ?? classification.retryable) endpoint.retryableFailures += 1;
         endpoint.lastFailureAt = new Date(now).toISOString();
     }
     endpointTotals.set(input.endpointIndex, endpoint);
