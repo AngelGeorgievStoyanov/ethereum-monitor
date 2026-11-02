@@ -148,7 +148,8 @@ function getCteMainStatement(sql: string): string | null {
 }
 
 function getQueryOperation(sql: string): { operation: 'read' | 'write' | 'other'; queryType: string } {
-    const firstKeyword = readSqlWord(sql.trimStart(), 0).word || 'UNKNOWN';
+    const firstKeywordIndex = skipSqlTrivia(sql, 0);
+    const firstKeyword = readSqlWord(sql, firstKeywordIndex).word || 'UNKNOWN';
     const queryType = firstKeyword === 'WITH' ? getCteMainStatement(sql) ?? 'WITH' : firstKeyword;
     if (['SELECT', 'SHOW', 'EXPLAIN'].includes(queryType)) {
         return { operation: 'read', queryType };
