@@ -543,7 +543,10 @@ export function recordRpcRequest(input: RpcInput): void {
     rpcEvents.push({
         timestamp: new Date(now).toISOString(), timestampMs: now, method: input.method,
         endpointIndex: input.endpointIndex, durationMs: input.durationMs, outcome: input.outcome,
-        failureKind, message: input.outcome === 'failure' ? message.slice(0, 500) : null,
+        failureKind,
+        httpStatus: input.httpStatus ?? classification.httpStatus,
+        rpcCode: input.rpcCode ?? classification.rpcCode,
+        message: input.outcome === 'failure' ? message.slice(0, 500) : null,
     });
     trimSamples(now);
     publish();
