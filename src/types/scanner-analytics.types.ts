@@ -1,3 +1,51 @@
+export interface ScannerAnalyticsWindowMetrics {
+    processing: {
+        processedBlocks: number;
+        processedTransactions: number;
+        blocksPerSecond: number;
+        transactionsPerSecond: number;
+        averageTransactionsPerBlock: number | null;
+        averageBlockDurationMs: number | null;
+        averageFilterDurationMs: number | null;
+        averageDatabaseBatchWriteDurationMs: number | null;
+    };
+    rpc: {
+        totalRequests: number;
+        failures: number;
+        rateLimitErrors: number;
+        timeoutErrors: number;
+        connectionErrors: number;
+        providerErrors: number;
+        jsonRpcErrors: number;
+        otherErrors: number;
+        retryableFailures: number;
+        averageLatencyMs: number | null;
+        latencyP95Ms: number | null;
+        operations: {
+            totalOperations: number;
+            successfulOperations: number;
+            failedOperations: number;
+            retriedOperations: number;
+            totalRetryAttempts: number;
+            endpointFailovers: number;
+            averageAttemptsPerSuccessfulOperation: number | null;
+        };
+    };
+    database: {
+        queries: number;
+        reads: number;
+        writes: number;
+        failures: number;
+        averageQueryDurationMs: number | null;
+    };
+    filters: {
+        evaluations: number;
+        matches: number;
+        failures: number;
+        averageDurationMs: number | null;
+    };
+}
+
 export interface ScannerAnalyticsResponse {
     generatedAt: string;
     window: string;
@@ -7,6 +55,7 @@ export interface ScannerAnalyticsResponse {
     historyStartedAt: string;
     availableWindows: Array<{ value: string; label: string }>;
     current: Record<string, unknown>;
+    windowMetrics: ScannerAnalyticsWindowMetrics;
     blockSamples: Array<Record<string, unknown>>;
     lagSamples: Array<Record<string, unknown>>;
     rpcEvents: Array<Record<string, unknown>>;
