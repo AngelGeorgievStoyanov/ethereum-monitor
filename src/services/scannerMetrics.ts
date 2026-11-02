@@ -1,5 +1,8 @@
-import { ProcessedBlockMetrics } from './blockProcessingService';
-import { recordProcessedBlock } from './metricsAggregatorService';
+import type { ProcessedBlockMetrics } from './blockProcessingService';
+import {
+    getBlockProcessingMetrics as getAggregatedBlockProcessingMetrics,
+    recordProcessedBlock,
+} from './metricsAggregatorService';
 
 export interface BlockProcessingTotals {
     processedBlocks: number;
@@ -62,12 +65,6 @@ export function createBlockProcessingTotals(): BlockProcessingTotals {
     };
 }
 
-const processTotals = createBlockProcessingTotals();
-const recentBlocks: Array<RecentBlockMetric & { timestamp: number }> = [];
-let lastProcessedBlock: number | null = null;
-let lastProcessedAt: string | null = null;
-let lastBlockDurationMs: number | null = null;
-
 function addMetrics(
     totals: BlockProcessingTotals,
     metrics: ProcessedBlockMetrics,
@@ -96,13 +93,6 @@ export function accumulateBlockMetrics(
     blockNumber: number,
 ): void {
     addMetrics(totals, metrics, blockDurationMs);
-    addMetrics(processTotals, metrics, blockDurationMs);
-
-    const timestamp = Date.now();
-    const processedAt = new Date(timestamp).toISOString();
-    lastProcessedBlock = blockNumber;
-    lastProcessedAt = processedAt;
-    lastBlockDurationMs = blockDurationMs;
     recordProcessedBlock({
         blockNumber,
         transactionCount: metrics.transactionCount,
@@ -119,53 +109,8 @@ export function accumulateBlockMetrics(
         erc20FailedAttemptsSeen: metrics.erc20FailedAttemptsSeen,
         erc20FailedAttemptsMatched: metrics.erc20FailedAttemptsMatched,
     });
-
-    recentBlocks.push({
-        timestamp,
-        processedAt,
-        blockNumber,
-        blockDurationMs,
-        fetchDurationMs: metrics.fetchDurationMs,
-        filterMatchingDurationMs: metrics.filterMatchingDurationMs,
-        databaseWriteDurationMs: metrics.databaseWriteDurationMs,
-        nativeTransfersSeen: metrics.nativeTransfersSeen,
-        nativeMatches: metrics.nativeMatches,
-        erc20TransferLogsSeen: metrics.erc20TransferLogsSeen,
-        erc20Matches: metrics.erc20Matches,
-    });
-
-    const cutoff = timestamp - 60000;
-    while (recentBlocks.length > 0 && recentBlocks[0].timestamp < cutoff) {
-        recentBlocks.shift();
-    }
 }
 
 export function getBlockProcessingMetrics(): BlockProcessingMetrics {
-    const cutoff = Date.now() - 60000;
-    while (recentBlocks.length > 0 && recentBlocks[0].timestamp < cutoff) {
-        recentBlocks.shift();
-    }
-
-    const recentCount = recentBlocks.length;
-    const recentTotal = (selector: (block: RecentBlockMetric) => number): number =>
-        recentBlocks.reduce((total, block) => total + selector(block), 0);
-    const average = (total: number): number | null =>
-        recentCount > 0 ? Number((total / recentCount).toFixed(1)) : null;
-
-    return {
-        ...processTotals,
-        lastProcessedBlock,
-        lastProcessedAt,
-        lastBlockDurationMs,
-        blocksProcessedLastMinute: recentCount,
-        blocksPerSecondLastMinute: Number((recentCount / 60).toFixed(2)),
-        averageBlockDurationLastMinuteMs: average(recentTotal((block) => block.blockDurationMs)),
-        averageFetchDurationLastMinuteMs: average(recentTotal((block) => block.fetchDurationMs)),
-        averageDatabaseWriteDurationLastMinuteMs: average(
-            recentTotal((block) => block.databaseWriteDurationMs),
-        ),
-        recentBlocks: recentBlocks.slice(-30).map(({ timestamp: _timestamp, ...block }) => ({
-            ...block,
-        })),
-    };
+    return getAggregatedBlockProcessingMetrics();
 }
