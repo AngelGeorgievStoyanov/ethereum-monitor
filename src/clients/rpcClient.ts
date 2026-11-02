@@ -134,6 +134,7 @@ export function createRpcClient() {
     }
 
     async function getBlockFromAllEndpoints(blockNumber: number) {
+        const operationStartedAt = Date.now();
         const results: Array<{
             endpointIndex: number;
             block: Awaited<ReturnType<JsonRpcProvider['getBlock']>> | null;
@@ -169,10 +170,19 @@ export function createRpcClient() {
             }
         }
 
+        publishRpcOperationMetricEvent({
+            operation: 'getBlockFromAllEndpoints',
+            durationMs: Date.now() - operationStartedAt,
+            attempts: 1,
+            retryCount: 0,
+            endpointFailovers: 0,
+            outcome: results.every((result) => result.error === null) ? 'success' : 'failure',
+        });
         return results;
     }
 
     async function getFinalizedFromAllEndpoints() {
+        const operationStartedAt = Date.now();
         const results: Array<{
             endpointIndex: number;
             blockNumber: number | null;
@@ -221,6 +231,14 @@ export function createRpcClient() {
             }
         }
 
+        publishRpcOperationMetricEvent({
+            operation: 'getFinalizedFromAllEndpoints',
+            durationMs: Date.now() - operationStartedAt,
+            attempts: 1,
+            retryCount: 0,
+            endpointFailovers: 0,
+            outcome: results.every((result) => result.error === null) ? 'success' : 'failure',
+        });
         return results;
     }
 
