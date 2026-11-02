@@ -12,6 +12,7 @@ import {
 import { getLiveness, getReadiness } from './controllers/healthController';
 import {
     getScannerStatus,
+    getScannerAnalyticsController,
     getRescanJobStatus,
     pauseScanner,
     resumeScannerController,
@@ -30,6 +31,7 @@ router.put('/tx-filters/:id', updateTxFilter);
 router.delete('/tx-filters/:id', deleteTxFilter);
 
 router.get('/scanner/status', getScannerStatus);
+router.get('/scanner/analytics', getScannerAnalyticsController);
 router.post('/scanner/pause', pauseScanner);
 router.post('/scanner/resume', resumeScannerController);
 router.post('/scanner/rescan', rescanScannerController);
