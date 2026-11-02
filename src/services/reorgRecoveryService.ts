@@ -1,3 +1,4 @@
+import { getDynamicConfigService } from './dynamicConfigService';
 import {
     MAX_REORG_LOOKBACK_BLOCKS,
     REORG_RECOVERY_STABLE_BLOCKS,
@@ -206,6 +207,7 @@ async function processReorgRecoveryInternal(
     }
 
     while (state.reorgRecoveryActive && state.lastProcessedBlock < finalizedBlockNumber) {
+        if (getDynamicConfigService().getScannerControlSnapshot()) return true;
         if (!(await isScannerLockHeld())) {
             console.warn(
                 '[Reorg] Scanner lock lost; recovery will resume after the lock is reacquired',

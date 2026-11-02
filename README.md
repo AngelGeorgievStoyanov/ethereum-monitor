@@ -95,12 +95,11 @@ Processing and recovery metrics are held in process memory and reset when the pr
 
 A rescan checks existing canonical history from fromBlock through the saved checkpoint. It does not move the checkpoint.
 
-1. Pause the scanner in manual mode:
+1. Pause the scanner:
 
         POST /api/scanner/pause
-        Content-Type: application/json
 
-        {"mode":"manual"}
+   The pause is applied on the next 30-second control refresh. The scanner finishes its current processing batch first.
 
 2. Start the rescan:
 
@@ -122,7 +121,7 @@ All routes use the /api prefix.
 | GET                 | /health/live                  | Process liveness.                                              |
 | GET                 | /health/ready                 | Database and RPC availability.                                 |
 | GET                 | /scanner/status               | Checkpoint, lag, pause, recovery, RPC, and processing metrics. |
-| POST                | /scanner/pause                | Pause now or after a block.                                    |
+| POST                | /scanner/pause                | Request a manual pause.                                        |
 | POST                | /scanner/resume               | Resume scanning.                                               |
 | POST                | /scanner/rescan               | Start a manual rescan.                                         |
 | GET                 | /scanner/rescan/:id           | Check rescan progress.                                         |

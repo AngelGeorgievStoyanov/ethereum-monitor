@@ -1,15 +1,8 @@
-import type {
-    ScannerControlState,
-    ScannerPauseMode,
-    ScannerStatusState,
-} from '../types/scanner-status.types';
+import type { ScannerControlState, ScannerStatusState } from '../types/scanner-status.types';
 
 export interface ScannerPauseResponse {
     message: string;
     paused: boolean;
-    mode: ScannerPauseMode | null;
-    pauseRequestedAtBlock: number | null;
-    pauseUntil: number | null;
 }
 
 export interface ReorgRecoveryRetryResponse {
@@ -40,5 +33,8 @@ export function mapReorgRecoveryRetryResponse(
 }
 
 export function mapScannerResumeResponse(state: ScannerControlState): ScannerPauseResponse {
-    return mapScannerControlResponse('Scanner resumed', state);
+    return mapScannerControlResponse(
+        'Scanner resume requested; it will be applied on the next control refresh',
+        state,
+    );
 }

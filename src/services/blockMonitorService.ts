@@ -3,7 +3,6 @@ import {
     MAX_BLOCKS_PER_FINALIZED_CATCHUP,
     SCANNER_MAX_PARALLEL_BLOCKS,
     SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
-    SCANNER_CONTROL_REFRESH_INTERVAL_MS,
     SCANNER_POLL_INTERVAL_MS,
     SCANNER_STALL_CHECK_INTERVAL_MS,
     SCANNER_STALL_WARNING_INTERVAL_MS,
@@ -16,7 +15,6 @@ import { initializeScannerState } from './scannerInitializationService';
 import { invalidateConfirmedBlockCache, processFinalizedBlocks } from './blockProcessor';
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
 import { refreshScannerStatusSnapshot } from './scannerStatusService';
-import { getScannerControlState } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
 import { markScannerStopped, recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
@@ -145,8 +143,6 @@ export function createBlockMonitorService() {
         }, SCANNER_STALL_CHECK_INTERVAL_MS);
         let waitingForFilters = dynamicConfigService.getTxFilters().length === 0;
         let waitingForPause = false;
-        let cachedControlPaused = false;
-        let lastControlStateCheckAt = 0;
         if (waitingForFilters) {
             console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
         }
@@ -177,10 +173,6 @@ export function createBlockMonitorService() {
                     needsStateReload = false;
                 }
 
-                if (Date.now() - lastControlStateCheckAt >= SCANNER_CONTROL_REFRESH_INTERVAL_MS) {
-                    cachedControlPaused = (await getScannerControlState()).paused;
-                    lastControlStateCheckAt = Date.now();
-                }
 
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
@@ -195,7 +187,7 @@ export function createBlockMonitorService() {
                     waitingForFilters = true;
                     waitingForPause = false;
                 } else {
-                    if (cachedControlPaused) {
+                    if (dynamicConfigService.getScannerControlSnapshot()) {
                         if (!waitingForPause) {
                             console.log('[Scanner] Paused; skipping finalized-block RPC polling');
                         }

@@ -6,7 +6,7 @@ import {
     SCANNER_MAX_PARALLEL_BLOCKS,
     SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
 } from '../constants/scanner.constants';
-import { shouldPauseBeforeBlock } from './scannerControlService';
+import { getDynamicConfigService } from './dynamicConfigService';
 import { formatError } from '../utils/formatError';
 import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
 import { BlockReceiptConsistencyError } from './evmBlockDataService';
@@ -86,7 +86,7 @@ export async function processFinalizedBlocks(
     while (state.lastProcessedBlock < finalizedBlockNumber) {
         currentBatchStart = state.lastProcessedBlock + 1;
         const batchStartedAt = Date.now();
-        if (await shouldPauseBeforeBlock(currentBatchStart, state.lastProcessedBlock)) return;
+        if (getDynamicConfigService().getScannerControlSnapshot()) return;
         const filterConfig = getActiveTxFilters();
         const activeTxFilters = filterConfig.filters;
         if (activeTxFilters.length === 0) return;

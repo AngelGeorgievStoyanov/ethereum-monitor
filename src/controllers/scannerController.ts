@@ -42,10 +42,8 @@ export const getScannerAnalyticsController = async (req: Request, res: Response)
 
 export const pauseScanner = async (req: Request, res: Response): Promise<void> => {
     try {
-        const input = validateScannerPauseInput(req.body);
-        res.json(
-            await requestScannerPauseResponse(input.mode, input.atBlock, input.durationMinutes),
-        );
+        validateScannerPauseInput(req.body);
+        res.json(await requestScannerPauseResponse());
     } catch (error) {
         sendHttpError(res, 'Unable to request scanner pause', error);
     }

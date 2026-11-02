@@ -12,8 +12,9 @@
 ## Scanner status snapshots
 
 - During application startup, after database and Dynamic Config initialization, the application loads the initial pause/control state, checkpoint/recovery state, and latest rescan job from PostgreSQL and publishes a status snapshot before the HTTP server starts. After scanner ownership is acquired and scanner state is initialized, the snapshot is refreshed with the scanner runtime state.
-- Pause/resume changes update the status snapshot immediately after the database write.
-- The scanner's existing control refresh cycle continues checking the persistent pause state so changes made by another application instance are detected. This is the only recurring PostgreSQL read required for status synchronization.
+- The initial pause state is loaded from PostgreSQL during startup and published to Dynamic Config before the scanner starts.
+- A dedicated Fast Refresh reads only the persisted `scannerPaused` flag every 30 seconds and updates the in-memory Dynamic Config snapshot. Pause/resume API requests only write PostgreSQL; the scanner observes them on the next refresh.
+- If a Fast Refresh read fails, the last successfully loaded pause state remains active. The scanner reads the in-memory snapshot at its safe processing boundaries and performs no database reads for pause checks.
 - The existing scanner main loop republishes its runtime context during normal polling. Checkpoint and recovery state are published from the scanner's in-memory state after processing and recovery work; the stall check continues to expose stale progress through the last-processed timestamp.
 - Rescan job creation, progress, completion, failure, and recovery handoff publish the updated job summary.
 - Lock loss and reacquisition publish scanner running state immediately.
@@ -61,7 +62,7 @@ History is bounded in memory using generic retention settings in `src/constants/
 
 ### GET /api/scanner/status
 
-Returns the prepared scanner status snapshot from Dynamic Config. It does not query PostgreSQL or RPC. The scanner's existing control refresh cycle checks the persisted pause state independently of Dashboard requests.
+Returns the prepared scanner status snapshot from Dynamic Config. It does not query PostgreSQL or RPC. The dedicated 30-second Fast Refresh checks the persisted pause state independently of Dashboard requests. The scanner and Dashboard read only the in-memory Dynamic Config snapshot.
 
 ### GET /api/scanner/analytics?window=1h
 

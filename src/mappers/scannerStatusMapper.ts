@@ -29,9 +29,6 @@ export function mapScannerStatusResponse(input: {
     return {
         scannerRunning: input.scannerRunning,
         paused: input.control.paused,
-        mode: input.control.mode,
-        pauseRequestedAtBlock: input.control.pauseRequestedAtBlock,
-        pauseUntil: input.control.pauseUntil,
         lastProcessedBlock,
         reorgRecoveryActive: input.state?.reorgRecoveryActive ?? false,
         reorgRecoveryBlocked: input.state?.reorgRecoveryBlocked ?? false,

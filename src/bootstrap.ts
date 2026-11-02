@@ -5,6 +5,7 @@ import { initializeDatabase } from './database/initializeDatabase';
 import { getBlockMonitorService } from './services/blockMonitorServiceFactory';
 import { getDynamicConfigService } from './services/dynamicConfigService';
 import { refreshScannerStatusSnapshot } from './services/scannerStatusService';
+import { initScannerControlRefresh, stopScannerControlRefresh } from './services/scannerControlService';
 import { formatError } from './utils/formatError';
 
 export async function startApplication(): Promise<void> {
@@ -15,6 +16,7 @@ export async function startApplication(): Promise<void> {
 
         dynamicConfigService = getDynamicConfigService();
         await dynamicConfigService.init();
+        await initScannerControlRefresh();
         await refreshScannerStatusSnapshot();
 
         const blockMonitorService = getBlockMonitorService();
@@ -33,6 +35,7 @@ export async function startApplication(): Promise<void> {
 
         process.once('beforeExit', () => {
             dynamicConfigService?.stopRefreshTimer();
+            stopScannerControlRefresh();
         });
     } catch (error) {
         dynamicConfigService?.stopRefreshTimer();

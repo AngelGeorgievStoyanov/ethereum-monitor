@@ -19,6 +19,7 @@ export function createDynamicConfigService() {
     let runtimeMetricsSnapshot: unknown = null;
     let runtimeAnalyticsSnapshot: unknown = null;
     let scannerStatusSnapshot: unknown = null;
+    let scannerControlPausedSnapshot: boolean | null = null;
 
     async function loadTxFilters(): Promise<void> {
         const loadedFilters = await txFilterService.loadActiveTxFilters();
@@ -136,6 +137,18 @@ export function createDynamicConfigService() {
         return runtimeAnalyticsSnapshot;
     }
 
+    function publishScannerControlSnapshot(paused: boolean): void {
+        scannerControlPausedSnapshot = paused;
+        updateScannerStatusSnapshot({ paused });
+    }
+
+    function getScannerControlSnapshot(): boolean {
+        if (scannerControlPausedSnapshot === null) {
+            throw new Error('Scanner control configuration has not been initialized');
+        }
+        return scannerControlPausedSnapshot;
+    }
+
     function publishScannerStatus(snapshot: unknown): void {
         scannerStatusSnapshot = snapshot;
     }
@@ -165,6 +178,8 @@ export function createDynamicConfigService() {
         getRuntimeMetricsSnapshot,
         publishRuntimeAnalytics,
         getRuntimeAnalyticsSnapshot,
+        publishScannerControlSnapshot,
+        getScannerControlSnapshot,
         publishScannerStatus,
         getScannerStatusSnapshot,
         updateScannerStatusSnapshot,

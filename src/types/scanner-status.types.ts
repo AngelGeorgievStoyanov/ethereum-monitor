@@ -1,16 +1,5 @@
-export type ScannerPauseMode = 'manual' | 'temporary';
-
 export interface ScannerControlState {
     paused: boolean;
-    mode: ScannerPauseMode | null;
-    pauseRequestedAtBlock: number | null;
-    pauseUntil: number | null;
-}
-
-export interface ScannerControlRecord extends ScannerControlState {
-    pauseUntilDate: Date | null;
-    pauseTargetBlock: number | null;
-    pauseDurationMinutes: number;
 }
 
 export interface ScannerStatusState {
@@ -104,9 +93,6 @@ export interface BlockProcessingMetrics {
 export interface ScannerStatusResponse {
     scannerRunning: boolean;
     paused: boolean;
-    mode: ScannerPauseMode | null;
-    pauseRequestedAtBlock: number | null;
-    pauseUntil: number | null;
     lastProcessedBlock: number | null;
     reorgRecoveryActive: boolean;
     reorgRecoveryBlocked: boolean;

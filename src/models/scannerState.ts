@@ -12,11 +12,6 @@ class ScannerState extends Model {
     public reorgRecoveryStartBlock!: number | null;
     public reorgRecoveryTargetBlock!: number | null;
     public scannerPaused!: boolean;
-    public scannerPauseMode!: 'manual' | 'temporary' | null;
-    public scannerPauseRequestedAtBlock!: number | null;
-    public scannerPauseUntil!: Date | null;
-    public scannerPauseTargetBlock!: number | null;
-    public scannerPauseDurationMinutes!: number;
 }
 
 ScannerState.init(
@@ -66,31 +61,6 @@ ScannerState.init(
             type: DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: false,
-        },
-        scannerPauseMode: {
-            type: DataTypes.STRING(16),
-            allowNull: true,
-            defaultValue: null,
-        },
-        scannerPauseRequestedAtBlock: {
-            type: DataTypes.INTEGER,
-            allowNull: true,
-            defaultValue: null,
-        },
-        scannerPauseUntil: {
-            type: DataTypes.DATE,
-            allowNull: true,
-            defaultValue: null,
-        },
-        scannerPauseTargetBlock: {
-            type: DataTypes.INTEGER,
-            allowNull: true,
-            defaultValue: null,
-        },
-        scannerPauseDurationMinutes: {
-            type: DataTypes.INTEGER,
-            allowNull: false,
-            defaultValue: 5,
         },
     },
     {
