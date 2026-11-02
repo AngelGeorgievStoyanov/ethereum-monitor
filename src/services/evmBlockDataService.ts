@@ -121,7 +121,6 @@ function validateBlockReceipts(
     }
 }
 
-
 export async function fetchBlockDataFromVerifiedBlock(
     blockNumber: number,
     block: ethers.Block,
