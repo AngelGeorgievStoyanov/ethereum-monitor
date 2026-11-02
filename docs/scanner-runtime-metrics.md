@@ -50,6 +50,7 @@ History is bounded in memory using generic retention settings in `src/constants/
 - Metric samples are retained for up to 24 hours, subject to per-category memory safety limits.
 - The configured sample limits are capacity safeguards, not an assumption about how many blocks a network produces.
 - Analytics windows are configured centrally and currently include `1h`, `3h`, `6h`, `9h`, `12h`, and `24h`.
+- Network-independent one-minute buckets retain throughput, lag, RPC failure/latency, database query, filter evaluation, and batch timing aggregates. Charts use these buckets rather than relying on a fixed number of block samples.
 - An `available` window returns all history available in the current process, up to the retention period.
 - Each analytics response reports requested duration, available duration, history start time, and whether the requested window is complete or partial.
 - A process that has been running for 40 minutes can therefore return 40 minutes of partial data for a 1-hour window and complete 30/40-minute analysis through the `available` window. It does not need to run for 24 hours.
@@ -65,7 +66,7 @@ Returns the prepared scanner status snapshot from Dynamic Config. It does not qu
 
 Returns the prepared runtime analytics snapshot for the requested window. Supported values are configured in `src/constants/scanner-metrics.constants.ts`, plus `available`.
 
-The response includes the current metrics snapshot, block samples, lag samples, RPC events, catch-up sessions, processing batches, retention metadata, and window coverage.
+The response includes the current metrics snapshot, block samples, lag samples, RPC events, catch-up sessions, processing batches, minute-level aggregates, retention metadata, and window coverage.
 
 ## Measurement semantics
 
