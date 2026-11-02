@@ -77,7 +77,17 @@ let totalFilterMatchingDurationMs = 0;
 let totalBlockDurationMs = 0;
 let totalDatabaseWriteDurationMs = 0;
 const databaseMetrics = { writes: 0, failures: 0, totalWriteDurationMs: 0, lastErrorAt: null as string | null, lastError: null as string | null };
-let recoveryMetrics: Record<string, number> = {};
+let recoveryMetrics: Record<string, number> = {
+    reorgCount: 0,
+    reorgDepthLast: 0,
+    reorgDepthMax: 0,
+    reorgRecoveryDurationMsLast: 0,
+    reorgConsensusFailuresTotal: 0,
+    reorgBlocksReprocessedTotal: 0,
+    rescanRunsTotal: 0,
+    rescanBlocksProcessedTotal: 0,
+    rescanFailuresTotal: 0,
+};
 
 function publish(): void {
     if (publishTimer) return;
