@@ -50,7 +50,13 @@ type MinuteMetricBucket = {
     rpcFailures: number;
     rpcRateLimitErrors: number;
     rpcTimeoutErrors: number;
+    rpcConnectionErrors: number;
+    rpcProviderErrors: number;
+    rpcJsonRpcErrors: number;
+    rpcOtherErrors: number;
+    rpcRetryableFailures: number;
     logicalRpcOperations: number;
+    successfulOperationAttempts: number;
     rpcRetriedOperations: number;
     rpcRetryAttempts: number;
     rpcEndpointFailovers: number;
@@ -59,6 +65,7 @@ type MinuteMetricBucket = {
     databaseQueries: number;
     databaseReads: number;
     databaseWrites: number;
+    databaseFailures: number;
     databaseDurationMsTotal: number;
     filterEvaluations: number;
     filterMatches: number;
@@ -91,7 +98,13 @@ function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
             rpcFailures: 0,
             rpcRateLimitErrors: 0,
             rpcTimeoutErrors: 0,
+            rpcConnectionErrors: 0,
+            rpcProviderErrors: 0,
+            rpcJsonRpcErrors: 0,
+            rpcOtherErrors: 0,
+            rpcRetryableFailures: 0,
             logicalRpcOperations: 0,
+            successfulOperationAttempts: 0,
             rpcRetriedOperations: 0,
             rpcRetryAttempts: 0,
             rpcEndpointFailovers: 0,
@@ -100,6 +113,7 @@ function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
             databaseQueries: 0,
             databaseReads: 0,
             databaseWrites: 0,
+            databaseFailures: 0,
             databaseDurationMsTotal: 0,
             filterEvaluations: 0,
             filterMatches: 0,
@@ -548,8 +562,15 @@ export function recordRpcRequest(input: RpcInput): void {
     rpcBucket.rpcRequests += 1;
     rpcBucket.rpcDurationMsTotal += input.durationMs;
     if (input.outcome === 'failure') rpcBucket.rpcFailures += 1;
-    if (failureKind === 'rateLimit') rpcBucket.rpcRateLimitErrors += 1;
-    if (failureKind === 'timeout') rpcBucket.rpcTimeoutErrors += 1;
+    if (input.outcome === 'failure') {
+        if (failureKind === 'rateLimit') rpcBucket.rpcRateLimitErrors += 1;
+        else if (failureKind === 'timeout') rpcBucket.rpcTimeoutErrors += 1;
+        else if (failureKind === 'network') rpcBucket.rpcConnectionErrors += 1;
+        else if (failureKind === 'provider') rpcBucket.rpcProviderErrors += 1;
+        else if (failureKind === 'rpc') rpcBucket.rpcJsonRpcErrors += 1;
+        else rpcBucket.rpcOtherErrors += 1;
+        if (input.retryable ?? classification.retryable) rpcBucket.rpcRetryableFailures += 1;
+    }
     const endpoint = endpointTotals.get(input.endpointIndex) ?? { attempts: 0, successes: 0, failures: 0, retryableFailures: 0, durationMs: 0, lastFailureAt: null as string | null };
     endpoint.attempts += 1;
     endpoint.durationMs += input.durationMs;
@@ -670,6 +691,7 @@ export function recordDatabaseFailure(operation: string, message: string): void 
     databaseMetrics.failures += 1;
     databaseMetrics.lastErrorAt = new Date().toISOString();
     databaseMetrics.lastError = (operation + ': ' + message).slice(0, 500);
+    getMinuteBucket(Date.now()).databaseFailures += 1;
     publish();
 }
 
@@ -812,6 +834,7 @@ function recordRpcOperation(input: RpcOperationMetricEvent): void {
     rpcOperationTotals.endpointFailovers += input.endpointFailovers;
     const bucket = getMinuteBucket(Date.now());
     bucket.logicalRpcOperations += 1;
+    if (input.outcome === 'success') bucket.successfulOperationAttempts += input.attempts;
     bucket.rpcRetriedOperations += input.retryCount > 0 ? 1 : 0;
     bucket.rpcRetryAttempts += input.retryCount;
     bucket.rpcEndpointFailovers += input.endpointFailovers;
