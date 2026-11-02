@@ -1,3 +1,4 @@
+import { BaseError } from 'sequelize';
 import { createTransfersBatch } from '../repositories/transactionRepository';
 import { mapTransferBatchItems } from '../mappers/transferBatchMapper';
 import {
@@ -7,14 +8,29 @@ import {
     ReorgRecoveryProgress,
 } from '../repositories/scannerPersistenceRepository';
 import { isScannerLockHeld } from './scannerLockService';
+import { recordDatabaseFailure } from './metricsAggregatorService';
+import { formatError } from '../utils/formatError';
 import type { TransferBatchCandidate } from '../types/transfer-batch.types';
+
+async function trackDatabaseFailure<T>(operation: string, action: () => Promise<T>): Promise<T> {
+    try {
+        return await action();
+    } catch (error) {
+        if (error instanceof BaseError) {
+            recordDatabaseFailure(operation, formatError(error));
+        }
+        throw error;
+    }
+}
 
 export async function createTransactionsFromEthereumDataBatch(
     candidates: readonly TransferBatchCandidate[],
     transaction?: import('sequelize').Transaction,
     reconcileMatches = false,
 ): Promise<void> {
-    await createTransfersBatch(mapTransferBatchItems(candidates), transaction, reconcileMatches);
+    await trackDatabaseFailure('createTransactionsFromEthereumDataBatch', () =>
+        createTransfersBatch(mapTransferBatchItems(candidates), transaction, reconcileMatches),
+    );
 }
 
 export async function reconcileBlockCandidates(
@@ -22,11 +38,13 @@ export async function reconcileBlockCandidates(
     scannerStateId: string,
     expectedCheckpoint: number,
 ): Promise<void> {
-    await reconcileBlockTransferItems(
-        mapTransferBatchItems(candidates),
-        scannerStateId,
-        expectedCheckpoint,
-        isScannerLockHeld,
+    await trackDatabaseFailure('reconcileBlockCandidates', () =>
+        reconcileBlockTransferItems(
+            mapTransferBatchItems(candidates),
+            scannerStateId,
+            expectedCheckpoint,
+            isScannerLockHeld,
+        ),
     );
 }
 
@@ -47,13 +65,15 @@ export async function persistProcessedBlockBatch({
     newCheckpoint,
     recoveryProgress,
 }: PersistProcessedBlockBatchOptions): Promise<number> {
-    return persistProcessedBlockBatchTransaction({
-        transferItems: mapTransferBatchItems(candidates),
-        blocks,
-        scannerStateId,
-        expectedCheckpoint,
-        newCheckpoint,
-        recoveryProgress,
-        assertScannerLockHeld: isScannerLockHeld,
-    });
+    return trackDatabaseFailure('persistProcessedBlockBatch', () =>
+        persistProcessedBlockBatchTransaction({
+            transferItems: mapTransferBatchItems(candidates),
+            blocks,
+            scannerStateId,
+            expectedCheckpoint,
+            newCheckpoint,
+            recoveryProgress,
+            assertScannerLockHeld: isScannerLockHeld,
+        }),
+    );
 }
