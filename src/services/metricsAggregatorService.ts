@@ -330,23 +330,16 @@ function getRpcSummary(now: number): RpcSummary {
         return rpcSummaryCache;
     }
 
-    const activeRpcEvents = rpcEvents.slice(rpcEventsStartIndex);
-    const latencySamples = activeRpcEvents
-        .map((event) => Number(event.durationMs))
-        .filter(Number.isFinite)
-        .sort((left, right) => left - right);
-    const percentile = (ratio: number): number | null =>
-        latencySamples.length
-            ? latencySamples[
-                  Math.min(latencySamples.length - 1, Math.ceil(latencySamples.length * ratio) - 1)
-              ]
-            : null;
-
+    const latencySamples: number[] = [];
     const methodTotals = new Map<
         string,
         { requests: number; successes: number; failures: number; totalDurationMs: number }
     >();
-    for (const event of activeRpcEvents) {
+    for (let index = rpcEventsStartIndex; index < rpcEvents.length; index += 1) {
+        const event = rpcEvents[index];
+        const durationMs = Number(event.durationMs);
+        if (Number.isFinite(durationMs)) latencySamples.push(durationMs);
+
         const method = String(event.method);
         const value = methodTotals.get(method) ?? {
             requests: 0,
@@ -355,11 +348,18 @@ function getRpcSummary(now: number): RpcSummary {
             totalDurationMs: 0,
         };
         value.requests += 1;
-        value.totalDurationMs += Number(event.durationMs);
+        value.totalDurationMs += durationMs;
         if (event.outcome === 'success') value.successes += 1;
         else value.failures += 1;
         methodTotals.set(method, value);
     }
+    latencySamples.sort((left, right) => left - right);
+    const percentile = (ratio: number): number | null =>
+        latencySamples.length
+            ? latencySamples[
+                  Math.min(latencySamples.length - 1, Math.ceil(latencySamples.length * ratio) - 1)
+              ]
+            : null;
 
     const recentErrors: Array<Record<string, unknown>> = [];
     for (let index = rpcEvents.length - 1; index >= rpcEventsStartIndex; index -= 1) {
