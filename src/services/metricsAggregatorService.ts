@@ -6,7 +6,7 @@ import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.con
 import { classifyRpcError } from '../utils/classifyRpcError';
 import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
 import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
-import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS } from '../constants/scanner-metrics.constants';
+import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -278,7 +278,7 @@ function publish(): void {
             publishScannerAnalyticsSnapshots(currentSnapshot);
             lastAnalyticsPublishedAt = now;
         }
-    }, 1000);
+    }, METRICS_PUBLISH_INTERVAL_MS);
     publishTimer.unref?.();
 }
 
