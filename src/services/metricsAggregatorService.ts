@@ -66,11 +66,14 @@ type MinuteMetricBucket = {
     batchDurationMsTotal: number;
 };
 const minuteBuckets: MinuteMetricBucket[] = [];
+const minuteBucketsByTimestamp = new Map<number, MinuteMetricBucket>();
 
 function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
     const bucketTimestampMs = Math.floor(timestampMs / METRICS_BUCKET_INTERVAL_MS) * METRICS_BUCKET_INTERVAL_MS;
-    let bucket = minuteBuckets[minuteBuckets.length - 1];
-    if (!bucket || bucket.timestampMs !== bucketTimestampMs) {
+    const existingBucket = minuteBucketsByTimestamp.get(bucketTimestampMs);
+    if (existingBucket) return existingBucket;
+    let bucket: MinuteMetricBucket;
+    {
         bucket = {
             timestamp: new Date(bucketTimestampMs).toISOString(),
             timestampMs: bucketTimestampMs,
@@ -99,11 +102,16 @@ function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
             batchDurationMsTotal: 0,
         };
         minuteBuckets.push(bucket);
+        minuteBuckets.sort((left, right) => left.timestampMs - right.timestampMs);
+        minuteBucketsByTimestamp.set(bucketTimestampMs, bucket);
     }
     while (minuteBuckets.length > 0 && (
         minuteBuckets.length > METRICS_MAX_BUCKETS ||
         timestampMs - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS
-    )) minuteBuckets.shift();
+    )) {
+        const removedBucket = minuteBuckets.shift();
+        if (removedBucket) minuteBucketsByTimestamp.delete(removedBucket.timestampMs);
+    }
     return bucket;
 }
 
@@ -238,7 +246,10 @@ function trimSamples(now: number): void {
     while (batchSamples.length > 0 && (batchSamples.length > METRICS_SAMPLE_LIMITS.batches || now - batchSamples[0].timestampMs > METRICS_RETENTION_MS)) batchSamples.shift();
     while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > METRICS_RETENTION_MS) finalizedSamples.shift();
     while (lagSamples.length > 0 && (lagSamples.length > METRICS_SAMPLE_LIMITS.lag || now - lagSamples[0].timestampMs > METRICS_RETENTION_MS)) lagSamples.shift();
-    while (minuteBuckets.length > 0 && (minuteBuckets.length > METRICS_MAX_BUCKETS || now - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS)) minuteBuckets.shift();
+    while (minuteBuckets.length > 0 && (minuteBuckets.length > METRICS_MAX_BUCKETS || now - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS)) {
+        const removedBucket = minuteBuckets.shift();
+        if (removedBucket) minuteBucketsByTimestamp.delete(removedBucket.timestampMs);
+    }
 }
 
 function getSnapshot() {
