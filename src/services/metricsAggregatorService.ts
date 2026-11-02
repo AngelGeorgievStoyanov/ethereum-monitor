@@ -76,6 +76,9 @@ type MinuteMetricBucket = {
     latestLagBlocks: number | null;
     processingBatches: number;
     batchDurationMsTotal: number;
+    rpcMethods: Record<string, { requests: number; successes: number; failures: number; totalDurationMs: number }>;
+    filtersById: Record<string, { evaluations: number; matches: number; failures: number; totalDurationMs: number }>;
+    databaseByOperation: Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }>;
 };
 const minuteBuckets: MinuteMetricBucket[] = [];
 const minuteBucketsByTimestamp = new Map<number, MinuteMetricBucket>();
@@ -124,6 +127,9 @@ function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
             latestLagBlocks: null,
             processingBatches: 0,
             batchDurationMsTotal: 0,
+            rpcMethods: {},
+            filtersById: {},
+            databaseByOperation: {},
         };
         minuteBuckets.push(bucket);
         minuteBuckets.sort((left, right) => left.timestampMs - right.timestampMs);
@@ -562,6 +568,17 @@ export function recordRpcRequest(input: RpcInput): void {
     rpcBucket.rpcRequests += 1;
     rpcBucket.rpcDurationMsTotal += input.durationMs;
     if (input.outcome === 'failure') rpcBucket.rpcFailures += 1;
+    const methodMetrics = rpcBucket.rpcMethods[input.method] ?? {
+        requests: 0,
+        successes: 0,
+        failures: 0,
+        totalDurationMs: 0,
+    };
+    methodMetrics.requests += 1;
+    methodMetrics.totalDurationMs += input.durationMs;
+    if (input.outcome === 'success') methodMetrics.successes += 1;
+    else methodMetrics.failures += 1;
+    rpcBucket.rpcMethods[input.method] = methodMetrics;
     if (input.outcome === 'failure') {
         if (failureKind === 'rateLimit') rpcBucket.rpcRateLimitErrors += 1;
         else if (failureKind === 'timeout') rpcBucket.rpcTimeoutErrors += 1;
@@ -879,6 +896,17 @@ function recordFilterEvaluation(input: FilterMetricEvent): void {
     if (input.matched) bucket.filterMatches += 1;
     if (input.failed) bucket.filterFailures += 1;
     bucket.predicateDurationMsTotal += input.durationMs;
+    const filterBucket = bucket.filtersById[key] ?? {
+        evaluations: 0,
+        matches: 0,
+        failures: 0,
+        totalDurationMs: 0,
+    };
+    filterBucket.evaluations += 1;
+    if (input.matched) filterBucket.matches += 1;
+    if (input.failed) filterBucket.failures += 1;
+    filterBucket.totalDurationMs += input.durationMs;
+    bucket.filtersById[key] = filterBucket;
     publish();
 }
 
@@ -902,6 +930,15 @@ function recordDatabaseQuery(input: DatabaseMetricEvent): void {
     if (input.operation === 'read') bucket.databaseReads += 1;
     if (input.operation === 'write') bucket.databaseWrites += 1;
     bucket.databaseDurationMsTotal += input.durationMs;
+    const operationBucket = bucket.databaseByOperation[input.queryType] ?? {
+        count: 0,
+        totalDurationMs: 0,
+        maxDurationMs: 0,
+    };
+    operationBucket.count += 1;
+    operationBucket.totalDurationMs += input.durationMs;
+    operationBucket.maxDurationMs = Math.max(operationBucket.maxDurationMs, input.durationMs);
+    bucket.databaseByOperation[input.queryType] = operationBucket;
     publish();
 }
 
