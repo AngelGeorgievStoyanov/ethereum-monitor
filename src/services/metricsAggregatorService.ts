@@ -712,6 +712,89 @@ function buildScannerAnalytics(
     const selectedSessions = catchUpSessions.filter((session) => session.startedAtMs >= since);
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
     const selectedMinuteBuckets = minuteBuckets.filter((bucket) => bucket.timestampMs + METRICS_BUCKET_INTERVAL_MS > since);
+    const sumBucketMetric = (key: keyof MinuteMetricBucket): number =>
+        selectedMinuteBuckets.reduce((total, bucket) => total + Number(bucket[key] ?? 0), 0);
+    const windowSeconds = Math.max(1, availableWindowMs / 1000);
+    const processedBlocks = sumBucketMetric('processedBlocks');
+    const processedTransactions = sumBucketMetric('processedTransactions');
+    const rpcRequests = sumBucketMetric('rpcRequests');
+    const rpcFailures = sumBucketMetric('rpcFailures');
+    const logicalRpcOperations = sumBucketMetric('logicalRpcOperations');
+    const failedRpcOperations = sumBucketMetric('rpcOperationFailures');
+    const successfulRpcOperations = Math.max(0, logicalRpcOperations - failedRpcOperations);
+    const selectedRpcDurations = selectedRpc
+        .map((event) => Number(event.durationMs))
+        .filter((duration) => Number.isFinite(duration))
+        .sort((left, right) => left - right);
+    const windowPercentile = (ratio: number): number | null =>
+        selectedRpcDurations.length
+            ? selectedRpcDurations[
+                  Math.min(selectedRpcDurations.length - 1, Math.ceil(selectedRpcDurations.length * ratio) - 1)
+              ]
+            : null;
+    const windowMetrics = {
+        processing: {
+            processedBlocks,
+            processedTransactions,
+            blocksPerSecond: Number((processedBlocks / windowSeconds).toFixed(2)),
+            transactionsPerSecond: Number((processedTransactions / windowSeconds).toFixed(2)),
+            averageTransactionsPerBlock: processedBlocks
+                ? Number((processedTransactions / processedBlocks).toFixed(2))
+                : null,
+            averageBlockDurationMs: processedBlocks
+                ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
+                : null,
+            averageFilterDurationMs: sumBucketMetric('filterEvaluations')
+                ? Number((sumBucketMetric('predicateDurationMsTotal') / sumBucketMetric('filterEvaluations')).toFixed(2))
+                : null,
+            averageDatabaseBatchWriteDurationMs: processedBlocks
+                ? Number((sumBucketMetric('databaseBatchWriteDurationMsTotal') / processedBlocks).toFixed(1))
+                : null,
+        },
+        rpc: {
+            totalRequests: rpcRequests,
+            failures: rpcFailures,
+            rateLimitErrors: sumBucketMetric('rpcRateLimitErrors'),
+            timeoutErrors: sumBucketMetric('rpcTimeoutErrors'),
+            connectionErrors: sumBucketMetric('rpcConnectionErrors'),
+            providerErrors: sumBucketMetric('rpcProviderErrors'),
+            jsonRpcErrors: sumBucketMetric('rpcJsonRpcErrors'),
+            otherErrors: sumBucketMetric('rpcOtherErrors'),
+            retryableFailures: sumBucketMetric('rpcRetryableFailures'),
+            averageLatencyMs: rpcRequests
+                ? Number((sumBucketMetric('rpcDurationMsTotal') / rpcRequests).toFixed(1))
+                : null,
+            latencyP95Ms: windowPercentile(0.95),
+            operations: {
+                totalOperations: logicalRpcOperations,
+                successfulOperations: successfulRpcOperations,
+                failedOperations: failedRpcOperations,
+                retriedOperations: sumBucketMetric('rpcRetriedOperations'),
+                totalRetryAttempts: sumBucketMetric('rpcRetryAttempts'),
+                endpointFailovers: sumBucketMetric('rpcEndpointFailovers'),
+                averageAttemptsPerSuccessfulOperation: successfulRpcOperations
+                    ? Number((sumBucketMetric('successfulOperationAttempts') / successfulRpcOperations).toFixed(2))
+                    : null,
+            },
+        },
+        database: {
+            queries: sumBucketMetric('databaseQueries'),
+            reads: sumBucketMetric('databaseReads'),
+            writes: sumBucketMetric('databaseWrites'),
+            failures: sumBucketMetric('databaseFailures'),
+            averageQueryDurationMs: sumBucketMetric('databaseQueries')
+                ? Number((sumBucketMetric('databaseDurationMsTotal') / sumBucketMetric('databaseQueries')).toFixed(1))
+                : null,
+        },
+        filters: {
+            evaluations: sumBucketMetric('filterEvaluations'),
+            matches: sumBucketMetric('filterMatches'),
+            failures: sumBucketMetric('filterFailures'),
+            averageDurationMs: sumBucketMetric('filterEvaluations')
+                ? Number((sumBucketMetric('predicateDurationMsTotal') / sumBucketMetric('filterEvaluations')).toFixed(2))
+                : null,
+        },
+    };
 
     return {
         generatedAt: new Date(now).toISOString(),
@@ -727,6 +810,7 @@ function buildScannerAnalytics(
             { value: 'available', label: 'Available history' },
         ],
         current,
+        windowMetrics,
         blockSamples: selectedBlocks.map(({ timestampMs: _timestampMs, ...sample }) => sample),
         lagSamples: selectedLag.map(({ timestampMs: _timestampMs, ...sample }) => sample),
         rpcEvents: selectedRpc.map(({ timestampMs: _timestampMs, ...event }) => event),
