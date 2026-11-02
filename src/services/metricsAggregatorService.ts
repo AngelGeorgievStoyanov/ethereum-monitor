@@ -695,6 +695,7 @@ function buildScannerAnalytics(
             rpcEvents: rpcEvents.length,
             catchUpSessions: catchUpSessions.length,
             batches: batchSamples.length,
+            minuteBuckets: minuteBuckets.length,
         },
     };
 }
