@@ -107,7 +107,7 @@ function getSnapshot() {
     const lagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
         ? Math.max(0, latestFinalizedBlock - lastProcessedBlock) : null;
     const recentTransactions = sum('transactionCount');
-    const recentFinalized = finalizedSamples.filter((sample) => now - sample.timestampMs <= 60000);
+    const recentFinalized = finalizedSamples.filter((sample) => now - sample.timestampMs <= 900000);
     const finalizedElapsedMs = recentFinalized.length > 1
         ? recentFinalized[recentFinalized.length - 1].timestampMs - recentFinalized[0].timestampMs
         : 0;
@@ -115,9 +115,13 @@ function getSnapshot() {
         ? Number(((recentFinalized[recentFinalized.length - 1].blockNumber - recentFinalized[0].blockNumber) * 1000 / finalizedElapsedMs).toFixed(2))
         : null;
     const blocksPerSecondLastMinute = Number((recent.length / 60).toFixed(2));
-    const lagReductionBlocksPerSecond = chainBlocksPerSecond === null
-        ? null
-        : Number((blocksPerSecondLastMinute - chainBlocksPerSecond).toFixed(2));
+    const activeCatchUpSession = catchUpSessions[catchUpSessions.length - 1];
+    const activeCatchUpElapsedMs = activeCatchUpSession?.status === 'running'
+        ? now - activeCatchUpSession.startedAtMs
+        : 0;
+    const lagReductionBlocksPerSecond = activeCatchUpSession?.status === 'running' && lagBlocks !== null && activeCatchUpElapsedMs >= 10000
+        ? Number(((Number(activeCatchUpSession.initialLagBlocks) - lagBlocks) * 1000 / activeCatchUpElapsedMs).toFixed(2))
+        : null;
     const estimatedCatchUpSeconds = lagBlocks !== null && lagBlocks > 0 && lagReductionBlocksPerSecond !== null && lagReductionBlocksPerSecond > 0
         ? Number((lagBlocks / lagReductionBlocksPerSecond).toFixed(1))
         : null;
