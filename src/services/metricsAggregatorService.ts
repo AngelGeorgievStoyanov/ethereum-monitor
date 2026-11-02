@@ -225,17 +225,32 @@ function publish(): void {
         const currentSnapshot = getSnapshot();
         getDynamicConfigService().publishRuntimeMetrics(currentSnapshot);
         const runtime = currentSnapshot as {
-            scanner: { running: boolean; uptimeSeconds: number; activeFiltersCount: number };
-            chain: { latestFinalizedBlock: number | null; latestFinalizedAt: string | null; lagBlocks: number | null; rpcAvailable: boolean | null };
+            scanner: {
+                running: boolean;
+                paused: boolean;
+                pauseMode: string | null;
+                uptimeSeconds: number;
+                activeFiltersCount: number;
+            };
+            chain: {
+                latestFinalizedBlock: number | null;
+                latestFinalizedAt: string | null;
+                lastProcessedBlock: number | null;
+                lagBlocks: number | null;
+                rpcAvailable: boolean | null;
+            };
             rpc: { endpoints: Array<Record<string, unknown>> };
             recovery: Record<string, number>;
         };
         getDynamicConfigService().updateScannerStatusSnapshot({
             scannerRunning: runtime.scanner.running,
+            paused: runtime.scanner.paused,
+            mode: runtime.scanner.pauseMode,
             processUptimeSeconds: runtime.scanner.uptimeSeconds,
             activeFiltersCount: runtime.scanner.activeFiltersCount,
             latestFinalizedBlock: runtime.chain.latestFinalizedBlock,
             latestFinalizedAt: runtime.chain.latestFinalizedAt,
+            lastProcessedBlock: runtime.chain.lastProcessedBlock,
             lagBlocks: runtime.chain.lagBlocks,
             rpcAvailable: runtime.chain.rpcAvailable ?? false,
             rpcMetrics: runtime.rpc.endpoints,
