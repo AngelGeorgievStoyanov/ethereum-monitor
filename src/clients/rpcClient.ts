@@ -163,7 +163,7 @@ export function createRpcClient() {
             } catch (error) {
                 const message = formatError(error);
                 recordEndpointFailure(endpoint, startedAt, error);
-                publishRpcMetricEvent({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message, retryable: isRetryableEndpointError(error) });
+                publishRpcMetricEvent({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message, retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 results.push({ endpointIndex: endpoint.index, block: null, error: message });
             }
         }
@@ -210,7 +210,7 @@ export function createRpcClient() {
             } catch (error) {
                 const message = formatError(error);
                 recordEndpointFailure(endpoint, startedAt, error);
-                publishRpcMetricEvent({ method: 'getBlock(finalized,diagnostic)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message, retryable: isRetryableEndpointError(error) });
+                publishRpcMetricEvent({ method: 'getBlock(finalized,diagnostic)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message, retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 results.push({
                     endpointIndex: endpoint.index,
                     blockNumber: null,
@@ -236,7 +236,7 @@ export function createRpcClient() {
                 publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: block ? 'success' : 'failure', message: block ? undefined : 'EMPTY_BLOCK' });
             } catch (error) {
                 getBlockDurationMs = Date.now() - getBlockStartedAt;
-                publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
+                publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 throw error;
             }
 
@@ -252,7 +252,7 @@ export function createRpcClient() {
                 publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'success' });
             } catch (error) {
                 getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
-                publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
+                publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 throw error;
             }
 
