@@ -15,6 +15,7 @@ import {
 import { getBlockWithConsensus } from './blockConsensusService';
 import { reconcileBlockCandidates } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
+import type { TransferBatchCandidate } from '../types/transfer-batch.types';
 import { iterateBlockRangeBatches } from '../utils/blockRangeBatch';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import {
@@ -86,7 +87,7 @@ async function runManualRescanInternal({
     let currentBlock = fromBlock - 1;
     let lastProgressReported = 0;
     const canonicalIdentities = new Map<number, CanonicalBlockIdentity>();
-    const pendingCandidates: import('../types/transfer-batch.types').TransferBatchCandidate[] = [];
+    const pendingCandidates: TransferBatchCandidate[] = [];
 
     const flushPendingCandidates = async (): Promise<void> => {
         if (pendingCandidates.length === 0) return;
