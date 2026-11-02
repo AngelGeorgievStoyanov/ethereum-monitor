@@ -517,7 +517,7 @@ function publishScannerAnalyticsSnapshots(current: ReturnType<typeof getSnapshot
     getDynamicConfigService().publishRuntimeAnalytics(snapshots);
 }
 
-export function getScannerAnalytics(windowLabel = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
+export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
     const snapshots = getDynamicConfigService().getRuntimeAnalyticsSnapshot() as
         | Record<string, ScannerAnalyticsResponse>
         | null;
