@@ -19,6 +19,7 @@ import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { isScannerLockHeld } from './scannerLockService';
 import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
+import { recordProcessingBatch } from './metricsAggregatorService';
 
 type ConfirmedBlock = CanonicalBlockIdentity;
 
@@ -84,6 +85,7 @@ export async function processFinalizedBlocks(
 
     while (state.lastProcessedBlock < finalizedBlockNumber) {
         currentBatchStart = state.lastProcessedBlock + 1;
+        const batchStartedAt = Date.now();
         if (await shouldPauseBeforeBlock(currentBatchStart, state.lastProcessedBlock)) return;
         const filterConfig = getActiveTxFilters();
         const activeTxFilters = filterConfig.filters;
@@ -188,6 +190,13 @@ export async function processFinalizedBlocks(
                 );
                 accumulateBlockMetrics(totals, result, blockDurationMs, blockNumber);
             }
+            recordProcessingBatch({
+                startBlock: blockNumbers[0],
+                endBlock: blockNumbers[blockNumbers.length - 1],
+                blocks: preparedBlocks.length,
+                transactions: preparedBlocks.reduce((total, item) => total + item.result.transactionCount, 0),
+                durationMs: Date.now() - batchStartedAt,
+            });
         } catch (error) {
             console.error(
                 `[Scanner] Processing failed at block ${currentBatchStart}; checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
