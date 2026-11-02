@@ -3,6 +3,7 @@ export interface ScannerAnalyticsResponse {
     window: string;
     current: Record<string, unknown>;
     blockSamples: Array<Record<string, unknown>>;
+    lagSamples: Array<Record<string, unknown>>;
     rpcEvents: Array<Record<string, unknown>>;
     catchUpSessions: Array<Record<string, unknown>>;
     batches: Array<Record<string, unknown>>;
