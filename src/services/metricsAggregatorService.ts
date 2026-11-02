@@ -6,7 +6,7 @@ import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.con
 import { classifyRpcError } from '../utils/classifyRpcError';
 import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
 import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
-import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS } from '../constants/scanner-metrics.constants';
+import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS, METRICS_RPC_EVENT_COMPACTION_THRESHOLD } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -295,7 +295,7 @@ function trimSamples(now: number): void {
         rpcEventsStartIndex += 1;
     }
     if (
-        rpcEventsStartIndex >= 1000 &&
+        rpcEventsStartIndex >= METRICS_RPC_EVENT_COMPACTION_THRESHOLD &&
         rpcEventsStartIndex * 2 >= rpcEvents.length
     ) {
         rpcEvents.splice(0, rpcEventsStartIndex);
