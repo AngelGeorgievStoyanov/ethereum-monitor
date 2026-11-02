@@ -3,6 +3,7 @@ import { getDynamicConfigService } from './dynamicConfigService';
 import { subscribeToRpcMetricEvents, subscribeToRpcOperationMetricEvents, type RpcMetricEventInput, type RpcOperationMetricEvent } from '../metrics/metricsEventBus';
 import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
 import { classifyRpcError } from '../utils/classifyRpcError';
+import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -23,11 +24,8 @@ type BlockInput = {
 
 type RpcInput = RpcMetricEventInput;
 
-const MAX_BLOCK_SAMPLES = 10000;
-const MAX_RPC_EVENTS = 1000;
-const MAX_CATCHUP_SESSIONS = 50;
-const MAX_BATCH_SAMPLES = 1000;
-const startedAt = new Date().toISOString();
+const startedAtMs = Date.now();
+const startedAt = new Date(startedAtMs).toISOString();
 const blockSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
@@ -109,12 +107,12 @@ function publish(): void {
 }
 
 function trimSamples(now: number): void {
-    while (blockSamples.length > 0 && (blockSamples.length > MAX_BLOCK_SAMPLES || now - blockSamples[0].timestampMs > 86400000)) blockSamples.shift();
-    while (rpcEvents.length > MAX_RPC_EVENTS) rpcEvents.shift();
-    while (catchUpSessions.length > MAX_CATCHUP_SESSIONS) catchUpSessions.shift();
-    while (batchSamples.length > MAX_BATCH_SAMPLES) batchSamples.shift();
-    while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > 3600000) finalizedSamples.shift();
-    while (lagSamples.length > 1000) lagSamples.shift();
+    while (blockSamples.length > 0 && (blockSamples.length > METRICS_SAMPLE_LIMITS.blocks || now - blockSamples[0].timestampMs > METRICS_RETENTION_MS)) blockSamples.shift();
+    while (rpcEvents.length > METRICS_SAMPLE_LIMITS.rpcEvents) rpcEvents.shift();
+    while (catchUpSessions.length > METRICS_SAMPLE_LIMITS.catchUpSessions) catchUpSessions.shift();
+    while (batchSamples.length > METRICS_SAMPLE_LIMITS.batches) batchSamples.shift();
+    while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > METRICS_RETENTION_MS) finalizedSamples.shift();
+    while (lagSamples.length > 0 && (lagSamples.length > METRICS_SAMPLE_LIMITS.lag || now - lagSamples[0].timestampMs > METRICS_RETENTION_MS)) lagSamples.shift();
 }
 
 function getSnapshot() {
@@ -241,7 +239,7 @@ function getSnapshot() {
         },
         database: { ...databaseMetrics, averageWriteDurationMs: databaseMetrics.writes ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1)) : null },
         recovery: { ...recoveryMetrics },
-        recentRpcErrors: rpcEvents.filter((event) => event.outcome === 'failure').slice(-100).map(({ timestampMs: _timestampMs, ...event }) => event),
+        recentRpcErrors: rpcEvents.filter((event) => event.outcome === 'failure').slice(-METRICS_SAMPLE_LIMITS.recentRpcErrors).map(({ timestampMs: _timestampMs, ...event }) => event),
         recentBlocks: blockSamples.slice(-30).map(({ timestampMs: _timestampMs, ...sample }) => sample),
     };
 }
@@ -459,9 +457,13 @@ export function recordDatabaseFailure(operation: string, message: string): void 
     publish();
 }
 
-export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsResponse {
+export function getScannerAnalytics(windowMs = DEFAULT_METRICS_WINDOW.durationMs, windowLabel = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
     const now = Date.now();
-    const since = now - Math.max(60000, Math.min(windowMs, 86400000));
+    const requestedWindowMs = windowLabel === 'available'
+        ? METRICS_RETENTION_MS
+        : Math.max(60000, Math.min(windowMs, METRICS_RETENTION_MS));
+    const availableWindowMs = Math.max(0, Math.min(requestedWindowMs, now - startedAtMs));
+    const since = now - availableWindowMs;
     const selectedBlocks = blockSamples.filter((sample) => sample.timestampMs >= since);
     const selectedLag = lagSamples.filter((sample) => sample.timestampMs >= since);
     const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
@@ -470,7 +472,13 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
     const current = getSnapshot();
     const response: ScannerAnalyticsResponse = {
         generatedAt: new Date(now).toISOString(),
-        window: String(Math.max(60000, Math.min(windowMs, 86400000))),
+        window: windowLabel,
+        requestedWindowMs,
+        availableWindowMs,
+        windowCoverage: windowLabel === 'available'
+            ? 'available'
+            : now - startedAtMs >= requestedWindowMs ? 'complete' : 'partial',
+        historyStartedAt: startedAt,
         current,
         blockSamples: selectedBlocks.map(({ timestampMs: _timestampMs, ...sample }) => sample),
         lagSamples: selectedLag.map(({ timestampMs: _timestampMs, ...sample }) => sample),
