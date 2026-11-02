@@ -144,6 +144,12 @@ export function createDynamicConfigService() {
         return scannerStatusSnapshot;
     }
 
+    // Dynamic Config remains a passive in-memory snapshot store; callers own all state calculations.
+    function updateScannerStatusSnapshot(patch: Record<string, unknown>): void {
+        if (!scannerStatusSnapshot || typeof scannerStatusSnapshot !== 'object') return;
+        scannerStatusSnapshot = { ...scannerStatusSnapshot, ...patch };
+    }
+
     txFilterService.setDynamicConfigRefreshHandler(refreshWithRetry);
     return {
         init,
@@ -157,6 +163,7 @@ export function createDynamicConfigService() {
         getRuntimeAnalyticsSnapshot,
         publishScannerStatus,
         getScannerStatusSnapshot,
+        updateScannerStatusSnapshot,
     };
 }
 
