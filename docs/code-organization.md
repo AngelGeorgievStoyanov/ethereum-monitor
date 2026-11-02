@@ -242,7 +242,7 @@ These rules document the approved runtime design. They are intended to prevent f
 - Fetch each block and its receipts once for normal Rescan processing, then pass the fetched data through processing. Do not fetch the same block again unless a mismatch requires verification.
 - Normal Rescan does not run strict provider consensus for every block. First compare the fetched block identity with the stored canonical identity. Invoke strict consensus only when a mismatch is detected.
 - A mismatch confirmed by strict consensus is a reorganization signal and must follow the existing Reorg Recovery handoff. If consensus confirms the stored identity but the initially fetched response disagrees, stop conservatively; do not silently process a different provider response.
-- Persist and publish Rescan progress every `RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS` blocks (currently 50), and always publish the final progress on completion or failure. The interval batches progress updates only: it does not mean that block payloads, transactions, or receipts are accumulated in memory. Only progress values such as the current block and processed-block count are accumulated between updates.
+- Persist and publish Rescan progress every `RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS` blocks (currently 50), and always publish the final progress on completion or failure. Candidate persistence uses its own `RESCAN_CANDIDATE_BATCH_SIZE` limit (currently 500 candidates), so large candidate sets are flushed before the 50-block progress interval. A single block's prepared candidate array still exists while that block is processed; the candidate batch limit bounds accumulation across blocks, not the temporary result for one block.
 - Keep progress logging frequency separate from progress persistence frequency; use the dedicated constants in `src/constants/rescan.constants.ts`.
 
 ### Reorganization detection and recovery
@@ -253,12 +253,12 @@ These rules document the approved runtime design. They are intended to prevent f
 - Reuse the in-memory checkpoint/canonical-identity cache where valid to avoid redundant database reads, but never remove the transactional checkpoint and parent-hash integrity checks.
 - Keep Recovery state transitions and rollback/reprocessing decisions in the Recovery workflow. Do not move these decisions into Dynamic Config.
 - When optimizing Recovery RPC calls, preserve strict all-provider identity verification. The approved data-reuse approach is to obtain one full block response from one provider and identity-only responses from the other providers, compare all identities, and reuse the already fetched full block after consensus succeeds. Do not fetch three full copies of the block merely for consensus. This optimization must not weaken provider agreement requirements; receipts remain a separate processing input and must not be assumed to be included in the block response.
-- Do not claim this RPC response-reuse optimization is implemented until the RPC client and Recovery call path actually return and consume the full block response without fetching it again.
+- This RPC response-reuse optimization is implemented: the Recovery call path receives one full block response, verifies its identity against identity-only responses from the other configured providers, and reuses that full response after consensus succeeds. Receipts remain a separate processing input.
 
 ### Metrics and analytics
 
 - Metrics aggregation/publishing runs at `METRICS_PUBLISH_INTERVAL_MS` (currently 10000 ms).
-- Scanner analytics refreshes at `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms).
+- Scanner analytics refreshes at `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms). The RPC event-derived latency percentiles, per-method totals, and recent RPC error list in the runtime snapshot are cached for this same interval; they are not recalculated on every 10-second metrics publication.
 - Dashboard polling and RPC event collection are separate concerns; do not change their cadence merely to change the metrics snapshot publishing interval.
 - Dynamic Config stores the latest metrics and analytics snapshots. Aggregation and calculations remain in the metrics/analytics services.
 
