@@ -31,6 +31,7 @@ import {
     getConfirmedCheckpointBlock,
     hasCanonicalHistoryForCheckpoint,
     cacheConfirmedCheckpointBlock,
+    invalidateConfirmedBlockCache,
 } from './scannerCheckpointCache';
 import {
     findScannerStatusState,
