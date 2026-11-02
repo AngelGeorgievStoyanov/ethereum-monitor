@@ -1,6 +1,14 @@
 import { BlockVerificationUnavailableError } from '../errors/blockVerificationUnavailableError';
-import { getBlockWithConsensus } from './blockConsensusService';
+import {
+    getBlockWithConsensus,
+    getBlockWithConsensusAndData,
+} from './blockConsensusService';
 import type { ConsensusBlock } from './blockConsensusService';
+import {
+    fetchBlockForProcessing,
+    type FetchedBlockForProcessing,
+} from './blockProcessingService';
+import { fetchBlockDataFromVerifiedBlock } from './evmBlockDataService';
 import {
     CONSENSUS_LOG_INTERVAL_MS,
     CONSENSUS_MAX_RETRIES,
@@ -72,4 +80,32 @@ export async function getReorgVerifiedBlock(
     const message = `Block verification unavailable for block ${blockNumber} during ${operation} after ${CONSENSUS_MAX_RETRIES} retries using the only configured RPC provider: ${lastFailure}`;
     console.error(`[ReorgVerification] CRITICAL ${message}`);
     throw new BlockVerificationUnavailableError(blockNumber, operation, message);
+}
+
+
+export async function getReorgVerifiedBlockForProcessing(
+    blockNumber: number,
+    operation: string,
+): Promise<FetchedBlockForProcessing> {
+    if (evmRpcClient.getEndpointCount() === 1) {
+        return fetchBlockForProcessing(blockNumber);
+    }
+
+    const verified = await getBlockWithConsensusAndData(blockNumber, operation);
+    const fetched = await fetchBlockDataFromVerifiedBlock(
+        blockNumber,
+        verified.block,
+        verified.endpointIndex,
+        verified.getBlockDurationMs,
+        verified.consensusDurationMs,
+    );
+
+    return {
+        block: fetched.block as FetchedBlockForProcessing['block'],
+        receipts: fetched.receipts,
+        fetchDurationMs: fetched.durationMs,
+        getBlockDurationMs: fetched.getBlockDurationMs,
+        getBlockReceiptsDurationMs: fetched.getBlockReceiptsDurationMs,
+        attempt: fetched.attempt,
+    };
 }
