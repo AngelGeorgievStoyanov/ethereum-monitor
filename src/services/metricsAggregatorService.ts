@@ -151,6 +151,7 @@ const rpcTotals = {
     timeoutErrors: 0,
     connectionErrors: 0,
     serverErrors: 0,
+    providerErrors: 0,
     jsonRpcErrors: 0,
     otherErrors: 0,
     totalDurationMs: 0,
@@ -519,7 +520,10 @@ export function recordRpcRequest(input: RpcInput): void {
         if (failureKind === 'rateLimit') rpcTotals.rateLimitErrors += 1;
         else if (failureKind === 'timeout') rpcTotals.timeoutErrors += 1;
         else if (failureKind === 'network') rpcTotals.connectionErrors += 1;
-        else if (failureKind === 'provider') rpcTotals.serverErrors += 1;
+        else if (failureKind === 'provider') {
+            rpcTotals.serverErrors += 1;
+            rpcTotals.providerErrors += 1;
+        }
         else if (failureKind === 'rpc') rpcTotals.jsonRpcErrors += 1;
         else rpcTotals.otherErrors += 1;
     } else rpcTotals.successes += 1;
