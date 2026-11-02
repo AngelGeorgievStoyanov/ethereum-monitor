@@ -200,11 +200,27 @@ export function createRpcClient() {
             }
             recordEndpointSuccess(endpoint, startedAt);
             publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs, outcome: 'success' });
+            publishRpcOperationMetricEvent({
+                operation: `getBlockReceiptsFromEndpoint(${blockNumber})`,
+                durationMs,
+                attempts: 1,
+                retryCount: 0,
+                endpointFailovers: 0,
+                outcome: 'success',
+            });
             return { receipts: response as RpcTransactionReceipt[], durationMs };
         } catch (error) {
             const durationMs = Date.now() - startedAt;
             recordEndpointFailure(endpoint, startedAt, error);
             publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
+            publishRpcOperationMetricEvent({
+                operation: `getBlockReceiptsFromEndpoint(${blockNumber})`,
+                durationMs,
+                attempts: 1,
+                retryCount: 0,
+                endpointFailovers: 0,
+                outcome: 'failure',
+            });
             throw error;
         }
     }
