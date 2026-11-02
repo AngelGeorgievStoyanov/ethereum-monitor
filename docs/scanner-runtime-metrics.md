@@ -55,7 +55,7 @@ The response includes the current snapshot, block samples, lag samples, RPC even
 - Block and receipt fetching are measured as separate RPC methods.
 - Blocks/sec and transactions/sec use completed block samples from the trailing 60-second window.
 - Catch-up sessions begin when lag exceeds the configured parallel-processing threshold and finish when the processed checkpoint reaches the latest observed finalized block. Normal one-block/finality polling lag does not create a catch-up session.
-- Actual lag reduction speed is estimated from processed block rate minus finalized-chain growth rate. An ETA is shown only while that net rate is positive.
+- Actual lag reduction speed is measured from the session's initial lag against its current lag. An ETA is shown only after at least 10 seconds and while the measured net rate is positive. Finalized-chain growth rate is also exposed separately.
 - Processing batch samples report the actual block range, number of blocks, transaction count, total batch duration, and database write duration.
 - Database write failures are counted separately from RPC and processing failures.
 
