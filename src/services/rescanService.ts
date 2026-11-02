@@ -15,6 +15,7 @@ import {
 import { getBlockWithConsensus } from './blockConsensusService';
 import { reconcileBlockCandidates } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
+import { iterateBlockRangeBatches } from '../utils/blockRangeBatch';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
 import {
     recordReorgDetected,
@@ -93,18 +94,26 @@ async function runManualRescanInternal({
     };
 
     try {
-        for (let blockNumber = fromBlock; blockNumber <= checkpoint; blockNumber += 1) {
-            if (!canonicalIdentities.has(blockNumber)) {
-                const batchEnd = Math.min(
-                    blockNumber + RESCAN_BLOCK_IDENTITY_BATCH_SIZE - 1,
-                    checkpoint,
-                );
-                const batch = await findCanonicalBlockIdentitiesInRange(blockNumber, batchEnd);
-                canonicalIdentities.clear();
-                for (const identity of batch) {
-                    canonicalIdentities.set(identity.blockNumber, identity);
-                }
+        for (const range of iterateBlockRangeBatches({
+            fromBlock,
+            toBlock: checkpoint,
+            batchSize: RESCAN_BLOCK_IDENTITY_BATCH_SIZE,
+            direction: 'forward',
+        })) {
+            const batch = await findCanonicalBlockIdentitiesInRange(
+                range.fromBlock,
+                range.toBlock,
+            );
+            canonicalIdentities.clear();
+            for (const identity of batch) {
+                canonicalIdentities.set(identity.blockNumber, identity);
             }
+
+            for (
+                let blockNumber = range.fromBlock;
+                blockNumber <= range.toBlock;
+                blockNumber += 1
+            ) {
 
             const storedBlock = canonicalIdentities.get(blockNumber);
             if (!storedBlock) {
@@ -157,6 +166,7 @@ async function runManualRescanInternal({
                 console.log(
                     `[Rescan] Progress: processed ${blocksProcessed} block(s), current=${blockNumber}, range=${fromBlock}-${checkpoint}`,
                 );
+            }
             }
         }
 
