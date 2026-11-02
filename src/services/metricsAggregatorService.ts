@@ -50,6 +50,11 @@ type MinuteMetricBucket = {
     rpcFailures: number;
     rpcRateLimitErrors: number;
     rpcTimeoutErrors: number;
+    logicalRpcOperations: number;
+    rpcRetriedOperations: number;
+    rpcRetryAttempts: number;
+    rpcEndpointFailovers: number;
+    rpcOperationFailures: number;
     rpcDurationMsTotal: number;
     databaseQueries: number;
     databaseReads: number;
@@ -86,6 +91,11 @@ function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
             rpcFailures: 0,
             rpcRateLimitErrors: 0,
             rpcTimeoutErrors: 0,
+            logicalRpcOperations: 0,
+            rpcRetriedOperations: 0,
+            rpcRetryAttempts: 0,
+            rpcEndpointFailovers: 0,
+            rpcOperationFailures: 0,
             rpcDurationMsTotal: 0,
             databaseQueries: 0,
             databaseReads: 0,
@@ -775,6 +785,12 @@ function recordRpcOperation(input: RpcOperationMetricEvent): void {
     if (input.retryCount > 0) rpcOperationTotals.retriedOperations += 1;
     rpcOperationTotals.totalRetryAttempts += input.retryCount;
     rpcOperationTotals.endpointFailovers += input.endpointFailovers;
+    const bucket = getMinuteBucket(Date.now());
+    bucket.logicalRpcOperations += 1;
+    bucket.rpcRetriedOperations += input.retryCount > 0 ? 1 : 0;
+    bucket.rpcRetryAttempts += input.retryCount;
+    bucket.rpcEndpointFailovers += input.endpointFailovers;
+    if (input.outcome === 'failure') bucket.rpcOperationFailures += 1;
     publish();
 }
 
