@@ -21,5 +21,6 @@ export interface ScannerAnalyticsResponse {
         rpcEvents: number;
         catchUpSessions: number;
         batches: number;
+        minuteBuckets: number;
     };
 }
