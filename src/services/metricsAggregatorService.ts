@@ -32,6 +32,7 @@ const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
 const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const finalizedSamples: Array<{ timestampMs: number; blockNumber: number }> = [];
+const lagSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const endpointTotals = new Map<number, { attempts: number; successes: number; failures: number; retryableFailures: number; durationMs: number; lastFailureAt: string | null }>();
 const rpcTotals = {
     totalRequests: 0,
@@ -93,6 +94,7 @@ function trimSamples(now: number): void {
     while (catchUpSessions.length > MAX_CATCHUP_SESSIONS) catchUpSessions.shift();
     while (batchSamples.length > MAX_BATCH_SAMPLES) batchSamples.shift();
     while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > 3600000) finalizedSamples.shift();
+    while (lagSamples.length > 1000) lagSamples.shift();
 }
 
 function getSnapshot() {
@@ -218,6 +220,7 @@ export function recordFinalizedBlock(blockNumber: number): void {
     trimSamples(Date.now());
     rpcAvailable = true;
     const lag = lastProcessedBlock === null ? null : Math.max(0, blockNumber - lastProcessedBlock);
+    lagSamples.push({ timestamp: latestFinalizedAt, timestampMs: Date.now(), latestFinalizedBlock: blockNumber, lastProcessedBlock, lagBlocks: lag });
     if (lag !== null && lag > SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS && !catchUpActive) {
         const now = Date.now();
         catchUpSessions.push({
@@ -256,6 +259,8 @@ export function recordProcessedBlock(input: BlockInput): void {
     totalDatabaseWriteDurationMs += input.databaseWriteDurationMs;
     lastProcessedBlock = input.blockNumber;
     lastProcessedAt = timestamp;
+    const currentLag = latestFinalizedBlock === null ? null : Math.max(0, latestFinalizedBlock - lastProcessedBlock);
+    lagSamples.push({ timestamp, timestampMs: now, latestFinalizedBlock, lastProcessedBlock, lagBlocks: currentLag });
     const session = catchUpSessions[catchUpSessions.length - 1];
     if (session?.status === 'running') {
         session.processedBlocks = Number(session.processedBlocks) + 1;
@@ -410,6 +415,7 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
     const now = Date.now();
     const since = now - Math.max(60000, Math.min(windowMs, 86400000));
     const selectedBlocks = blockSamples.filter((sample) => sample.timestampMs >= since);
+    const selectedLag = lagSamples.filter((sample) => sample.timestampMs >= since);
     const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
     const selectedSessions = catchUpSessions.filter((session) => session.startedAtMs >= since);
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
@@ -419,6 +425,7 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
         window: String(Math.max(60000, Math.min(windowMs, 86400000))),
         current,
         blockSamples: selectedBlocks.map(({ timestampMs: _timestampMs, ...sample }) => sample),
+        lagSamples: selectedLag.map(({ timestampMs: _timestampMs, ...sample }) => sample),
         rpcEvents: selectedRpc.map(({ timestampMs: _timestampMs, ...event }) => event),
         catchUpSessions: selectedSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
         batches: selectedBatches.map(({ timestampMs: _timestampMs, ...sample }) => sample),
