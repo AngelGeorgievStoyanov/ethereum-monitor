@@ -242,7 +242,6 @@ function publish(): void {
     if (publishTimer) return;
     publishTimer = setTimeout(() => {
         publishTimer = undefined;
-        const now = Date.now();
         const currentSnapshot = getSnapshot();
         getDynamicConfigService().publishRuntimeMetrics(currentSnapshot);
         const runtime = currentSnapshot as {
