@@ -273,6 +273,7 @@ export function recordProcessingBatch(input: {
     blocks: number;
     transactions: number;
     durationMs: number;
+    databaseWriteDurationMs: number;
 }): void {
     const now = Date.now();
     batchSamples.push({
@@ -283,7 +284,7 @@ export function recordProcessingBatch(input: {
         transactionsPerSecond: input.durationMs > 0 ? Number((input.transactions * 1000 / input.durationMs).toFixed(2)) : 0,
     });
     databaseMetrics.writes += 1;
-    databaseMetrics.totalWriteDurationMs += input.durationMs;
+    databaseMetrics.totalWriteDurationMs += input.databaseWriteDurationMs;
     trimSamples(now);
     publish();
 }
