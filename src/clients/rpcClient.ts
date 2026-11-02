@@ -104,7 +104,7 @@ export function createRpcClient() {
                 return result;
             } catch (error) {
                 recordEndpointFailure(endpoint, startedAt, error);
-                recordRpcRequest({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error) });
+                recordRpcRequest({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
                 lastError = error;
                 if (!isRetryableEndpointError(error)) throw error;
 
@@ -152,7 +152,7 @@ export function createRpcClient() {
             } catch (error) {
                 const message = formatError(error);
                 recordEndpointFailure(endpoint, startedAt, error);
-                recordRpcRequest({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message });
+                recordRpcRequest({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message, retryable: isRetryableEndpointError(error) });
                 results.push({ endpointIndex: endpoint.index, block: null, error: message });
             }
         }
