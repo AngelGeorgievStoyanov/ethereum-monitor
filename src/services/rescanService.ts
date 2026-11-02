@@ -122,14 +122,14 @@ async function runManualRescanInternal({
                     );
                 }
                 canonicalIdentities.delete(blockNumber);
-    
+
                 const fetched = await fetchBlockForProcessing(blockNumber);
                 const fetchedIdentity = {
                     blockNumber: fetched.block.number,
                     blockHash: fetched.block.hash,
                     parentHash: fetched.block.parentHash,
                 };
-    
+
                 if (!matchesBlock(storedBlock, fetchedIdentity)) {
                     const consensusBlock = await getBlockWithConsensus(blockNumber, 'manual rescan');
                     if (!matchesBlock(storedBlock, consensusBlock)) {
@@ -139,12 +139,12 @@ async function runManualRescanInternal({
                             `Chain mismatch found at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
                         );
                     }
-    
+
                     throw new Error(
                         `RPC block response disagreed with provider consensus at block ${blockNumber}; stored canonical identity was confirmed by consensus. Rescan stopped without starting reorg recovery.`,
                     );
                 }
-    
+
                 const prepared = await processFetchedBlock(fetched, activeTxFilters, true);
                 if (!matchesBlock(storedBlock, prepared.block)) {
                     recordReorgDetected();
@@ -153,12 +153,12 @@ async function runManualRescanInternal({
                         `Fetched block data changed during processing at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
                     );
                 }
-    
+
                 await reconcileBlockCandidates(prepared.candidates, scannerStateId, checkpoint);
                 currentBlock = blockNumber;
                 blocksProcessed += 1;
                 recordRescanBlockProcessed();
-    
+
                 if (blocksProcessed % RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS === 0) {
                     await reportProgress();
                 }
