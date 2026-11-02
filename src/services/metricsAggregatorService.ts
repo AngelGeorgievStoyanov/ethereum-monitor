@@ -193,7 +193,6 @@ let maxParallelBlocks = 1;
 let parallelProcessingLagBlocks = 0;
 let catchUpActive = false;
 let publishTimer: ReturnType<typeof setTimeout> | undefined;
-let lastAnalyticsPublishedAt = 0;
 let totalProcessedBlocks = 0;
 let totalProcessedTransactions = 0;
 let totalNativeTransfersSeen = 0;
@@ -277,10 +276,6 @@ function publish(): void {
             recoveryMetrics: runtime.recovery,
             processingMetrics: getBlockProcessingMetrics(),
         });
-        if (now - lastAnalyticsPublishedAt >= METRICS_ANALYTICS_REFRESH_INTERVAL_MS) {
-            publishScannerAnalyticsSnapshots(currentSnapshot);
-            lastAnalyticsPublishedAt = now;
-        }
     }, METRICS_PUBLISH_INTERVAL_MS);
     publishTimer.unref?.();
 }
@@ -970,34 +965,41 @@ function buildScannerAnalytics(
     };
 }
 
-function publishScannerAnalyticsSnapshots(current: ReturnType<typeof getSnapshot>): void {
+let scannerAnalyticsCache: {
+    windowLabel: string;
+    generatedAtMs: number;
+    snapshot: ScannerAnalyticsResponse;
+} | null = null;
+
+export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
+    const selectedWindow = METRICS_TIME_WINDOWS.find((window) => window.value === windowLabel);
+    if (windowLabel !== 'available' && !selectedWindow) {
+        throw new Error(`Analytics window "${windowLabel}" is not configured`);
+    }
+
+    const now = Date.now();
+    if (
+        scannerAnalyticsCache?.windowLabel === windowLabel &&
+        now - scannerAnalyticsCache.generatedAtMs < METRICS_ANALYTICS_REFRESH_INTERVAL_MS
+    ) {
+        return scannerAnalyticsCache.snapshot;
+    }
+
+    const current = getSnapshot();
     const sortedRpcDurations = rpcEvents
         .slice(rpcEventsStartIndex)
         .map((event) => ({ timestampMs: event.timestampMs, durationMs: Number(event.durationMs) }))
         .filter((sample) => Number.isFinite(sample.durationMs))
         .sort((left, right) => left.durationMs - right.durationMs);
-    const snapshots: Record<string, ScannerAnalyticsResponse> = {};
-    for (const window of METRICS_TIME_WINDOWS) {
-        snapshots[window.value] = buildScannerAnalytics(window.durationMs, window.value, current, sortedRpcDurations);
-    }
-    snapshots.available = buildScannerAnalytics(METRICS_RETENTION_MS, 'available', current, sortedRpcDurations);
-    getDynamicConfigService().publishRuntimeAnalytics(snapshots);
-}
+    const snapshot = buildScannerAnalytics(
+        windowLabel === 'available' ? METRICS_RETENTION_MS : selectedWindow!.durationMs,
+        windowLabel,
+        current,
+        sortedRpcDurations,
+    );
 
-export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
-    const snapshots = getDynamicConfigService().getRuntimeAnalyticsSnapshot() as
-        | Record<string, ScannerAnalyticsResponse>
-        | null;
-    if (snapshots?.[windowLabel]) return snapshots[windowLabel];
-
-    // The first request can arrive before the first scheduled metrics publication.
-    const current = getSnapshot();
-    publishScannerAnalyticsSnapshots(current);
-    const initializedSnapshots = getDynamicConfigService().getRuntimeAnalyticsSnapshot() as
-        | Record<string, ScannerAnalyticsResponse>
-        | null;
-    const snapshot = initializedSnapshots?.[windowLabel];
-    if (!snapshot) throw new Error(`Analytics window "${windowLabel}" is not configured`);
+    // Keep only the most recently requested window; analytics payloads can contain large sample arrays.
+    scannerAnalyticsCache = { windowLabel, generatedAtMs: now, snapshot };
     return snapshot;
 }
 
