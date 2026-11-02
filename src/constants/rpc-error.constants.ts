@@ -61,8 +61,8 @@ export const RPC_ERROR_NESTED_KEYS = [
 
 export const RPC_ERROR_MESSAGE_PATTERNS = {
     RATE_LIMIT: [
-        /\\b429\\b/i,
-        /rate[\\s_-]*limit/i,
+        /\b429\b/i,
+        /rate[\s_-]*limit/i,
         /too many requests/i,
         /request limit exceeded/i,
         /quota exceeded/i,
@@ -74,7 +74,7 @@ export const RPC_ERROR_MESSAGE_PATTERNS = {
         /exceeded.*requests/i,
     ],
     TIMEOUT: [
-        /timed?\\s*out/i,
+        /timed?\s*out/i,
         /timeout/i,
         /deadline exceeded/i,
         /etimedout/i,
@@ -103,7 +103,7 @@ export const RPC_ERROR_MESSAGE_PATTERNS = {
     RPC: [
         /json.?rpc/i,
         /execution reverted/i,
-        /\\brevert(?:ed)?\\b/i,
+        /\brevert(?:ed)?\b/i,
         /invalid params/i,
         /method not found/i,
     ],
