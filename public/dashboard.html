@@ -464,7 +464,7 @@
         const retention = data.retention || {};
         const coverage = data.windowCoverage === 'complete' ? 'Complete' : data.windowCoverage === 'available' ? 'Available history' : 'Partial';
         const availableMinutes = Math.floor((data.availableWindowMs || 0) / 60000);
-        setText('analyticsRetention', coverage + ' · ' + availableMinutes + ' minutes available since ' + new Date(data.historyStartedAt).toLocaleTimeString() + ' · ' + number(retention.blockSamples) + ' block samples · ' + number(retention.lagSamples) + ' lag samples · ' + number(retention.rpcEvents) + ' RPC requests · ' + number(retention.batches) + ' batches');
+        setText('analyticsRetention', coverage + ' · ' + availableMinutes + ' minutes available since ' + new Date(data.historyStartedAt).toLocaleTimeString() + ' · ' + number(retention.blockSamples) + ' block samples · ' + number(retention.lagSamples) + ' lag samples · ' + number(retention.rpcEvents) + ' RPC requests · ' + number(retention.batches) + ' batches · ' + number(retention.minuteBuckets) + ' minute buckets');
         const sessions = (data.catchUpSessions || []).slice(-10).reverse();
         $('catchUpRows').innerHTML = sessions.map((item) => '<tr><td>' + (item.startedAt ? new Date(item.startedAt).toLocaleTimeString() : '—') + '</td><td>' + number(item.processedBlocks) + '</td><td>' + number(item.processedTransactions) + '</td><td>' + duration(item.durationMs) + '</td><td>' + number(item.blocksPerSecond) + '</td><td>' + escapeHtml(item.status) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No catch-up sessions retained</td></tr>';
         const methods = (rpc.methods || []).slice(-15);
