@@ -260,7 +260,7 @@ These rules document the approved runtime design. They are intended to prevent f
 - Metrics aggregation/publishing runs at `METRICS_PUBLISH_INTERVAL_MS` (currently 10000 ms).
 - Scanner analytics are calculated on demand for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms); analytics are not precomputed for every window during the 10-second runtime metrics publication. Each analytics calculation sorts the retained RPC durations once and reuses that ordering for the requested window. Retained RPC events use a head index for constant-time removal; the backing array is compacted periodically using `METRICS_RPC_EVENT_COMPACTION_THRESHOLD`, rather than shifting the full array for every expired event. Block and lag sample retention also uses head indexes with periodic compaction via `METRICS_SAMPLE_COMPACTION_THRESHOLD`, avoiding repeated array shifts.
 - Dashboard polling and RPC event collection are separate concerns; do not change their cadence merely to change the metrics snapshot publishing interval.
-- Dynamic Config stores the latest runtime metrics snapshot. Analytics are calculated on demand for the requested window and only the most recently requested analytics result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms), avoiding simultaneous copies of every window's large sample arrays.
+- Dynamic Config stores the latest runtime metrics snapshot only; the analytics cache is owned by the metrics aggregator.
 - Database query metrics classify `WITH` statements by the main statement after their CTE definitions, so data-changing CTEs are counted as writes rather than reads.
 
 ### Constants and code style
