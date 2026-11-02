@@ -151,6 +151,7 @@ export function createBlockMonitorService() {
         while (true) {
             try {
                 if (!(await isScannerLockHeld())) {
+                    updateScannerRuntimeContext({ running: false });
                     needsStateReload = true;
                     while (!(await tryAcquireScannerLock())) {
                         console.warn(
