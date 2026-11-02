@@ -5,6 +5,7 @@ import { subscribeToRpcMetricEvents, subscribeToRpcOperationMetricEvents, type R
 import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
 import { classifyRpcError } from '../utils/classifyRpcError';
 import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
+import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
 import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
@@ -91,6 +92,14 @@ let totalFilterMatchingDurationMs = 0;
 let totalBlockDurationMs = 0;
 let totalDatabaseWriteDurationMs = 0;
 const databaseMetrics = { writes: 0, failures: 0, totalWriteDurationMs: 0, lastErrorAt: null as string | null, lastError: null as string | null };
+const filterMetrics = {
+    evaluations: 0,
+    matches: 0,
+    failures: 0,
+    totalDurationMs: 0,
+    maxDurationMs: 0,
+    byFilter: {} as Record<string, { evaluations: number; matches: number; failures: number; totalDurationMs: number }>,
+};
 const databaseQueryTotals = {
     queries: 0,
     reads: 0,
@@ -292,6 +301,12 @@ function getSnapshot() {
                     lagReductionPerSecond: durationMs > 0 ? Number((lagReductionBlocks * 1000 / durationMs).toFixed(2)) : 0,
                 };
             }),
+        },
+        filters: {
+            ...filterMetrics,
+            averageDurationMs: filterMetrics.evaluations
+                ? Number((filterMetrics.totalDurationMs / filterMetrics.evaluations).toFixed(2))
+                : null,
         },
         database: {
             ...databaseMetrics,
@@ -588,6 +603,27 @@ export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW
     return snapshot;
 }
 
+function recordFilterEvaluation(input: FilterMetricEvent): void {
+    filterMetrics.evaluations += 1;
+    if (input.matched) filterMetrics.matches += 1;
+    if (input.failed) filterMetrics.failures += 1;
+    filterMetrics.totalDurationMs += input.durationMs;
+    filterMetrics.maxDurationMs = Math.max(filterMetrics.maxDurationMs, input.durationMs);
+    const key = String(input.filterId);
+    const filter = filterMetrics.byFilter[key] ?? {
+        evaluations: 0,
+        matches: 0,
+        failures: 0,
+        totalDurationMs: 0,
+    };
+    filter.evaluations += 1;
+    if (input.matched) filter.matches += 1;
+    if (input.failed) filter.failures += 1;
+    filter.totalDurationMs += input.durationMs;
+    filterMetrics.byFilter[key] = filter;
+    publish();
+}
+
 function recordDatabaseQuery(input: DatabaseMetricEvent): void {
     databaseQueryTotals.queries += 1;
     databaseQueryTotals[input.operation === 'read' ? 'reads' : input.operation === 'write' ? 'writes' : 'other'] += 1;
@@ -623,6 +659,7 @@ function recordRpcOperation(input: RpcOperationMetricEvent): void {
 subscribeToRpcMetricEvents(recordRpcRequest);
 subscribeToRpcOperationMetricEvents(recordRpcOperation);
 subscribeToDatabaseMetricEvents(recordDatabaseQuery);
+subscribeToFilterMetricEvents(recordFilterEvaluation);
 
 export function markScannerStopped(): void {
     scannerRunning = false;
