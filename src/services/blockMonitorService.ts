@@ -107,6 +107,7 @@ export function createBlockMonitorService() {
             state = await initializeScannerState();
             await refreshScannerStatusSnapshot();
             updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });
+            dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
         } catch (error) {
             scannerStarted = false;
             throw error;
@@ -153,6 +154,7 @@ export function createBlockMonitorService() {
             try {
                 if (!(await isScannerLockHeld())) {
                     updateScannerRuntimeContext({ running: false });
+                    dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: false });
                     needsStateReload = true;
                     while (!(await tryAcquireScannerLock())) {
                         console.warn(
@@ -162,6 +164,7 @@ export function createBlockMonitorService() {
                     }
                     console.log('[Scanner] Reacquired PostgreSQL advisory lock');
                     await markInterruptedRescanJobs();
+                    dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
                 }
 
                 if (needsStateReload) {
