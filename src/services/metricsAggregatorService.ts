@@ -282,6 +282,8 @@ export function recordProcessingBatch(input: {
         blocksPerSecond: input.durationMs > 0 ? Number((input.blocks * 1000 / input.durationMs).toFixed(2)) : 0,
         transactionsPerSecond: input.durationMs > 0 ? Number((input.transactions * 1000 / input.durationMs).toFixed(2)) : 0,
     });
+    databaseMetrics.writes += 1;
+    databaseMetrics.totalWriteDurationMs += input.durationMs;
     trimSamples(now);
     publish();
 }
