@@ -164,7 +164,9 @@ async function runManualRescanInternal({
                     );
                 }
 
-                pendingCandidates.push(...prepared.candidates);
+                for (const candidate of prepared.candidates) {
+                    pendingCandidates.push(candidate);
+                }
                 currentBlock = blockNumber;
                 blocksProcessed += 1;
                 recordRescanBlockProcessed();
