@@ -202,6 +202,7 @@ export async function processFinalizedBlocks(
                 blocks: preparedBlocks.length,
                 transactions: preparedBlocks.reduce((total, item) => total + item.result.transactionCount, 0),
                 durationMs: Date.now() - batchStartedAt,
+                databaseWriteDurationMs,
             });
         } catch (error) {
             console.error(
