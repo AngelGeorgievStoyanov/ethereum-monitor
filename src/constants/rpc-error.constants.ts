@@ -19,6 +19,7 @@ export const RPC_ERROR_JSON_CODES = {
 
 export const RPC_ERROR_MESSAGE_PATTERNS = {
     RATE_LIMIT: [
+        /\b429\b/i,
         /rate[\s_-]*limit/i,
         /too many requests/i,
         /request limit exceeded/i,
