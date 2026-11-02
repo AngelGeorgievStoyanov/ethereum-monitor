@@ -18,10 +18,11 @@ export async function getScannerStatusResponse() {
     const runtimeMetrics = getScannerRuntimeMetrics() as {
         scanner?: { uptimeSeconds?: number; activeFiltersCount?: number };
         recovery?: Record<string, number>;
-        chain?: { latestFinalizedBlock?: number | null; lastProcessedBlock?: number | null; lagBlocks?: number | null; rpcAvailable?: boolean | null };
+        chain?: { latestFinalizedBlock?: number | null; latestFinalizedAt?: string | null; lastProcessedBlock?: number | null; lagBlocks?: number | null; rpcAvailable?: boolean | null };
         rpc?: { endpoints?: Array<{ index: number; attempts: number; successes: number; failures: number; retryableFailures: number; totalDurationMs: number; lastFailureAt: string | null }> };
     } | null;
     const latestFinalizedBlock = runtimeMetrics?.chain?.latestFinalizedBlock ?? null;
+    const latestFinalizedAt = runtimeMetrics?.chain?.latestFinalizedAt ?? null;
     const rpcAvailable = runtimeMetrics?.chain?.rpcAvailable ?? false;
     const lagBlocks = runtimeMetrics?.chain?.lagBlocks ?? null;
     const rpcMetrics = (runtimeMetrics?.rpc?.endpoints ?? []).map((endpoint) => ({
@@ -43,6 +44,7 @@ export async function getScannerStatusResponse() {
         activeFiltersCount: runtimeMetrics?.scanner?.activeFiltersCount ?? getDynamicConfigService().getTxFilters().length,
         processUptimeSeconds: runtimeMetrics?.scanner?.uptimeSeconds ?? Math.floor(process.uptime()),
         latestFinalizedBlock,
+        latestFinalizedAt,
         lagBlocks,
         rpcAvailable,
         rpcMetrics,
