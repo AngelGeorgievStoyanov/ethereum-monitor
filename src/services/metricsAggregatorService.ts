@@ -184,7 +184,6 @@ let lastProcessedAt: string | null = null;
 let rpcAvailable: boolean | null = null;
 let scannerRunning = false;
 let scannerPaused = false;
-let pauseMode: string | null = null;
 let activeFiltersCount = 0;
 let maxBlocksPerCatchup = 0;
 let maxParallelBlocks = 1;
@@ -248,7 +247,6 @@ function publish(): void {
             scanner: {
                 running: boolean;
                 paused: boolean;
-                pauseMode: string | null;
                 uptimeSeconds: number;
                 activeFiltersCount: number;
             };
@@ -265,7 +263,6 @@ function publish(): void {
         getDynamicConfigService().updateScannerStatusSnapshot({
             scannerRunning: runtime.scanner.running,
             paused: runtime.scanner.paused,
-            mode: runtime.scanner.pauseMode,
             processUptimeSeconds: runtime.scanner.uptimeSeconds,
             activeFiltersCount: runtime.scanner.activeFiltersCount,
             latestFinalizedBlock: runtime.chain.latestFinalizedBlock,
@@ -367,7 +364,7 @@ function getSnapshot() {
             cpuPercent,
             eventLoopUtilizationPercent: Number((eventLoopUtilization.utilization * 100).toFixed(2)),
         },
-        scanner: { running: scannerRunning, paused: scannerPaused, pauseMode, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount, maxBlocksPerCatchup, maxParallelBlocks, parallelProcessingLagBlocks },
+        scanner: { running: scannerRunning, paused: scannerPaused, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount, maxBlocksPerCatchup, maxParallelBlocks, parallelProcessingLagBlocks },
         chain: { latestFinalizedBlock, latestFinalizedAt, lastProcessedBlock, lastProcessedAt, lagBlocks, rpcAvailable },
         processing: {
             processedBlocks: totalProcessedBlocks,
@@ -611,13 +608,12 @@ export function recordRpcRequest(input: RpcInput): void {
 }
 
 export function updateScannerRuntimeContext(input: {
-    running?: boolean; paused?: boolean; pauseMode?: string | null; activeFiltersCount?: number;
+    running?: boolean; paused?: boolean; activeFiltersCount?: number;
     lastProcessedBlock?: number | null; recovery?: Record<string, number>;
     maxBlocksPerCatchup?: number; maxParallelBlocks?: number; parallelProcessingLagBlocks?: number;
 }): void {
     if (input.running !== undefined) scannerRunning = input.running;
     if (input.paused !== undefined) scannerPaused = input.paused;
-    if (input.pauseMode !== undefined) pauseMode = input.pauseMode;
     if (input.activeFiltersCount !== undefined) activeFiltersCount = input.activeFiltersCount;
     if (input.lastProcessedBlock !== undefined) lastProcessedBlock = input.lastProcessedBlock;
     if (input.maxBlocksPerCatchup !== undefined) maxBlocksPerCatchup = input.maxBlocksPerCatchup;
