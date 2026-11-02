@@ -726,7 +726,11 @@ function buildScannerAnalytics(
     const selectedBlocks = blockSamples.filter((sample) => sample.timestampMs >= since);
     const selectedLag = lagSamples.filter((sample) => sample.timestampMs >= since);
     const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
-    const selectedSessions = catchUpSessions.filter((session) => session.startedAtMs >= since);
+    const selectedSessions = catchUpSessions.filter((session) =>
+        session.status === 'running' ||
+        session.startedAtMs >= since ||
+        (session.completedAt !== null && Date.parse(String(session.completedAt)) >= since),
+    );
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
     const selectedMinuteBuckets = minuteBuckets.filter((bucket) => bucket.timestampMs + METRICS_BUCKET_INTERVAL_MS > since);
     const sumBucketMetric = (key: keyof MinuteMetricBucket): number =>
