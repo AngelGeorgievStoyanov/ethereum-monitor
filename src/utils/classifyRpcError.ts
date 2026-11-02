@@ -91,7 +91,15 @@ function collectErrorDetails(error: unknown): ErrorDetails {
         const record = value as Record<string, unknown>;
 
         for (const key of RPC_ERROR_MESSAGE_KEYS) {
-            if (typeof record[key] === 'string') details.messages.push(record[key] as string);
+            if (typeof record[key] !== 'string') continue;
+            const messageValue = (record[key] as string).trim();
+            details.messages.push(messageValue);
+            if (
+                current.depth < RPC_ERROR_MAX_NESTED_DEPTH &&
+                (messageValue.startsWith('{') || messageValue.startsWith('['))
+            ) {
+                queue.push({ value: messageValue, depth: current.depth + 1 });
+            }
         }
 
         for (const key of RPC_ERROR_STATUS_KEYS) {
