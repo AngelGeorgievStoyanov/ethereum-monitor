@@ -3,7 +3,9 @@ import type { TxFilterFieldDefinition, TxFilterOperatorName } from './txFilterRe
 import { getTxFilterOperator } from './txFilterRegistry';
 
 export function normalizeTxFilterValue(value: unknown, field: TxFilterFieldDefinition): unknown {
-    if (value === null || value === undefined) return value;
+    if (value === null || value === undefined) {
+        throw new Error('Filter values cannot be null or undefined');
+    }
 
     if (field.type === 'bigint') {
         if (typeof value !== 'string' && typeof value !== 'bigint') {
