@@ -5,4 +5,13 @@ export interface ScannerAnalyticsResponse {
     blockSamples: Array<Record<string, unknown>>;
     rpcEvents: Array<Record<string, unknown>>;
     catchUpSessions: Array<Record<string, unknown>>;
+    batches: Array<Record<string, unknown>>;
+    retention: {
+        oldestBlockSampleAt: string | null;
+        oldestRpcEventAt: string | null;
+        blockSamples: number;
+        rpcEvents: number;
+        catchUpSessions: number;
+        batches: number;
+    };
 }
