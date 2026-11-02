@@ -34,6 +34,7 @@ let lastCpuSampleAt = startedAtMs;
 let lastEventLoopUtilization = performance.eventLoopUtilization();
 const blockSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
+let rpcEventsStartIndex = 0;
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
 const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const finalizedSamples: Array<{ timestampMs: number; blockNumber: number }> = [];
@@ -284,7 +285,22 @@ function publish(): void {
 
 function trimSamples(now: number): void {
     while (blockSamples.length > 0 && (blockSamples.length > METRICS_SAMPLE_LIMITS.blocks || now - blockSamples[0].timestampMs > METRICS_RETENTION_MS)) blockSamples.shift();
-    while (rpcEvents.length > 0 && (rpcEvents.length > METRICS_SAMPLE_LIMITS.rpcEvents || now - rpcEvents[0].timestampMs > METRICS_RETENTION_MS)) rpcEvents.shift();
+    while (
+        rpcEventsStartIndex < rpcEvents.length &&
+        (
+            rpcEvents.length - rpcEventsStartIndex > METRICS_SAMPLE_LIMITS.rpcEvents ||
+            now - rpcEvents[rpcEventsStartIndex].timestampMs > METRICS_RETENTION_MS
+        )
+    ) {
+        rpcEventsStartIndex += 1;
+    }
+    if (
+        rpcEventsStartIndex >= 1000 &&
+        rpcEventsStartIndex * 2 >= rpcEvents.length
+    ) {
+        rpcEvents.splice(0, rpcEventsStartIndex);
+        rpcEventsStartIndex = 0;
+    }
     while (catchUpSessions.length > 0 && (catchUpSessions.length > METRICS_SAMPLE_LIMITS.catchUpSessions || now - catchUpSessions[0].startedAtMs > METRICS_RETENTION_MS)) catchUpSessions.shift();
     while (batchSamples.length > 0 && (batchSamples.length > METRICS_SAMPLE_LIMITS.batches || now - batchSamples[0].timestampMs > METRICS_RETENTION_MS)) batchSamples.shift();
     while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > METRICS_RETENTION_MS) finalizedSamples.shift();
@@ -314,7 +330,8 @@ function getRpcSummary(now: number): RpcSummary {
         return rpcSummaryCache;
     }
 
-    const latencySamples = rpcEvents
+    const activeRpcEvents = rpcEvents.slice(rpcEventsStartIndex);
+    const latencySamples = activeRpcEvents
         .map((event) => Number(event.durationMs))
         .filter(Number.isFinite)
         .sort((left, right) => left - right);
@@ -329,7 +346,7 @@ function getRpcSummary(now: number): RpcSummary {
         string,
         { requests: number; successes: number; failures: number; totalDurationMs: number }
     >();
-    for (const event of rpcEvents) {
+    for (const event of activeRpcEvents) {
         const method = String(event.method);
         const value = methodTotals.get(method) ?? {
             requests: 0,
@@ -345,7 +362,7 @@ function getRpcSummary(now: number): RpcSummary {
     }
 
     const recentErrors: Array<Record<string, unknown>> = [];
-    for (let index = rpcEvents.length - 1; index >= 0; index -= 1) {
+    for (let index = rpcEvents.length - 1; index >= rpcEventsStartIndex; index -= 1) {
         const event = rpcEvents[index];
         if (event.outcome !== 'failure') continue;
         const { timestampMs: _timestampMs, ...error } = event;
@@ -778,7 +795,7 @@ function buildScannerAnalytics(
     const since = now - availableWindowMs;
     const selectedBlocks = blockSamples.filter((sample) => sample.timestampMs >= since);
     const selectedLag = lagSamples.filter((sample) => sample.timestampMs >= since);
-    const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
+    const selectedRpc = rpcEvents.slice(rpcEventsStartIndex).filter((event) => event.timestampMs >= since);
     const selectedSessions = catchUpSessions.filter((session) =>
         session.status === 'running' ||
         session.startedAtMs >= since ||
@@ -924,10 +941,10 @@ function buildScannerAnalytics(
         minuteBuckets: selectedMinuteBuckets.map(({ timestampMs: _timestampMs, ...bucket }) => bucket),
         retention: {
             oldestBlockSampleAt: (blockSamples[0]?.timestamp as string | undefined) ?? null,
-            oldestRpcEventAt: (rpcEvents[0]?.timestamp as string | undefined) ?? null,
+            oldestRpcEventAt: (rpcEvents[rpcEventsStartIndex]?.timestamp as string | undefined) ?? null,
             blockSamples: blockSamples.length,
             lagSamples: lagSamples.length,
-            rpcEvents: rpcEvents.length,
+            rpcEvents: rpcEvents.length - rpcEventsStartIndex,
             catchUpSessions: catchUpSessions.length,
             batches: batchSamples.length,
             minuteBuckets: minuteBuckets.length,
