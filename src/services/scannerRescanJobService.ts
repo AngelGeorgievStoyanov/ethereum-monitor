@@ -11,6 +11,15 @@ import { resumeScanner } from './scannerControlService';
 import { releaseManualRescanReservation } from './blockMonitorService';
 import type { ScannerRescanJobSummary } from '../types/scanner-status.types';
 
+async function updateAndPublishRescanJob(
+    jobId: string,
+    updates: Parameters<typeof updateScannerRescanJob>[1],
+): Promise<ScannerRescanJobSummary | null> {
+    const updatedJob = await updateScannerRescanJob(jobId, updates);
+    if (updatedJob) getDynamicConfigService().updateScannerStatusSnapshot({ rescanJob: updatedJob });
+    return updatedJob;
+}
+
 export async function getRescanJobStatus(jobId: string): Promise<ScannerRescanJobSummary | null> {
     return findScannerRescanJobById(jobId);
 }
@@ -29,7 +38,7 @@ export async function executeRescanJob(
             return;
         }
 
-        await updateScannerRescanJob(jobId, {
+        await updateAndPublishRescanJob(jobId, {
             status: 'RUNNING',
             currentBlock: fromBlock,
             startedAt: new Date(),
@@ -39,10 +48,10 @@ export async function executeRescanJob(
             scannerStateId: SCANNER_ID,
             getActiveTxFilters: () => getDynamicConfigService().getTxFilters(),
             onProgress: async (currentBlock, blocksProcessed) => {
-                await updateScannerRescanJob(jobId, { currentBlock, blocksProcessed });
+                await updateAndPublishRescanJob(jobId, { currentBlock, blocksProcessed });
             },
         });
-        await updateScannerRescanJob(jobId, {
+        await updateAndPublishRescanJob(jobId, {
             status: 'COMPLETED',
             currentBlock: result.toBlock,
             blocksProcessed: result.blocksProcessed,
@@ -56,7 +65,7 @@ export async function executeRescanJob(
     } catch (error) {
         const message = formatError(error);
         if (error instanceof RescanReorgDetectedError && job) {
-            await updateScannerRescanJob(jobId, {
+            await updateAndPublishRescanJob(jobId, {
                 status: 'RECOVERY_STARTED',
                 error: message,
                 completedAt: new Date(),
@@ -78,7 +87,7 @@ export async function executeRescanJob(
         try {
             if (!job) job = await findScannerRescanJobById(jobId);
             if (job) {
-                await updateScannerRescanJob(jobId, {
+                await updateAndPublishRescanJob(jobId, {
                     status: 'FAILED',
                     error: message.slice(0, 1000),
                     completedAt: new Date(),
