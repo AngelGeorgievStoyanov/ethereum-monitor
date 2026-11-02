@@ -119,6 +119,7 @@ export interface ScannerStatusResponse {
     activeFiltersCount: number;
     processUptimeSeconds: number;
     latestFinalizedBlock: number | null;
+    latestFinalizedAt: string | null;
     lagBlocks: number | null;
     rpcAvailable: boolean;
     rpcMetrics: RpcEndpointMetrics[];
