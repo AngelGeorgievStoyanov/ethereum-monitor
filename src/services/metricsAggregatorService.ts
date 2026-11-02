@@ -53,10 +53,20 @@ let scannerPaused = false;
 let pauseMode: string | null = null;
 let activeFiltersCount = 0;
 let catchUpActive = false;
+let publishTimer: ReturnType<typeof setTimeout> | undefined;
+let totalProcessedBlocks = 0;
+let totalProcessedTransactions = 0;
+let totalNativeMatches = 0;
+let totalErc20Matches = 0;
 let recoveryMetrics: Record<string, number> = {};
 
 function publish(): void {
-    getDynamicConfigService().publishRuntimeMetrics(getSnapshot());
+    if (publishTimer) return;
+    publishTimer = setTimeout(() => {
+        publishTimer = undefined;
+        getDynamicConfigService().publishRuntimeMetrics(getSnapshot());
+    }, 1000);
+    publishTimer.unref?.();
 }
 
 function trimSamples(now: number): void {
@@ -71,9 +81,7 @@ function getSnapshot() {
     const recent = blockSamples.filter((sample) => now - sample.timestampMs <= 60000);
     const sum = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
     const average = (key: string) => recent.length ? Number((sum(key) / recent.length).toFixed(1)) : null;
-    const totalTransactions = blockSamples.reduce((total, sample) => total + Number(sample.transactionCount ?? 0), 0);
-    const totalNativeMatches = blockSamples.reduce((total, sample) => total + Number(sample.nativeMatches ?? 0), 0);
-    const totalErc20Matches = blockSamples.reduce((total, sample) => total + Number(sample.erc20Matches ?? 0), 0);
+    const totalTransactions = totalProcessedTransactions;
     const lagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
         ? Math.max(0, latestFinalizedBlock - lastProcessedBlock) : null;
     const recentTransactions = sum('transactionCount');
@@ -87,13 +95,13 @@ function getSnapshot() {
         scanner: { running: scannerRunning, paused: scannerPaused, pauseMode, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount },
         chain: { latestFinalizedBlock, latestFinalizedAt, lastProcessedBlock, lastProcessedAt, lagBlocks, rpcAvailable },
         processing: {
-            processedBlocks: blockSamples.length,
+            processedBlocks: totalProcessedBlocks,
             processedTransactions: totalTransactions,
             totalNativeMatches,
             totalErc20Matches,
             blocksPerSecondLastMinute: Number((recent.length / 60).toFixed(2)),
             transactionsPerSecondLastMinute: Number((recentTransactions / 60).toFixed(2)),
-            averageTransactionsPerBlock: blockSamples.length ? Number((totalTransactions / blockSamples.length).toFixed(1)) : 0,
+            averageTransactionsPerBlock: totalProcessedBlocks ? Number((totalTransactions / totalProcessedBlocks).toFixed(1)) : 0,
             averageBlockDurationMs: average('blockDurationMs'),
             averageFetchDurationMs: average('fetchDurationMs'),
             averageGetBlockDurationMs: average('getBlockDurationMs'),
@@ -155,6 +163,10 @@ export function recordProcessedBlock(input: BlockInput): void {
     const now = Date.now();
     const timestamp = new Date(now).toISOString();
     blockSamples.push({ ...input, timestamp, timestampMs: now });
+    totalProcessedBlocks += 1;
+    totalProcessedTransactions += input.transactionCount;
+    totalNativeMatches += input.nativeMatches;
+    totalErc20Matches += input.erc20Matches;
     lastProcessedBlock = input.blockNumber;
     lastProcessedAt = timestamp;
     const session = catchUpSessions[catchUpSessions.length - 1];
