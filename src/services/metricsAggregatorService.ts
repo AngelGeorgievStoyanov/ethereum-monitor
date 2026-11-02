@@ -1,5 +1,6 @@
 import type { ScannerAnalyticsResponse } from '../types/scanner-analytics.types';
 import { getDynamicConfigService } from './dynamicConfigService';
+import { subscribeToRpcMetricEvents, type RpcMetricEventInput } from '../metrics/metricsEventBus';
 
 type BlockInput = {
     blockNumber: number;
@@ -14,14 +15,7 @@ type BlockInput = {
     erc20Matches: number;
 };
 
-type RpcInput = {
-    method: string;
-    endpointIndex: number;
-    durationMs: number;
-    outcome: 'success' | 'failure';
-    message?: string;
-    retryable?: boolean;
-};
+type RpcInput = RpcMetricEventInput;
 
 const MAX_BLOCK_SAMPLES = 10000;
 const MAX_RPC_EVENTS = 1000;
@@ -278,6 +272,8 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
     getDynamicConfigService().publishRuntimeAnalytics(response);
     return getDynamicConfigService().getRuntimeAnalyticsSnapshot() as ScannerAnalyticsResponse;
 }
+
+subscribeToRpcMetricEvents(recordRpcRequest);
 
 export function markScannerStopped(): void {
     scannerRunning = false;
