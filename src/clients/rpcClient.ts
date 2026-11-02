@@ -101,11 +101,11 @@ export function createRpcClient() {
                     RPC_ENDPOINT_TIMEOUT_MS,
                 );
                 recordEndpointSuccess(endpoint, startedAt);
-                publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
+                if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
                 return result;
             } catch (error) {
                 recordEndpointFailure(endpoint, startedAt, error);
-                publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
+                if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
                 lastError = error;
                 if (!isRetryableEndpointError(error)) throw error;
 
