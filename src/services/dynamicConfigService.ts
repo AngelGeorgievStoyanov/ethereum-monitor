@@ -18,6 +18,7 @@ export function createDynamicConfigService() {
     let initialized = false;
     let runtimeMetricsSnapshot: unknown = null;
     let runtimeAnalyticsSnapshot: unknown = null;
+    let scannerStatusSnapshot: unknown = null;
 
     async function loadTxFilters(): Promise<void> {
         const loadedFilters = await txFilterService.loadActiveTxFilters();
@@ -135,6 +136,14 @@ export function createDynamicConfigService() {
         return runtimeAnalyticsSnapshot;
     }
 
+    function publishScannerStatus(snapshot: unknown): void {
+        scannerStatusSnapshot = snapshot;
+    }
+
+    function getScannerStatusSnapshot(): unknown {
+        return scannerStatusSnapshot;
+    }
+
     txFilterService.setDynamicConfigRefreshHandler(refreshWithRetry);
     return {
         init,
@@ -146,6 +155,8 @@ export function createDynamicConfigService() {
         getRuntimeMetricsSnapshot,
         publishRuntimeAnalytics,
         getRuntimeAnalyticsSnapshot,
+        publishScannerStatus,
+        getScannerStatusSnapshot,
     };
 }
 
