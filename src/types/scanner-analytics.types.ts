@@ -1,6 +1,10 @@
 export interface ScannerAnalyticsResponse {
     generatedAt: string;
     window: string;
+    requestedWindowMs: number;
+    availableWindowMs: number;
+    windowCoverage: 'complete' | 'partial' | 'available';
+    historyStartedAt: string;
     current: Record<string, unknown>;
     blockSamples: Array<Record<string, unknown>>;
     lagSamples: Array<Record<string, unknown>>;
