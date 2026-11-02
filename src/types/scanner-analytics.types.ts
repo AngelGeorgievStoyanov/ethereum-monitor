@@ -5,6 +5,7 @@ export interface ScannerAnalyticsResponse {
     availableWindowMs: number;
     windowCoverage: 'complete' | 'partial' | 'available';
     historyStartedAt: string;
+    availableWindows: Array<{ value: string; label: string }>;
     current: Record<string, unknown>;
     blockSamples: Array<Record<string, unknown>>;
     lagSamples: Array<Record<string, unknown>>;
