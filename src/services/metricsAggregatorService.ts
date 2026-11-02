@@ -749,6 +749,34 @@ function buildScannerAnalytics(
                   Math.min(selectedRpcDurations.length - 1, Math.ceil(selectedRpcDurations.length * ratio) - 1)
               ]
             : null;
+    const windowRpcMethods: Record<string, { requests: number; successes: number; failures: number; totalDurationMs: number }> = {};
+    const windowFiltersById: Record<string, { evaluations: number; matches: number; failures: number; totalDurationMs: number }> = {};
+    const windowDatabaseByOperation: Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }> = {};
+    for (const bucket of selectedMinuteBuckets) {
+        for (const [method, metric] of Object.entries(bucket.rpcMethods)) {
+            const total = windowRpcMethods[method] ?? { requests: 0, successes: 0, failures: 0, totalDurationMs: 0 };
+            total.requests += metric.requests;
+            total.successes += metric.successes;
+            total.failures += metric.failures;
+            total.totalDurationMs += metric.totalDurationMs;
+            windowRpcMethods[method] = total;
+        }
+        for (const [filterId, metric] of Object.entries(bucket.filtersById)) {
+            const total = windowFiltersById[filterId] ?? { evaluations: 0, matches: 0, failures: 0, totalDurationMs: 0 };
+            total.evaluations += metric.evaluations;
+            total.matches += metric.matches;
+            total.failures += metric.failures;
+            total.totalDurationMs += metric.totalDurationMs;
+            windowFiltersById[filterId] = total;
+        }
+        for (const [operation, metric] of Object.entries(bucket.databaseByOperation)) {
+            const total = windowDatabaseByOperation[operation] ?? { count: 0, totalDurationMs: 0, maxDurationMs: 0 };
+            total.count += metric.count;
+            total.totalDurationMs += metric.totalDurationMs;
+            total.maxDurationMs = Math.max(total.maxDurationMs, metric.maxDurationMs);
+            windowDatabaseByOperation[operation] = total;
+        }
+    }
     const windowMetrics = {
         processing: {
             processedBlocks,
@@ -782,6 +810,7 @@ function buildScannerAnalytics(
                 ? Number((sumBucketMetric('rpcDurationMsTotal') / rpcRequests).toFixed(1))
                 : null,
             latencyP95Ms: windowPercentile(0.95),
+            methods: Object.entries(windowRpcMethods).map(([method, metric]) => ({ method, ...metric })),
             operations: {
                 totalOperations: logicalRpcOperations,
                 successfulOperations: successfulRpcOperations,
@@ -802,6 +831,7 @@ function buildScannerAnalytics(
             averageQueryDurationMs: sumBucketMetric('databaseQueries')
                 ? Number((sumBucketMetric('databaseDurationMsTotal') / sumBucketMetric('databaseQueries')).toFixed(1))
                 : null,
+            byOperation: windowDatabaseByOperation,
         },
         filters: {
             evaluations: sumBucketMetric('filterEvaluations'),
@@ -810,6 +840,7 @@ function buildScannerAnalytics(
             averageDurationMs: sumBucketMetric('filterEvaluations')
                 ? Number((sumBucketMetric('predicateDurationMsTotal') / sumBucketMetric('filterEvaluations')).toFixed(2))
                 : null,
+            byFilter: windowFiltersById,
         },
     };
 
