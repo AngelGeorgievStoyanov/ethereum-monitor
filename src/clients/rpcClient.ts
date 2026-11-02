@@ -133,7 +133,7 @@ export function createRpcClient() {
         throw lastError ?? new Error(`No RPC endpoint available for ${operationName}`);
     }
 
-    async function getBlockFromAllEndpoints(blockNumber: number) {
+    async function getBlockFromAllEndpoints(blockNumber: number, fullBlockEndpointIndex?: number) {
         const operationStartedAt = Date.now();
         const results: Array<{
             endpointIndex: number;
@@ -147,7 +147,7 @@ export function createRpcClient() {
             recordEndpointAttempt(endpoint);
             try {
                 const block = await withTimeout(
-                    endpoint.provider.getBlock(blockNumber),
+                    endpoint.provider.getBlock(blockNumber, endpoint.index === fullBlockEndpointIndex),
                     RPC_ENDPOINT_TIMEOUT_MS,
                 );
                 if (block) {
@@ -161,12 +161,13 @@ export function createRpcClient() {
                     endpointIndex: endpoint.index,
                     block,
                     error: block ? null : 'EMPTY_BLOCK',
+                    durationMs: Date.now() - startedAt,
                 });
             } catch (error) {
                 const message = formatError(error);
                 recordEndpointFailure(endpoint, startedAt, error);
                 publishRpcMetricEvent({ method: 'getBlock(consensus)', endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message, retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
-                results.push({ endpointIndex: endpoint.index, block: null, error: message });
+                results.push({ endpointIndex: endpoint.index, block: null, error: message, durationMs: Date.now() - startedAt });
             }
         }
 
@@ -179,6 +180,32 @@ export function createRpcClient() {
             outcome: results.every((result) => result.error === null) ? 'success' : 'failure',
         });
         return results;
+    }
+
+    async function getBlockReceiptsFromEndpoint(blockNumber: number, endpointIndex: number) {
+        const endpoint = endpoints.find((item) => item.index === endpointIndex);
+        if (!endpoint) throw new Error(`RPC endpoint ${endpointIndex} is not configured`);
+
+        const startedAt = Date.now();
+        recordEndpointAttempt(endpoint);
+        try {
+            const response = await withTimeout(
+                endpoint.provider.send('eth_getBlockReceipts', [toQuantity(blockNumber)]),
+                RPC_ENDPOINT_TIMEOUT_MS,
+            );
+            const durationMs = Date.now() - startedAt;
+            if (!Array.isArray(response)) {
+                throw new Error('eth_getBlockReceipts returned a non-array response');
+            }
+            recordEndpointSuccess(endpoint, startedAt);
+            publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs, outcome: 'success' });
+            return { receipts: response as RpcTransactionReceipt[], durationMs };
+        } catch (error) {
+            const durationMs = Date.now() - startedAt;
+            recordEndpointFailure(endpoint, startedAt, error);
+            publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
+            throw error;
+        }
     }
 
     async function getFinalizedFromAllEndpoints() {
@@ -298,6 +325,7 @@ export function createRpcClient() {
         execute,
         getBlockAndReceipts,
         getBlockFromAllEndpoints,
+        getBlockReceiptsFromEndpoint,
         getFinalizedFromAllEndpoints,
         getBlock(blockTag: string | number, includeTransactions = false) {
             return execute(`getBlock(${String(blockTag)})`, (provider) =>
