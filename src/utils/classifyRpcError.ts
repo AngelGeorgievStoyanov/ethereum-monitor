@@ -114,14 +114,14 @@ export function classifyRpcError(error: unknown): RpcErrorClassification {
         category = RPC_ERROR_CATEGORIES.RPC;
     }
 
+    const retryable = category === RPC_ERROR_CATEGORIES.RATE_LIMIT ||
+        category === RPC_ERROR_CATEGORIES.TIMEOUT ||
+        category === RPC_ERROR_CATEGORIES.NETWORK ||
+        category === RPC_ERROR_CATEGORIES.PROVIDER;
+
     return {
         category,
-        retryable: [
-            RPC_ERROR_CATEGORIES.RATE_LIMIT,
-            RPC_ERROR_CATEGORIES.TIMEOUT,
-            RPC_ERROR_CATEGORIES.NETWORK,
-            RPC_ERROR_CATEGORIES.PROVIDER,
-        ].includes(category),
+        retryable,
         httpStatus: details.httpStatuses[0] ?? null,
         rpcCode: details.rpcCodes[0] ?? null,
         message: message || 'Unknown RPC error',
