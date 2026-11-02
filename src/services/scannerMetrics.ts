@@ -1,4 +1,5 @@
 import { ProcessedBlockMetrics } from './blockProcessingService';
+import { recordProcessedBlock } from './metricsAggregatorService';
 
 export interface BlockProcessingTotals {
     processedBlocks: number;
@@ -102,6 +103,18 @@ export function accumulateBlockMetrics(
     lastProcessedBlock = blockNumber;
     lastProcessedAt = processedAt;
     lastBlockDurationMs = blockDurationMs;
+    recordProcessedBlock({
+        blockNumber,
+        transactionCount: metrics.transactionCount,
+        blockDurationMs,
+        fetchDurationMs: metrics.fetchDurationMs,
+        getBlockDurationMs: metrics.getBlockDurationMs,
+        getBlockReceiptsDurationMs: metrics.getBlockReceiptsDurationMs,
+        filterMatchingDurationMs: metrics.filterMatchingDurationMs,
+        databaseWriteDurationMs: metrics.databaseWriteDurationMs,
+        nativeMatches: metrics.nativeMatches,
+        erc20Matches: metrics.erc20Matches,
+    });
 
     recentBlocks.push({
         timestamp,
