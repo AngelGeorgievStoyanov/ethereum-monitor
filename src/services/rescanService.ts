@@ -86,6 +86,13 @@ async function runManualRescanInternal({
     let currentBlock = fromBlock - 1;
     let lastProgressReported = 0;
     const canonicalIdentities = new Map<number, CanonicalBlockIdentity>();
+    const pendingCandidates: import('../types/transfer-batch.types').TransferBatchCandidate[] = [];
+
+    const flushPendingCandidates = async (): Promise<void> => {
+        if (pendingCandidates.length === 0) return;
+        await reconcileBlockCandidates(pendingCandidates, scannerStateId, checkpoint);
+        pendingCandidates.length = 0;
+    };
 
     const reportProgress = async (): Promise<void> => {
         if (!onProgress || blocksProcessed === lastProgressReported) return;
@@ -133,6 +140,7 @@ async function runManualRescanInternal({
                 if (!matchesBlock(storedBlock, fetchedIdentity)) {
                     const consensusBlock = await getBlockWithConsensus(blockNumber, 'manual rescan');
                     if (!matchesBlock(storedBlock, consensusBlock)) {
+                        await flushPendingCandidates();
                         recordReorgDetected();
                         await markReorgRecoveryPending(scannerStateId, checkpoint);
                         throw new RescanReorgDetectedError(
@@ -147,6 +155,7 @@ async function runManualRescanInternal({
 
                 const prepared = await processFetchedBlock(fetched, activeTxFilters, true);
                 if (!matchesBlock(storedBlock, prepared.block)) {
+                    await flushPendingCandidates();
                     recordReorgDetected();
                     await markReorgRecoveryPending(scannerStateId, checkpoint);
                     throw new RescanReorgDetectedError(
@@ -154,12 +163,13 @@ async function runManualRescanInternal({
                     );
                 }
 
-                await reconcileBlockCandidates(prepared.candidates, scannerStateId, checkpoint);
+                pendingCandidates.push(...prepared.candidates);
                 currentBlock = blockNumber;
                 blocksProcessed += 1;
                 recordRescanBlockProcessed();
 
                 if (blocksProcessed % RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS === 0) {
+                    await flushPendingCandidates();
                     await reportProgress();
                 }
                 if (blocksProcessed % RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS === 0) {
@@ -168,11 +178,14 @@ async function runManualRescanInternal({
                     );
                 }
             }
+
+            await flushPendingCandidates();
         }
 
         await reportProgress();
     } catch (error) {
         try {
+            await flushPendingCandidates();
             await reportProgress();
         } catch (progressError) {
             console.error(
