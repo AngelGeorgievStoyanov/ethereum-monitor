@@ -149,7 +149,7 @@
         </div>
         <div class="metric-grid" style="margin-top:12px">
             <div class="metric-tile"><div class="label">RPC connection errors</div><div class="value" id="rpcConnectionErrors">—</div></div>
-            <div class="metric-tile"><div class="label">RPC server errors</div><div class="value" id="rpcServerErrors">—</div></div>
+            <div class="metric-tile"><div class="label">RPC provider errors</div><div class="value" id="rpcServerErrors">—</div></div>
             <div class="metric-tile"><div class="label">JSON-RPC errors</div><div class="value" id="rpcJsonErrors">—</div></div>
             <div class="metric-tile"><div class="label">Retryable failures</div><div class="value" id="rpcRetryableFailures">—</div></div>
             <div class="metric-tile"><div class="label">Avg. filter evaluation</div><div class="value" id="avgFilterEvaluation">—</div></div>
@@ -426,7 +426,7 @@
         setText('parallelBlocks', number(scanner.maxParallelBlocks));
         setText('databaseFailures', number(database.failures));
         setText('rpcConnectionErrors', number(rpc.connectionErrors));
-        setText('rpcServerErrors', number(rpc.serverErrors));
+        setText('rpcServerErrors', number(rpc.providerErrors));
         setText('rpcJsonErrors', number(rpc.jsonRpcErrors));
         setText('rpcRetryableFailures', number(rpc.retryableFailures));
         setText('rpcOtherErrors', number(rpc.otherErrors));
