@@ -16,6 +16,8 @@ export function createDynamicConfigService() {
     let refreshTimer: ReturnType<typeof setInterval> | undefined;
     let pendingReloadCount = 0;
     let initialized = false;
+    let runtimeMetricsSnapshot: unknown = null;
+    let runtimeAnalyticsSnapshot: unknown = null;
 
     async function loadTxFilters(): Promise<void> {
         const loadedFilters = await txFilterService.loadActiveTxFilters();
@@ -116,6 +118,23 @@ export function createDynamicConfigService() {
         return getTxFilterSnapshot().filters;
     }
 
+    // Runtime metrics are passively stored and returned; calculations belong to the aggregator.
+    function publishRuntimeMetrics(snapshot: unknown): void {
+        runtimeMetricsSnapshot = snapshot;
+    }
+
+    function getRuntimeMetricsSnapshot(): unknown {
+        return runtimeMetricsSnapshot;
+    }
+
+    function publishRuntimeAnalytics(snapshot: unknown): void {
+        runtimeAnalyticsSnapshot = snapshot;
+    }
+
+    function getRuntimeAnalyticsSnapshot(): unknown {
+        return runtimeAnalyticsSnapshot;
+    }
+
     txFilterService.setDynamicConfigRefreshHandler(refreshWithRetry);
     return {
         init,
@@ -123,6 +142,10 @@ export function createDynamicConfigService() {
         stopRefreshTimer,
         getTxFilters,
         getTxFilterSnapshot,
+        publishRuntimeMetrics,
+        getRuntimeMetricsSnapshot,
+        publishRuntimeAnalytics,
+        getRuntimeAnalyticsSnapshot,
     };
 }
 
