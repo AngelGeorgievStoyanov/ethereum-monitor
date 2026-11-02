@@ -17,6 +17,7 @@ export function mapScannerStatusResponse(input: {
     activeFiltersCount: number;
     processUptimeSeconds: number;
     latestFinalizedBlock: number | null;
+    latestFinalizedAt: string | null;
     lagBlocks: number | null;
     rpcAvailable: boolean;
     rpcMetrics: RpcEndpointMetrics[];
@@ -42,6 +43,7 @@ export function mapScannerStatusResponse(input: {
         activeFiltersCount: input.activeFiltersCount,
         processUptimeSeconds: input.processUptimeSeconds,
         latestFinalizedBlock: input.latestFinalizedBlock,
+        latestFinalizedAt: input.latestFinalizedAt,
         lagBlocks: input.lagBlocks,
         rpcAvailable: input.rpcAvailable,
         rpcMetrics: input.rpcMetrics,
