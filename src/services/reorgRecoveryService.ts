@@ -331,6 +331,7 @@ async function processReorgRecoveryInternal(
         });
         if (committedCheckpoint !== blockNumber) {
             await refreshScannerState(state);
+            invalidateConfirmedBlockCache();
             continue;
         }
 
