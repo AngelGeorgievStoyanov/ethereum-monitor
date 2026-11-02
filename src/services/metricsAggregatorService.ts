@@ -20,6 +20,7 @@ type RpcInput = {
     durationMs: number;
     outcome: 'success' | 'failure';
     message?: string;
+    retryable?: boolean;
 };
 
 const MAX_BLOCK_SAMPLES = 10000;
@@ -29,7 +30,7 @@ const startedAt = new Date().toISOString();
 const blockSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
-const endpointTotals = new Map<number, { attempts: number; successes: number; failures: number; durationMs: number }>();
+const endpointTotals = new Map<number, { attempts: number; successes: number; failures: number; retryableFailures: number; durationMs: number; lastFailureAt: string | null }>();
 const rpcTotals = {
     totalRequests: 0,
     successes: 0,
@@ -87,8 +88,25 @@ function getSnapshot() {
     const recentTransactions = sum('transactionCount');
     const endpoints = Array.from(endpointTotals.entries()).map(([index, value]) => ({
         index, attempts: value.attempts, successes: value.successes, failures: value.failures,
+        retryableFailures: value.retryableFailures,
+        totalDurationMs: value.durationMs,
+        lastFailureAt: value.lastFailureAt,
         averageLatencyMs: value.attempts ? Number((value.durationMs / value.attempts).toFixed(1)) : null,
     }));
+    const latencySamples = rpcEvents.map((event) => Number(event.durationMs)).sort((a, b) => a - b);
+    const percentile = (ratio: number) => latencySamples.length
+        ? latencySamples[Math.min(latencySamples.length - 1, Math.ceil(latencySamples.length * ratio) - 1)]
+        : null;
+    const methodTotals = new Map<string, { requests: number; successes: number; failures: number; totalDurationMs: number }>();
+    for (const event of rpcEvents) {
+        const method = String(event.method);
+        const value = methodTotals.get(method) ?? { requests: 0, successes: 0, failures: 0, totalDurationMs: 0 };
+        value.requests += 1;
+        value.totalDurationMs += Number(event.durationMs);
+        if (event.outcome === 'success') value.successes += 1;
+        else value.failures += 1;
+        methodTotals.set(method, value);
+    }
     return {
         startedAt,
         updatedAt: new Date(now).toISOString(),
@@ -113,6 +131,10 @@ function getSnapshot() {
         rpc: {
             ...rpcTotals,
             averageLatencyMs: rpcTotals.totalRequests ? Number((rpcTotals.totalDurationMs / rpcTotals.totalRequests).toFixed(1)) : null,
+            latencyP50Ms: percentile(0.5),
+            latencyP95Ms: percentile(0.95),
+            latencyP99Ms: percentile(0.99),
+            methods: Array.from(methodTotals.entries()).map(([method, value]) => ({ method, ...value })),
             endpoints,
         },
         catchUp: { active: catchUpActive, sessions: catchUpSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session) },
@@ -202,11 +224,15 @@ export function recordRpcRequest(input: RpcInput): void {
     } else rpcTotals.successes += 1;
     rpcTotals.totalRequests += 1;
     rpcTotals.totalDurationMs += input.durationMs;
-    const endpoint = endpointTotals.get(input.endpointIndex) ?? { attempts: 0, successes: 0, failures: 0, durationMs: 0 };
+    const endpoint = endpointTotals.get(input.endpointIndex) ?? { attempts: 0, successes: 0, failures: 0, retryableFailures: 0, durationMs: 0, lastFailureAt: null as string | null };
     endpoint.attempts += 1;
     endpoint.durationMs += input.durationMs;
     if (input.outcome === 'success') endpoint.successes += 1;
-    else endpoint.failures += 1;
+    else {
+        endpoint.failures += 1;
+        if (input.retryable) endpoint.retryableFailures += 1;
+        endpoint.lastFailureAt = new Date(now).toISOString();
+    }
     endpointTotals.set(input.endpointIndex, endpoint);
     rpcEvents.push({
         timestamp: new Date(now).toISOString(), timestampMs: now, method: input.method,
