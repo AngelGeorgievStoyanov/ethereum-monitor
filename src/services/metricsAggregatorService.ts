@@ -229,7 +229,7 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
     const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
     const selectedSessions = catchUpSessions.filter((session) => session.startedAtMs >= since);
     const current = getSnapshot();
-    return {
+    const response: ScannerAnalyticsResponse = {
         generatedAt: new Date(now).toISOString(),
         window: String(Math.max(60000, Math.min(windowMs, 86400000))),
         current,
@@ -237,6 +237,8 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
         rpcEvents: selectedRpc.map(({ timestampMs: _timestampMs, ...event }) => event),
         catchUpSessions: selectedSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
     };
+    getDynamicConfigService().publishRuntimeAnalytics(response);
+    return getDynamicConfigService().getRuntimeAnalyticsSnapshot() as ScannerAnalyticsResponse;
 }
 
 export function markScannerStopped(): void {
