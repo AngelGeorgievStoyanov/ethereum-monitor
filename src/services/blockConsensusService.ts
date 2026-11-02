@@ -42,6 +42,75 @@ function describeDisagreement(
     return '';
 }
 
+
+export interface ConsensusVerifiedBlockData extends ConsensusBlock {
+    block: NonNullable<Awaited<ReturnType<typeof evmRpcClient.getBlock>>>;
+    endpointIndex: number;
+    getBlockDurationMs: number;
+    consensusDurationMs: number;
+}
+
+export async function getBlockWithConsensusAndData(
+    blockNumber: number,
+    operation: string,
+): Promise<ConsensusVerifiedBlockData> {
+    let lastLoggedAt = 0;
+    let lastDisagreements: string[] = [];
+
+    for (let retry = 0; retry <= CONSENSUS_MAX_RETRIES; retry += 1) {
+        const operationStartedAt = Date.now();
+        const results = await evmRpcClient.getBlockFromAllEndpoints(blockNumber, 1);
+        const firstBlock = results.find(
+            (result) => result.block && result.block.hash && result.block.parentHash,
+        )?.block;
+        const expected: ConsensusBlock | undefined = firstBlock
+            ? {
+                  blockNumber: firstBlock.number,
+                  blockHash: firstBlock.hash!,
+                  parentHash: firstBlock.parentHash,
+              }
+            : undefined;
+        const disagreements = results
+            .map((result) => describeDisagreement(expected, result, blockNumber))
+            .filter(Boolean);
+        const fullBlockResult = results.find((result) => result.endpointIndex === 1);
+
+        if (
+            expected &&
+            disagreements.length === 0 &&
+            results.length === evmRpcClient.getEndpointCount() &&
+            fullBlockResult?.block
+        ) {
+            return {
+                ...expected,
+                block: fullBlockResult.block,
+                endpointIndex: fullBlockResult.endpointIndex,
+                getBlockDurationMs: fullBlockResult.durationMs,
+                consensusDurationMs: Date.now() - operationStartedAt,
+            };
+        }
+
+        lastDisagreements =
+            disagreements.length > 0
+                ? disagreements
+                : ['Full block response from provider P1 was unavailable'];
+        const now = Date.now();
+        if (retry === 0 || now - lastLoggedAt >= CONSENSUS_LOG_INTERVAL_MS) {
+            console.warn(
+                `[Consensus] ${operation} failed for block ${blockNumber}; attempt ${retry + 1}/${CONSENSUS_MAX_RETRIES + 1}; retrying in ${CONSENSUS_RETRY_INTERVAL_MS}ms; ${lastDisagreements.join('; ')}`,
+            );
+            lastLoggedAt = now;
+        }
+
+        if (retry === CONSENSUS_MAX_RETRIES) break;
+        await sleep(CONSENSUS_RETRY_INTERVAL_MS);
+    }
+
+    const message = `Consensus unavailable for block ${blockNumber} during ${operation} after ${CONSENSUS_MAX_RETRIES} retries: ${lastDisagreements.join('; ')}`;
+    console.error(`[Consensus] CRITICAL ${message}`);
+    throw new ConsensusUnavailableError(blockNumber, operation, message);
+}
+
 export async function getBlockWithConsensus(
     blockNumber: number,
     operation: string,
