@@ -258,7 +258,7 @@ These rules document the approved runtime design. They are intended to prevent f
 ### Metrics and analytics
 
 - Metrics aggregation/publishing runs at `METRICS_PUBLISH_INTERVAL_MS` (currently 10000 ms).
-- Scanner analytics refreshes at `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms). The RPC event-derived latency percentiles, per-method totals, and recent RPC error list in the runtime snapshot are cached for this same interval; they are not recalculated on every 10-second metrics publication.
+- Scanner analytics refreshes at `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms). The RPC event-derived latency percentiles, per-method totals, and recent RPC error list in the runtime snapshot are cached for this same interval; they are not recalculated on every 10-second metrics publication. Retained RPC events use a head index for constant-time removal; the backing array is compacted periodically using `METRICS_RPC_EVENT_COMPACTION_THRESHOLD`, rather than shifting the full array for every expired event.
 - Dashboard polling and RPC event collection are separate concerns; do not change their cadence merely to change the metrics snapshot publishing interval.
 - Dynamic Config stores the latest metrics and analytics snapshots. Aggregation and calculations remain in the metrics/analytics services.
 
