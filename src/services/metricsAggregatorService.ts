@@ -1,6 +1,6 @@
 import type { ScannerAnalyticsResponse } from '../types/scanner-analytics.types';
 import { getDynamicConfigService } from './dynamicConfigService';
-import { subscribeToRpcMetricEvents, type RpcMetricEventInput } from '../metrics/metricsEventBus';
+import { subscribeToRpcMetricEvents, subscribeToRpcOperationMetricEvents, type RpcMetricEventInput, type RpcOperationMetricEvent } from '../metrics/metricsEventBus';
 import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
 import { classifyRpcError } from '../utils/classifyRpcError';
 
@@ -35,6 +35,15 @@ const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [
 const finalizedSamples: Array<{ timestampMs: number; blockNumber: number }> = [];
 const lagSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const endpointTotals = new Map<number, { attempts: number; successes: number; failures: number; retryableFailures: number; durationMs: number; lastFailureAt: string | null }>();
+const rpcOperationTotals = {
+    totalOperations: 0,
+    successfulOperations: 0,
+    failedOperations: 0,
+    retriedOperations: 0,
+    totalRetryAttempts: 0,
+    endpointFailovers: 0,
+    totalSuccessfulAttempts: 0,
+};
 const rpcTotals = {
     totalRequests: 0,
     successes: 0,
@@ -196,6 +205,15 @@ function getSnapshot() {
             latencyP99Ms: percentile(0.99),
             methods: Array.from(methodTotals.entries()).map(([method, value]) => ({ method, ...value })),
             endpoints,
+            operations: {
+                ...rpcOperationTotals,
+                averageAttemptsPerSuccessfulOperation: rpcOperationTotals.successfulOperations
+                    ? Number((rpcOperationTotals.totalSuccessfulAttempts / rpcOperationTotals.successfulOperations).toFixed(2))
+                    : null,
+                retryRate: rpcOperationTotals.totalOperations
+                    ? Number((rpcOperationTotals.retriedOperations / rpcOperationTotals.totalOperations * 100).toFixed(2))
+                    : 0,
+            },
         },
         catchUp: {
             active: catchUpActive,
@@ -203,7 +221,23 @@ function getSnapshot() {
             chainBlocksPerSecond,
             lagReductionBlocksPerSecond,
             estimatedRemainingSeconds: estimatedCatchUpSeconds,
-            sessions: catchUpSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
+            sessions: catchUpSessions.map(({ startedAtMs, ...session }) => {
+                if (session.status !== 'running') return session;
+                const durationMs = Math.max(0, now - startedAtMs);
+                const processedBlocks = Number(session.processedBlocks ?? 0);
+                const processedTransactions = Number(session.processedTransactions ?? 0);
+                const finalLagBlocks = lagBlocks ?? Number(session.initialLagBlocks);
+                const lagReductionBlocks = Math.max(0, Number(session.initialLagBlocks) - finalLagBlocks);
+                return {
+                    ...session,
+                    durationMs,
+                    blocksPerSecond: durationMs > 0 ? Number((processedBlocks * 1000 / durationMs).toFixed(2)) : 0,
+                    transactionsPerSecond: durationMs > 0 ? Number((processedTransactions * 1000 / durationMs).toFixed(2)) : 0,
+                    finalLagBlocks,
+                    lagReductionBlocks,
+                    lagReductionPerSecond: durationMs > 0 ? Number((lagReductionBlocks * 1000 / durationMs).toFixed(2)) : 0,
+                };
+            }),
         },
         database: { ...databaseMetrics, averageWriteDurationMs: databaseMetrics.writes ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1)) : null },
         recovery: { ...recoveryMetrics },
@@ -457,7 +491,22 @@ export function getScannerAnalytics(windowMs = 3600000): ScannerAnalyticsRespons
     return getDynamicConfigService().getRuntimeAnalyticsSnapshot() as ScannerAnalyticsResponse;
 }
 
+function recordRpcOperation(input: RpcOperationMetricEvent): void {
+    rpcOperationTotals.totalOperations += 1;
+    if (input.outcome === 'success') {
+        rpcOperationTotals.successfulOperations += 1;
+        rpcOperationTotals.totalSuccessfulAttempts += input.attempts;
+    } else {
+        rpcOperationTotals.failedOperations += 1;
+    }
+    if (input.retryCount > 0) rpcOperationTotals.retriedOperations += 1;
+    rpcOperationTotals.totalRetryAttempts += input.retryCount;
+    rpcOperationTotals.endpointFailovers += input.endpointFailovers;
+    publish();
+}
+
 subscribeToRpcMetricEvents(recordRpcRequest);
+subscribeToRpcOperationMetricEvents(recordRpcOperation);
 
 export function markScannerStopped(): void {
     scannerRunning = false;
