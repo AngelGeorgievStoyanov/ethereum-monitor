@@ -16,6 +16,7 @@ import { findScannerStatusState } from '../repositories/scannerStateRepository';
 import { executeRescanJob } from './scannerRescanJobService';
 import { formatError } from '../utils/formatError';
 import { mapManualRescanResponse } from '../mappers/manualRescanMapper';
+import { getDynamicConfigService } from './dynamicConfigService';
 
 export interface ManualRescanErrorResponse {
     message: string;
@@ -119,11 +120,12 @@ async function requestManualRescanOperation(
         reservedForRequest = true;
 
         const operationId = randomUUID();
-        await createScannerRescanJob({
+        const queuedJob = await createScannerRescanJob({
             id: operationId,
             fromBlock: requestedFromBlock,
             toBlock: state.lastProcessedBlock,
         });
+        getDynamicConfigService().updateScannerStatusSnapshot({ rescanJob: queuedJob });
 
         void executeRescanJob(operationId, requestedFromBlock, state.lastProcessedBlock).catch(
             (error) => {
