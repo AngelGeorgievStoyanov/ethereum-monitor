@@ -261,7 +261,8 @@
         const recovery = data.recoveryMetrics || {};
         const lag = data.lagBlocks;
         let label = 'RUNNING', statusClass = 'ok';
-        if (!data.rpcAvailable && data.latestFinalizedBlock === null) { label = 'RPC STATUS UNKNOWN'; statusClass = 'warn'; }
+        if (!data.scannerRunning) { label = 'SCANNER NOT RUNNING'; statusClass = 'bad'; }
+        else if (!data.rpcAvailable && data.latestFinalizedBlock === null) { label = 'RPC STATUS UNKNOWN'; statusClass = 'warn'; }
         else if (!data.rpcAvailable) { label = 'RPC UNAVAILABLE'; statusClass = 'bad'; }
         else if (data.reorgRecoveryBlocked) { label = 'RECOVERY BLOCKED'; statusClass = 'bad'; }
         else if (data.reorgRecoveryActive) { label = 'REORG RECOVERY'; statusClass = 'warn'; }
@@ -279,7 +280,7 @@
         setText('lag', number(lag));
         setText('activeFilters', number(data.activeFiltersCount));
         setPipeline('rpcState', data.latestFinalizedBlock === null ? 'Not checked yet' : data.rpcAvailable ? 'Available · ' + ago(data.latestFinalizedAt) : 'Unavailable', data.rpcAvailable ? 'state' : '');
-        setPipeline('processingState', data.paused ? 'Paused' : data.reorgRecoveryActive ? 'Recovery in progress' : label, statusClass === 'bad' ? '' : 'state');
+        setPipeline('processingState', !data.scannerRunning ? 'Not running' : data.paused ? 'Paused' : data.reorgRecoveryActive ? 'Recovery in progress' : label, statusClass === 'bad' ? '' : 'state');
         setPipeline('filterState', number(data.activeFiltersCount) + ' active filters', data.activeFiltersCount > 0 ? 'state' : '');
         setPipeline('databaseState', 'Checkpoint persisted: ' + number(data.lastProcessedBlock), 'state');
 
