@@ -19,4 +19,5 @@ export const METRICS_TIME_WINDOWS = [
 ] as const;
 
 export const DEFAULT_METRICS_WINDOW = METRICS_TIME_WINDOWS[0];
+export const METRICS_ANALYTICS_REFRESH_INTERVAL_MS = 30000;
 export const AVAILABLE_METRICS_WINDOW = 'available';
