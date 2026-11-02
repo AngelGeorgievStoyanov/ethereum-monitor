@@ -3,7 +3,7 @@ import { RpcTransactionReceipt } from '../types/evm-rpc.types';
 import { RPC_ENDPOINT_TIMEOUT_MS } from '../constants/evm-rpc.constants';
 import { env } from '../config/env';
 import { formatError } from '../utils/formatError';
-import { publishRpcMetricEvent } from '../metrics/metricsEventBus';
+import { publishRpcMetricEvent, publishRpcOperationMetricEvent } from '../metrics/metricsEventBus';
 import { classifyRpcError } from '../utils/classifyRpcError';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -78,12 +78,26 @@ export function createRpcClient() {
         timeoutMs = RPC_ENDPOINT_TIMEOUT_MS,
     ): Promise<T> {
         let lastError: unknown;
+        const operationStartedAt = Date.now();
+        const attemptedEndpointIndices: number[] = [];
+        const publishOperationResult = (outcome: 'success' | 'failure') => {
+            const attempts = attemptedEndpointIndices.length;
+            publishRpcOperationMetricEvent({
+                operation: operationName,
+                durationMs: Date.now() - operationStartedAt,
+                attempts,
+                retryCount: Math.max(0, attempts - 1),
+                endpointFailovers: Math.max(0, attempts - 1),
+                outcome,
+            });
+        };
 
         for (let attempt = 0; attempt < endpoints.length; attempt += 1) {
             const endpoint = endpoints[nextEndpointIndex];
             nextEndpointIndex = (nextEndpointIndex + 1) % endpoints.length;
 
             const startedAt = Date.now();
+            attemptedEndpointIndices.push(endpoint.index);
             recordEndpointAttempt(endpoint);
 
             try {
@@ -93,12 +107,16 @@ export function createRpcClient() {
                 );
                 recordEndpointSuccess(endpoint, startedAt);
                 if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
+                publishOperationResult('success');
                 return result;
             } catch (error) {
                 recordEndpointFailure(endpoint, startedAt, error);
                 if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 lastError = error;
-                if (!isRetryableEndpointError(error)) throw error;
+                if (!isRetryableEndpointError(error)) {
+                    publishOperationResult('failure');
+                    throw error;
+                }
 
                 console.warn(
                     `[RPC] Endpoint ${endpoint.index} failed temporarily during ${operationName}; ` +
@@ -110,6 +128,7 @@ export function createRpcClient() {
             }
         }
 
+        publishOperationResult('failure');
         throw lastError ?? new Error(`No RPC endpoint available for ${operationName}`);
     }
 
