@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
-    <title>Ethereum Monitor Dashboard</title>
+    <title>EVM Monitor Dashboard</title>
     <style>
         :root {
             color-scheme: dark;
@@ -67,7 +67,7 @@
 <main>
     <header>
         <div>
-            <h1>Ethereum Monitor</h1>
+            <h1>EVM Monitor</h1>
             <p class="sub">Live scanner overview · status every 5s · analytics every 30s</p>
         </div>
         <div id="overallStatus" class="status"><span class="dot"></span><span id="overallStatusText">CONNECTING</span></div>
@@ -127,8 +127,12 @@
             <h2>Runtime analytics</h2>
             <select id="analyticsWindow" aria-label="Analytics time window">
                 <option value="1h">Last hour</option>
+                <option value="3h">Last 3 hours</option>
                 <option value="6h">Last 6 hours</option>
+                <option value="9h">Last 9 hours</option>
+                <option value="12h">Last 12 hours</option>
                 <option value="24h">Last 24 hours</option>
+                <option value="available">Available history</option>
             </select>
         </div>
         <div class="metric-grid">
@@ -156,6 +160,12 @@
             <div class="metric-tile"><div class="label">Retryable failures</div><div class="value" id="rpcRetryableFailures">—</div></div>
             <div class="metric-tile"><div class="label">Avg. filter evaluation</div><div class="value" id="avgFilterEvaluation">—</div></div>
             <div class="metric-tile"><div class="label">Avg. DB batch write</div><div class="value" id="avgDbBatchWrite">—</div></div>
+        </div>
+        <div class="metric-grid" style="margin-top:12px">
+            <div class="metric-tile"><div class="label">Logical RPC operations</div><div class="value" id="rpcOperations">—</div></div>
+            <div class="metric-tile"><div class="label">Retried operations</div><div class="value" id="rpcRetriedOperations">—</div></div>
+            <div class="metric-tile"><div class="label">Endpoint failovers</div><div class="value" id="rpcEndpointFailovers">—</div></div>
+            <div class="metric-tile"><div class="label">Avg. attempts / successful operation</div><div class="value" id="rpcAverageAttempts">—</div></div>
         </div>
         <div class="layout">
             <section>
@@ -343,6 +353,7 @@
         const catchUp = current.catchUp || {};
         const scanner = current.scanner || {};
         const database = current.database || {};
+        const operations = rpc.operations || {};
         setText('analyticsBlocksPerSecond', processing.blocksPerSecondLastMinute ?? '—');
         setText('analyticsTransactionsPerSecond', processing.transactionsPerSecondLastMinute ?? '—');
         setText('lagReductionRate', catchUp.lagReductionBlocksPerSecond === null || catchUp.lagReductionBlocksPerSecond === undefined ? '—' : catchUp.lagReductionBlocksPerSecond);
@@ -359,11 +370,17 @@
         setText('rpcServerErrors', number(rpc.serverErrors));
         setText('rpcJsonErrors', number(rpc.jsonRpcErrors));
         setText('rpcRetryableFailures', number(rpc.retryableFailures));
+        setText('rpcOperations', number(operations.totalOperations));
+        setText('rpcRetriedOperations', number(operations.retriedOperations));
+        setText('rpcEndpointFailovers', number(operations.endpointFailovers));
+        setText('rpcAverageAttempts', number(operations.averageAttemptsPerSuccessfulOperation));
         setText('avgFilterEvaluation', duration(processing.averageFilterMatchingDurationMs));
         setText('avgDbBatchWrite', duration(database.averageWriteDurationMs));
         drawLagChart(data.lagSamples);
         const retention = data.retention || {};
-        setText('analyticsRetention', 'Retained samples: ' + number(retention.blockSamples) + ' blocks · ' + number(retention.lagSamples) + ' lag · ' + number(retention.rpcEvents) + ' RPC · ' + number(retention.batches) + ' batches');
+        const coverage = data.windowCoverage === 'complete' ? 'Complete' : data.windowCoverage === 'available' ? 'Available history' : 'Partial';
+        const availableMinutes = Math.floor((data.availableWindowMs || 0) / 60000);
+        setText('analyticsRetention', coverage + ' · ' + availableMinutes + ' minutes available since ' + new Date(data.historyStartedAt).toLocaleTimeString() + ' · ' + number(retention.blockSamples) + ' block samples · ' + number(retention.lagSamples) + ' lag samples · ' + number(retention.rpcEvents) + ' RPC requests · ' + number(retention.batches) + ' batches');
         const sessions = (data.catchUpSessions || []).slice(-10).reverse();
         $('catchUpRows').innerHTML = sessions.map((item) => '<tr><td>' + (item.startedAt ? new Date(item.startedAt).toLocaleTimeString() : '—') + '</td><td>' + number(item.processedBlocks) + '</td><td>' + number(item.processedTransactions) + '</td><td>' + duration(item.durationMs) + '</td><td>' + number(item.blocksPerSecond) + '</td><td>' + escapeHtml(item.status) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No catch-up sessions retained</td></tr>';
         const methods = (rpc.methods || []).slice(-15);
