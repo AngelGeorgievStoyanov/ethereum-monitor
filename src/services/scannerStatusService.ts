@@ -16,6 +16,8 @@ export async function getScannerStatusResponse() {
     ]);
 
     const runtimeMetrics = getScannerRuntimeMetrics() as {
+        scanner?: { uptimeSeconds?: number; activeFiltersCount?: number };
+        recovery?: Record<string, number>;
         chain?: { latestFinalizedBlock?: number | null; lastProcessedBlock?: number | null; lagBlocks?: number | null; rpcAvailable?: boolean | null };
         rpc?: { endpoints?: Array<{ index: number; attempts: number; successes: number; failures: number; retryableFailures: number; totalDurationMs: number; lastFailureAt: string | null }> };
     } | null;
@@ -36,10 +38,10 @@ export async function getScannerStatusResponse() {
         control,
         state,
         rescanJob,
-        recoveryMetrics: getRecoveryMetrics(),
+        recoveryMetrics: (runtimeMetrics?.recovery as ReturnType<typeof getRecoveryMetrics> | undefined) ?? getRecoveryMetrics(),
         processingMetrics: getBlockProcessingMetrics(),
-        activeFiltersCount: getDynamicConfigService().getTxFilters().length,
-        processUptimeSeconds: Math.floor(process.uptime()),
+        activeFiltersCount: runtimeMetrics?.scanner?.activeFiltersCount ?? getDynamicConfigService().getTxFilters().length,
+        processUptimeSeconds: runtimeMetrics?.scanner?.uptimeSeconds ?? Math.floor(process.uptime()),
         latestFinalizedBlock,
         lagBlocks,
         rpcAvailable,
