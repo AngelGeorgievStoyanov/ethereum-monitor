@@ -4,6 +4,8 @@ export interface ScannerAnalyticsResponse {
     current: Record<string, unknown>;
     blockSamples: Array<Record<string, unknown>>;
     lagSamples: Array<Record<string, unknown>>;
+    processingHistory: Array<Record<string, unknown>>;
+    rpcHistory: Array<Record<string, unknown>>;
     rpcEvents: Array<Record<string, unknown>>;
     catchUpSessions: Array<Record<string, unknown>>;
     batches: Array<Record<string, unknown>>;
@@ -12,6 +14,8 @@ export interface ScannerAnalyticsResponse {
         oldestRpcEventAt: string | null;
         blockSamples: number;
         lagSamples: number;
+        processingMinutes: number;
+        rpcMinutes: number;
         rpcEvents: number;
         catchUpSessions: number;
         batches: number;
