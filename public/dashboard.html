@@ -225,6 +225,20 @@
                 </div>
             </section>
         </div>
+        <div class="layout">
+            <section>
+                <h2>Filter performance</h2>
+                <div class="table-wrap">
+                    <table><thead><tr><th>Filter ID</th><th>Evaluations</th><th>Matches</th><th>Failures</th><th>Avg. latency</th></tr></thead><tbody id="filterMetricRows"><tr><td colspan="5" class="muted">Waiting for data</td></tr></tbody></table>
+                </div>
+            </section>
+            <section>
+                <h2>Database query types</h2>
+                <div class="table-wrap">
+                    <table><thead><tr><th>Query</th><th>Count</th><th>Avg. latency</th><th>Max latency</th></tr></thead><tbody id="databaseQueryRows"><tr><td colspan="4" class="muted">Waiting for data</td></tr></tbody></table>
+                </div>
+            </section>
+        </div>
         <div class="hint" id="lastBatchSummary">No processing batch recorded</div>
     </section>
 
@@ -475,6 +489,18 @@
         $('rpcMethodRows').innerHTML = methods.map((item) => '<tr><td>' + escapeHtml(item.method) + '</td><td>' + number(item.requests) + '</td><td>' + number(item.failures) + '</td><td>' + duration(item.requests ? item.totalDurationMs / item.requests : null) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No RPC methods reported</td></tr>';
         const errors = (data.rpcEvents || []).filter((item) => item.outcome === 'failure').slice(-12).reverse();
         $('rpcErrorRows').innerHTML = errors.map((item) => '<tr><td>' + (item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '—') + '</td><td>' + escapeHtml(item.method) + '</td><td>' + escapeHtml(item.failureKind) + '</td><td>' + number(item.httpStatus) + '</td><td>' + number(item.rpcCode) + '</td><td>' + escapeHtml(item.message) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No RPC errors in this window</td></tr>';
+        const filterRows = Object.entries(filters.byFilter || {}).map(([id, item]) => ({
+            id,
+            ...item,
+            averageDurationMs: item.evaluations ? item.totalDurationMs / item.evaluations : null,
+        })).sort((left, right) => right.totalDurationMs - left.totalDurationMs).slice(0, 10);
+        $('filterMetricRows').innerHTML = filterRows.map((item) => '<tr><td>' + escapeHtml(item.id) + '</td><td>' + number(item.evaluations) + '</td><td>' + number(item.matches) + '</td><td>' + number(item.failures) + '</td><td>' + duration(item.averageDurationMs) + '</td></tr>').join('') || '<tr><td colspan="5" class="muted">No filter evaluations recorded</td></tr>';
+        const queryRows = Object.entries(database.byOperation || {}).map(([query, item]) => ({
+            query,
+            ...item,
+            averageDurationMs: item.count ? item.totalDurationMs / item.count : null,
+        })).sort((left, right) => right.totalDurationMs - left.totalDurationMs);
+        $('databaseQueryRows').innerHTML = queryRows.map((item) => '<tr><td>' + escapeHtml(item.query) + '</td><td>' + number(item.count) + '</td><td>' + duration(item.averageDurationMs) + '</td><td>' + duration(item.maxDurationMs) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No database queries recorded</td></tr>';
         const batch = (data.batches || []).slice(-1)[0];
         setText('lastBatchSummary', batch ? 'Last batch: blocks ' + number(batch.startBlock) + '–' + number(batch.endBlock) + ' · ' + number(batch.transactions) + ' transactions · ' + duration(batch.durationMs) + ' total · ' + duration(batch.databaseWriteDurationMs) + ' DB write' : 'No processing batch recorded');
     }
