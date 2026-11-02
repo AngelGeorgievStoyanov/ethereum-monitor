@@ -1,7 +1,7 @@
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { findScannerStatusState } from '../repositories/scannerStateRepository';
 import { findLatestScannerRescanJob } from '../repositories/scannerRescanJobRepository';
-import { evmRpcClient } from './evmBlockDataService';
+import { getScannerRuntimeMetrics } from './metricsAggregatorService';
 import { getScannerControlState } from './scannerControlService';
 import { getRecoveryMetrics } from './recoveryMetrics';
 import { getBlockProcessingMetrics } from './scannerMetrics';
@@ -15,20 +15,23 @@ export async function getScannerStatusResponse() {
         findLatestScannerRescanJob(),
     ]);
 
-    let latestFinalizedBlock: number | null = null;
-    let rpcAvailable = false;
+    const runtimeMetrics = getScannerRuntimeMetrics() as {
+        chain?: { latestFinalizedBlock?: number | null; rpcAvailable?: boolean | null };
+        rpc?: { endpoints?: Array<{ index: number; attempts: number; successes: number; failures: number; averageLatencyMs: number | null }> };
+    } | null;
+    const latestFinalizedBlock = runtimeMetrics?.chain?.latestFinalizedBlock ?? null;
+    const rpcAvailable = runtimeMetrics?.chain?.rpcAvailable ?? false;
+    const rpcMetrics = (runtimeMetrics?.rpc?.endpoints ?? []).map((endpoint) => ({
+        index: endpoint.index,
+        attempts: endpoint.attempts,
+        successes: endpoint.successes,
+        failures: endpoint.failures,
+        retryableFailures: endpoint.failures,
+        totalDurationMs: endpoint.averageLatencyMs === null ? 0 : endpoint.averageLatencyMs * endpoint.attempts,
+        lastFailureAt: null,
+    }));
 
-    try {
-        const finalized = await evmRpcClient.getBlock('finalized');
-        if (finalized) {
-            latestFinalizedBlock = finalized.number;
-            rpcAvailable = true;
-        }
-    } catch {
-        // Status remains available while RPC providers are temporarily unavailable.
-    }
-
-    return mapScannerStatusResponse({
+    const response = mapScannerStatusResponse({
         control,
         state,
         rescanJob,
@@ -38,7 +41,9 @@ export async function getScannerStatusResponse() {
         processUptimeSeconds: Math.floor(process.uptime()),
         latestFinalizedBlock,
         rpcAvailable,
-        rpcMetrics: evmRpcClient.getMetrics(),
+        rpcMetrics,
         checkedAt: new Date().toISOString(),
     });
+    getDynamicConfigService().publishScannerStatus(response);
+    return getDynamicConfigService().getScannerStatusSnapshot() as typeof response;
 }
