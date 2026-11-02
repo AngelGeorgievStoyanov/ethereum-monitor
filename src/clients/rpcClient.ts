@@ -83,7 +83,8 @@ export function createRpcClient() {
 
     async function execute<T>(
         operationName: string,
-        operation: (provider: JsonRpcProvider) => Promise<T>,
+        operation: (provider: JsonRpcProvider, endpointIndex: number) => Promise<T>,
+        publishMetrics = true,
     ): Promise<T> {
         let lastError: unknown;
 
@@ -96,7 +97,7 @@ export function createRpcClient() {
 
             try {
                 const result = await withTimeout(
-                    operation(endpoint.provider),
+                    operation(endpoint.provider, endpoint.index),
                     RPC_ENDPOINT_TIMEOUT_MS,
                 );
                 recordEndpointSuccess(endpoint, startedAt);
@@ -216,27 +217,41 @@ export function createRpcClient() {
         let getBlockDurationMs = 0;
         let getBlockReceiptsDurationMs = 0;
 
-        const result = await execute(`getBlockAndReceipts(${blockNumber})`, async (provider) => {
+        const result = await execute(`getBlockAndReceipts(${blockNumber})`, async (provider, endpointIndex) => {
             const getBlockStartedAt = Date.now();
-            const block = await provider.getBlock(blockNumber, true);
-            getBlockDurationMs = Date.now() - getBlockStartedAt;
+            let block;
+            try {
+                block = await provider.getBlock(blockNumber, true);
+                getBlockDurationMs = Date.now() - getBlockStartedAt;
+                publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: block ? 'success' : 'failure', message: block ? undefined : 'EMPTY_BLOCK' });
+            } catch (error) {
+                getBlockDurationMs = Date.now() - getBlockStartedAt;
+                publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
+                throw error;
+            }
 
             if (!block) {
                 throw new Error(`Unable to load block ${blockNumber}`);
             }
 
             const getReceiptsStartedAt = Date.now();
-            const response: unknown = await provider.send('eth_getBlockReceipts', [
-                toQuantity(blockNumber),
-            ]);
-            getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
+            let response: unknown;
+            try {
+                response = await provider.send('eth_getBlockReceipts', [toQuantity(blockNumber)]);
+                getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
+                publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'success' });
+            } catch (error) {
+                getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
+                publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
+                throw error;
+            }
 
             if (!Array.isArray(response)) {
                 throw new Error('eth_getBlockReceipts returned a non-array response');
             }
 
             return { block, receipts: response as RpcTransactionReceipt[] };
-        });
+        }, false);
 
         return { ...result, getBlockDurationMs, getBlockReceiptsDurationMs };
     }
