@@ -73,12 +73,29 @@ export function createRpcClient() {
 
     async function execute<T>(
         operationName: string,
-        operation: (provider: JsonRpcProvider, endpointIndex: number) => Promise<T>,
+        operation: (
+            provider: JsonRpcProvider,
+            endpointIndex: number,
+            classifyError: (error: unknown) => ReturnType<typeof classifyRpcError>,
+        ) => Promise<T>,
         publishMetrics = true,
         timeoutMs = RPC_ENDPOINT_TIMEOUT_MS,
         trackEndpointMetrics = true,
     ): Promise<T> {
         let lastError: unknown;
+        let lastClassifiedError: unknown;
+        let lastClassification: ReturnType<typeof classifyRpcError> | undefined;
+        let hasClassification = false;
+        const classifyError = (error: unknown) => {
+            if (hasClassification && Object.is(error, lastClassifiedError) && lastClassification) {
+                return lastClassification;
+            }
+
+            lastClassifiedError = error;
+            lastClassification = classifyRpcError(error);
+            hasClassification = true;
+            return lastClassification;
+        };
         const operationStartedAt = Date.now();
         let attempts = 0;
         const publishOperationResult = (outcome: 'success' | 'failure') => {
@@ -102,7 +119,7 @@ export function createRpcClient() {
 
             try {
                 const result = await withTimeout(
-                    operation(endpoint.provider, endpoint.index),
+                    operation(endpoint.provider, endpoint.index, classifyError),
                     timeoutMs,
                 );
                 if (trackEndpointMetrics) recordEndpointSuccess(endpoint, startedAt);
@@ -110,7 +127,7 @@ export function createRpcClient() {
                 publishOperationResult('success');
                 return result;
             } catch (error) {
-                const classification = classifyRpcError(error);
+                const classification = classifyError(error);
                 if (trackEndpointMetrics) recordEndpointFailure(endpoint, startedAt, classification);
                 if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: classification.retryable, errorCategory: classification.category, httpStatus: classification.httpStatus, rpcCode: classification.rpcCode });
                 lastError = error;
@@ -293,7 +310,7 @@ export function createRpcClient() {
         let getBlockDurationMs = 0;
         let getBlockReceiptsDurationMs = 0;
 
-        const result = await execute(`getBlockAndReceipts(${blockNumber})`, async (provider, endpointIndex) => {
+        const result = await execute(`getBlockAndReceipts(${blockNumber})`, async (provider, endpointIndex, classifyError) => {
             const getBlockStartedAt = Date.now();
             let block;
             try {
@@ -306,7 +323,7 @@ export function createRpcClient() {
                 publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: block ? 'success' : 'failure', message: block ? undefined : 'EMPTY_BLOCK' });
             } catch (error) {
                 getBlockDurationMs = Date.now() - getBlockStartedAt;
-                const classification = classifyRpcError(error);
+                const classification = classifyError(error);
                 recordEndpointFailure(endpoints[endpointIndex - 1], getBlockStartedAt, classification);
                 publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: 'failure', message: formatError(error), retryable: classification.retryable, errorCategory: classification.category, httpStatus: classification.httpStatus, rpcCode: classification.rpcCode });
                 throw error;
@@ -327,7 +344,7 @@ export function createRpcClient() {
                 publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'success' });
             } catch (error) {
                 getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
-                const classification = classifyRpcError(error);
+                const classification = classifyError(error);
                 recordEndpointFailure(endpoints[endpointIndex - 1], getReceiptsStartedAt, classification);
                 publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'failure', message: formatError(error), retryable: classification.retryable, errorCategory: classification.category, httpStatus: classification.httpStatus, rpcCode: classification.rpcCode });
                 throw error;
