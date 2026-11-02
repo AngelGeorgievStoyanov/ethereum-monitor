@@ -4,6 +4,7 @@ import { RPC_ENDPOINT_TIMEOUT_MS } from '../constants/evm-rpc.constants';
 import { env } from '../config/env';
 import { formatError } from '../utils/formatError';
 import { publishRpcMetricEvent } from '../metrics/metricsEventBus';
+import { classifyRpcError } from '../utils/classifyRpcError';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
     let timer: ReturnType<typeof setTimeout>;
@@ -17,18 +18,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 }
 
 function isRetryableEndpointError(error: unknown): boolean {
-    let details = '';
-
-    try {
-        details = JSON.stringify(error);
-    } catch {
-        details = String(error);
-    }
-
-    const message = error instanceof Error ? error.message : String(error);
-    return /\b429\b|too many requests|-32005|rate.?limit|timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up|network error|\b50[234]\b/i.test(
-        `${message} ${details}`,
-    );
+    return classifyRpcError(error).retryable;
 }
 
 type RpcEndpoint = {
@@ -106,7 +96,7 @@ export function createRpcClient() {
                 return result;
             } catch (error) {
                 recordEndpointFailure(endpoint, startedAt, error);
-                if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: isRetryableEndpointError(error) });
+                if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 lastError = error;
                 if (!isRetryableEndpointError(error)) throw error;
 
