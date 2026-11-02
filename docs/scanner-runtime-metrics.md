@@ -38,7 +38,7 @@ The analytics response includes retention counts and the oldest retained block/R
 
 ### GET /api/scanner/status
 
-Returns the current scanner status. The latest finalized block is read from the runtime snapshot populated by the scanner loop. This endpoint does not call RPC.
+Returns the current scanner status. Runtime metrics, including the latest finalized block, are read from the Dynamic Config snapshots populated by the scanner and metrics aggregator. Persistent pause/checkpoint/rescan metadata is refreshed from PostgreSQL, merged into the status snapshot in Dynamic Config, and returned to the dashboard. This endpoint does not call RPC.
 
 ### GET /api/scanner/analytics?window=1h
 
