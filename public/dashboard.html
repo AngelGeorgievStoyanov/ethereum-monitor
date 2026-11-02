@@ -421,7 +421,12 @@
         const catchUp = current.catchUp || {};
         const scanner = current.scanner || {};
         const database = current.database || {};
-        const operations = rpc.operations || {};
+        const windowMetrics = data.windowMetrics || {};
+        const windowProcessing = windowMetrics.processing || {};
+        const windowRpc = windowMetrics.rpc || {};
+        const windowOperations = windowRpc.operations || {};
+        const windowDatabase = windowMetrics.database || {};
+        const windowFilters = windowMetrics.filters || {};
         const windowSelect = $('analyticsWindow');
         if (Array.isArray(data.availableWindows) && data.availableWindows.length) {
             windowSelect.innerHTML = data.availableWindows.map((item) => '<option value="' + escapeHtml(item.value) + '">' + escapeHtml(item.label) + '</option>').join('');
@@ -429,42 +434,42 @@
         }
         const runtime = current.runtime || {};
         const filters = current.filters || {};
-        setText('analyticsBlocksPerSecond', processing.blocksPerSecondLastMinute ?? '—');
-        setText('analyticsTransactionsPerSecond', processing.transactionsPerSecondLastMinute ?? '—');
+        setText('analyticsBlocksPerSecond', windowProcessing.blocksPerSecond ?? '—');
+        setText('analyticsTransactionsPerSecond', windowProcessing.transactionsPerSecond ?? '—');
         setText('lagReductionRate', catchUp.lagReductionBlocksPerSecond === null || catchUp.lagReductionBlocksPerSecond === undefined ? '—' : catchUp.lagReductionBlocksPerSecond);
         setText('catchUpEta', catchUp.estimatedRemainingSeconds === null || catchUp.estimatedRemainingSeconds === undefined ? '—' : Math.round(catchUp.estimatedRemainingSeconds) + 's');
-        setText('rpc429', number(rpc.rateLimitErrors));
-        setText('rpcTimeouts', number(rpc.timeoutErrors));
-        setText('rpcAverageLatency', duration(rpc.averageLatencyMs));
-        setText('rpcP95Latency', duration(rpc.latencyP95Ms));
-        setText('avgTransactionsPerBlock', number(processing.averageTransactionsPerBlock));
+        setText('rpc429', number(windowRpc.rateLimitErrors));
+        setText('rpcTimeouts', number(windowRpc.timeoutErrors));
+        setText('rpcAverageLatency', duration(windowRpc.averageLatencyMs));
+        setText('rpcP95Latency', duration(windowRpc.latencyP95Ms));
+        setText('avgTransactionsPerBlock', number(windowProcessing.averageTransactionsPerBlock));
         setText('catchUpCap', number(scanner.maxBlocksPerCatchup));
         setText('parallelBlocks', number(scanner.maxParallelBlocks));
-        setText('databaseFailures', number(database.failures));
-        setText('rpcConnectionErrors', number(rpc.connectionErrors));
-        setText('rpcServerErrors', number(rpc.providerErrors));
-        setText('rpcJsonErrors', number(rpc.jsonRpcErrors));
-        setText('rpcRetryableFailures', number(rpc.retryableFailures));
-        setText('rpcOtherErrors', number(rpc.otherErrors));
-        setText('rpcOperations', number(operations.totalOperations));
-        setText('rpcRetriedOperations', number(operations.retriedOperations));
-        setText('rpcRetryAttempts', number(operations.totalRetryAttempts));
-        setText('rpcEndpointFailovers', number(operations.endpointFailovers));
-        setText('rpcAverageAttempts', number(operations.averageAttemptsPerSuccessfulOperation));
-        setText('dbQueryCount', number(database.queries));
-        setText('dbReadCount', number(database.reads));
-        setText('dbWriteCount', number(database.writes));
-        setText('dbQueryLatency', duration(database.averageQueryDurationMs));
-        setText('filterEvaluations', number(filters.evaluations));
-        setText('filterMatches', number(filters.matches));
-        setText('filterFailures', number(filters.failures));
-        setText('filterAverageDuration', duration(filters.averageDurationMs));
+        setText('databaseFailures', number(windowDatabase.failures));
+        setText('rpcConnectionErrors', number(windowRpc.connectionErrors));
+        setText('rpcServerErrors', number(windowRpc.providerErrors));
+        setText('rpcJsonErrors', number(windowRpc.jsonRpcErrors));
+        setText('rpcRetryableFailures', number(windowRpc.retryableFailures));
+        setText('rpcOtherErrors', number(windowRpc.otherErrors));
+        setText('rpcOperations', number(windowOperations.totalOperations));
+        setText('rpcRetriedOperations', number(windowOperations.retriedOperations));
+        setText('rpcRetryAttempts', number(windowOperations.totalRetryAttempts));
+        setText('rpcEndpointFailovers', number(windowOperations.endpointFailovers));
+        setText('rpcAverageAttempts', number(windowOperations.averageAttemptsPerSuccessfulOperation));
+        setText('dbQueryCount', number(windowDatabase.queries));
+        setText('dbReadCount', number(windowDatabase.reads));
+        setText('dbWriteCount', number(windowDatabase.writes));
+        setText('dbQueryLatency', duration(windowDatabase.averageQueryDurationMs));
+        setText('filterEvaluations', number(windowFilters.evaluations));
+        setText('filterMatches', number(windowFilters.matches));
+        setText('filterFailures', number(windowFilters.failures));
+        setText('filterAverageDuration', duration(windowFilters.averageDurationMs));
         setText('runtimeCpu', number(runtime.cpuPercent) + '%');
         setText('runtimeMemory', number(runtime.memoryRssMb) + ' MB');
         setText('runtimeHeap', number(runtime.memoryHeapUsedMb) + ' MB');
         setText('runtimeEventLoop', number(runtime.eventLoopUtilizationPercent) + '%');
-        setText('avgFilterEvaluation', duration(processing.averageFilterMatchingDurationMs));
-        setText('avgDbBatchWrite', duration(database.averageWriteDurationMs));
+        setText('avgFilterEvaluation', duration(windowFilters.averageDurationMs));
+        setText('avgDbBatchWrite', duration(windowProcessing.averageDatabaseBatchWriteDurationMs));
         const minuteBuckets = data.minuteBuckets || [];
         drawMinuteChart('throughputChart', minuteBuckets, [
             { color: '#60a5fa', value: (bucket) => bucket.processedBlocks },
@@ -487,8 +492,17 @@
         setText('analyticsRetention', coverage + ' · ' + availableMinutes + ' minutes available since ' + new Date(data.historyStartedAt).toLocaleTimeString() + ' · ' + number(retention.blockSamples) + ' block samples · ' + number(retention.lagSamples) + ' lag samples · ' + number(retention.rpcEvents) + ' RPC requests · ' + number(retention.batches) + ' batches · ' + number(retention.minuteBuckets) + ' minute buckets');
         const sessions = (data.catchUpSessions || []).slice(-10).reverse();
         $('catchUpRows').innerHTML = sessions.map((item) => '<tr><td>' + (item.startedAt ? new Date(item.startedAt).toLocaleTimeString() : '—') + '</td><td>' + number(item.processedBlocks) + '</td><td>' + number(item.processedTransactions) + '</td><td>' + duration(item.durationMs) + '</td><td>' + number(item.blocksPerSecond) + '</td><td>' + escapeHtml(item.status) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No catch-up sessions retained</td></tr>';
-        const methods = (rpc.methods || []).slice(-15);
-        $('rpcMethodRows').innerHTML = methods.map((item) => '<tr><td>' + escapeHtml(item.method) + '</td><td>' + number(item.requests) + '</td><td>' + number(item.failures) + '</td><td>' + duration(item.requests ? item.totalDurationMs / item.requests : null) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No RPC methods reported</td></tr>';
+        const methodTotals = new Map();
+        for (const event of data.rpcEvents || []) {
+            const method = String(event.method);
+            const item = methodTotals.get(method) || { method, requests: 0, failures: 0, totalDurationMs: 0 };
+            item.requests += 1;
+            item.totalDurationMs += Number(event.durationMs || 0);
+            if (event.outcome === 'failure') item.failures += 1;
+            methodTotals.set(method, item);
+        }
+        const methods = Array.from(methodTotals.values()).sort((left, right) => right.requests - left.requests).slice(0, 15);
+        $('rpcMethodRows').innerHTML = methods.map((item) => '<tr><td>' + escapeHtml(item.method) + '</td><td>' + number(item.requests) + '</td><td>' + number(item.failures) + '</td><td>' + duration(item.requests ? item.totalDurationMs / item.requests : null) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No RPC methods reported in this window</td></tr>';
         const errors = (data.rpcEvents || []).filter((item) => item.outcome === 'failure').slice(-12).reverse();
         $('rpcErrorRows').innerHTML = errors.map((item) => '<tr><td>' + (item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '—') + '</td><td>' + escapeHtml(item.method) + '</td><td>' + escapeHtml(item.failureKind) + '</td><td>' + number(item.httpStatus) + '</td><td>' + number(item.rpcCode) + '</td><td>' + escapeHtml(item.message) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No RPC errors in this window</td></tr>';
         const filterRows = Object.entries(filters.byFilter || {}).map(([id, item]) => ({
