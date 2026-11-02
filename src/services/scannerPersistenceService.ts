@@ -7,7 +7,6 @@ import {
     ProcessedBlockRecord,
     ReorgRecoveryProgress,
 } from '../repositories/scannerPersistenceRepository';
-import { isScannerLockHeld } from './scannerLockService';
 import { recordDatabaseFailure } from './metricsAggregatorService';
 import { formatError } from '../utils/formatError';
 import type { TransferBatchCandidate } from '../types/transfer-batch.types';
@@ -43,7 +42,6 @@ export async function reconcileBlockCandidates(
             mapTransferBatchItems(candidates),
             scannerStateId,
             expectedCheckpoint,
-            isScannerLockHeld,
         ),
     );
 }
@@ -73,7 +71,6 @@ export async function persistProcessedBlockBatch({
             expectedCheckpoint,
             newCheckpoint,
             recoveryProgress,
-            assertScannerLockHeld: isScannerLockHeld,
         }),
     );
 }

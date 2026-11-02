@@ -999,8 +999,3 @@ subscribeToRpcOperationMetricEvents(recordRpcOperation);
 subscribeToDatabaseMetricEvents(recordDatabaseQuery);
 subscribeToFilterMetricEvents(recordFilterEvaluation);
 
-export function markScannerStopped(): void {
-    scannerRunning = false;
-    if (catchUpActive) completeCatchUp('interrupted');
-    publish();
-}

@@ -17,7 +17,6 @@ import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import type { CanonicalBlockIdentity } from '../repositories/blockRepository';
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
-import { isScannerLockHeld } from './scannerLockService';
 import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
 import { recordProcessingBatch } from './metricsAggregatorService';
 
@@ -147,13 +146,6 @@ export async function processFinalizedBlocks(
 
             const processedBlockRecords = preparedBlocks.map(({ result }) => result.block);
             const candidates = preparedBlocks.flatMap(({ result }) => result.candidates);
-            if (!(await isScannerLockHeld())) {
-                console.warn(
-                    `[Scanner] Advisory lock lost before committing batch at block ${currentBatchStart}; yielding to the lock owner`,
-                );
-                return;
-            }
-
             const databaseWriteStartedAt = Date.now();
             const committedCheckpoint = await persistProcessedBlockBatch({
                 candidates,
@@ -166,7 +158,7 @@ export async function processFinalizedBlocks(
 
             if (committedCheckpoint !== blockNumbers[blockNumbers.length - 1]) {
                 state.lastProcessedBlock = committedCheckpoint;
-                // Another replica changed the checkpoint; never keep a cache for a different range.
+                // The checkpoint changed; never keep a cache for a different range.
                 lastConfirmedBlock = null;
                 continue;
             }

@@ -11,14 +11,12 @@
 
 ## Scanner status snapshots
 
-- During application startup, after database and Dynamic Config initialization, the application loads the initial pause/control state, checkpoint/recovery state, and latest rescan job from PostgreSQL and publishes a status snapshot before the HTTP server starts. After scanner ownership is acquired and scanner state is initialized, the snapshot is refreshed with the scanner runtime state.
+- During application startup, after database and Dynamic Config initialization, the application loads the initial pause/control state, checkpoint/recovery state, and latest rescan job from PostgreSQL and publishes a status snapshot before the HTTP server starts. After scanner state is initialized, the snapshot is refreshed with the scanner runtime state.
 - The initial pause state is loaded from PostgreSQL during startup and published to Dynamic Config before the scanner starts.
 - A dedicated Fast Refresh reads only the persisted `scannerPaused` flag every 30 seconds and updates the in-memory Dynamic Config snapshot. Pause/resume API requests only write PostgreSQL; the scanner observes them on the next refresh.
 - If a Fast Refresh read fails, the last successfully loaded pause state remains active. The scanner reads the in-memory snapshot at its safe processing boundaries and performs no database reads for pause checks.
 - The existing scanner main loop republishes its runtime context during normal polling. Checkpoint and recovery state are published from the scanner's in-memory state after processing and recovery work; the stall check continues to expose stale progress through the last-processed timestamp.
 - Rescan job creation, progress, completion, failure, and recovery handoff publish the updated job summary.
-- Lock loss and reacquisition publish scanner running state immediately.
-- On lock reacquisition, persistent scanner state is loaded again and the status snapshot is refreshed.
 - If startup has not yet produced the first complete snapshot, the status endpoint reports that status is initializing rather than returning a fabricated empty state.
 
 ## Runtime metrics

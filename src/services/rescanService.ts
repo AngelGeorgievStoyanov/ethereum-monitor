@@ -6,7 +6,6 @@ import { getBlockWithConsensus } from './blockConsensusService';
 import { reconcileBlockCandidates } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
 import { markReorgRecoveryPending } from './reorgRecoveryService';
-import { isScannerLockHeld } from './scannerLockService';
 import {
     recordReorgDetected,
     recordRescanBlockProcessed,
@@ -50,9 +49,6 @@ async function runManualRescanInternal({
     toBlock: number;
     blocksProcessed: number;
 }> {
-    if (!(await isScannerLockHeld())) {
-        throw new Error('Manual rescan requires this instance to own the scanner lock');
-    }
     const initialState = await findScannerRescanState(scannerStateId);
     if (!initialState) throw new Error('Scanner state is not initialized');
     const checkpoint = initialState.lastProcessedBlock;
@@ -78,11 +74,6 @@ async function runManualRescanInternal({
     let blocksProcessed = 0;
 
     for (let blockNumber = fromBlock; blockNumber <= checkpoint; blockNumber += 1) {
-        if (!(await isScannerLockHeld())) {
-            throw new Error(
-                `Manual rescan stopped before block ${blockNumber}: scanner lock ownership was lost`,
-            );
-        }
         const currentState = await findScannerRescanState(scannerStateId);
         if (!currentState) throw new Error('Scanner state is not initialized');
         if (currentState.lastProcessedBlock !== checkpoint) {
@@ -124,11 +115,6 @@ async function runManualRescanInternal({
             );
         }
 
-        if (!(await isScannerLockHeld())) {
-            throw new Error(
-                `Manual rescan stopped before saving block ${blockNumber}: scanner lock ownership was lost`,
-            );
-        }
         await reconcileBlockCandidates(prepared.candidates, scannerStateId, checkpoint);
         blocksProcessed += 1;
         recordRescanBlockProcessed();

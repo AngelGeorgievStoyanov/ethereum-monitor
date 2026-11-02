@@ -15,9 +15,8 @@ import { initializeScannerState } from './scannerInitializationService';
 import { invalidateConfirmedBlockCache, processFinalizedBlocks } from './blockProcessor';
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
 import { refreshScannerStatusSnapshot } from './scannerStatusService';
-import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
-import { markScannerStopped, recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
+import { recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
 
 let processingFinalizedBlocks = false;
 let manualRescanReserved = false;
@@ -28,7 +27,7 @@ async function markInterruptedRescanJobs(): Promise<void> {
         console.warn(
             '[Rescan] Marked ' +
                 count +
-                ' abandoned rescan job(s) as INTERRUPTED after acquiring scanner ownership',
+                ' abandoned rescan job(s) as INTERRUPTED after process restart',
         );
     }
 }
@@ -97,11 +96,6 @@ export function createBlockMonitorService() {
         let state: ScannerRuntimeState;
 
         try {
-            while (!(await tryAcquireScannerLock())) {
-                console.warn('[Scanner] Another replica owns the scanner lock; waiting');
-                await sleep(SCANNER_POLL_INTERVAL_MS);
-            }
-            console.log('[Scanner] Acquired PostgreSQL advisory lock');
             await markInterruptedRescanJobs();
             state = await initializeScannerState();
             await refreshScannerStatusSnapshot();
@@ -112,7 +106,6 @@ export function createBlockMonitorService() {
             throw error;
         }
 
-        let needsStateReload = false;
         let lastObservedCheckpoint = state.lastProcessedBlock;
         let lastProgressAt = Date.now();
         let lastStallWarningAt = 0;
@@ -149,31 +142,6 @@ export function createBlockMonitorService() {
 
         while (true) {
             try {
-                if (!(await isScannerLockHeld())) {
-                    markScannerStopped();
-                    dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: false });
-                    needsStateReload = true;
-                    while (!(await tryAcquireScannerLock())) {
-                        console.warn(
-                            '[Scanner] Advisory lock unavailable after connection loss; waiting',
-                        );
-                        await sleep(SCANNER_POLL_INTERVAL_MS);
-                    }
-                    console.log('[Scanner] Reacquired PostgreSQL advisory lock');
-                    await markInterruptedRescanJobs();
-                    dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
-                }
-
-                if (needsStateReload) {
-                    state = await initializeScannerState();
-                    await refreshScannerStatusSnapshot();
-                    dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
-                    waitingForFilters = dynamicConfigService.getTxFilters().length === 0;
-                    waitingForPause = false;
-                    needsStateReload = false;
-                }
-
-
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
                 updateScannerRuntimeContext({ running: true, activeFiltersCount: activeTxFilters.length, lastProcessedBlock: state.lastProcessedBlock, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });

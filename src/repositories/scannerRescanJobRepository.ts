@@ -41,7 +41,7 @@ export async function markActiveScannerRescanJobsInterrupted(): Promise<number> 
     const [updatedRows] = await ScannerRescanJob.update(
         {
             status: 'INTERRUPTED',
-            error: 'Scanner ownership was lost before the rescan operation completed',
+            error: 'Scanner process stopped before the rescan operation completed',
             completedAt: new Date(),
         },
         { where: { status: { [Op.in]: ['QUEUED', 'RUNNING'] } } },

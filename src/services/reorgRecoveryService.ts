@@ -19,7 +19,6 @@ import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, evmRpcClient } from './evmBlockDataService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
-import { isScannerLockHeld } from './scannerLockService';
 import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import {
     findScannerStatusState,
@@ -84,14 +83,10 @@ export async function markReorgRecoveryPending(
     checkpoint: number,
     targetBlock = checkpoint + REORG_RECOVERY_STABLE_BLOCKS,
 ): Promise<void> {
-    if (!(await isScannerLockHeld()))
-        throw new Error('Cannot mark reorg recovery pending without owning the scanner lock');
     await persistReorgRecoveryPending(scannerStateId, checkpoint, targetBlock);
 }
 
 async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void> {
-    if (!(await isScannerLockHeld()))
-        throw new Error('Cannot search for or roll back a reorg without owning the scanner lock');
     const originalCheckpoint = state.reorgRecoveryStartBlock;
     if (originalCheckpoint === null)
         throw new Error('Reorg recovery has no checkpoint to reconcile');
@@ -125,8 +120,6 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
         );
     }
 
-    if (!(await isScannerLockHeld()))
-        throw new Error('Scanner lock ownership was lost before reorg rollback');
     const rollback = await rollbackToCommonAncestor({
         scannerStateId: state.id,
         expectedCheckpoint: originalCheckpoint,
@@ -147,10 +140,6 @@ async function processReorgRecoveryInternal(
     getActiveTxFilters: () => TxFilterConfigSnapshot,
 ): Promise<boolean> {
     await refreshScannerState(state);
-    if (!(await isScannerLockHeld())) {
-        console.warn('[Reorg] Scanner lock is not held; recovery will wait for ownership');
-        return true;
-    }
     if (state.reorgRecoveryBlocked) return true;
     if (state.reorgRecoveryActive) logSingleProviderReorgMode();
     if (state.lastProcessedBlock < 0 && !state.reorgRecoveryActive) return false;
@@ -208,12 +197,6 @@ async function processReorgRecoveryInternal(
 
     while (state.reorgRecoveryActive && state.lastProcessedBlock < finalizedBlockNumber) {
         if (getDynamicConfigService().getScannerControlSnapshot()) return true;
-        if (!(await isScannerLockHeld())) {
-            console.warn(
-                '[Reorg] Scanner lock lost; recovery will resume after the lock is reacquired',
-            );
-            return true;
-        }
 
         const blockNumber = state.lastProcessedBlock + 1;
         const verifiedBlock = await getReorgVerifiedBlock(blockNumber, 'reorg recovery');
@@ -270,12 +253,6 @@ async function processReorgRecoveryInternal(
                 ? state.reorgRecoveryStableBlocks + 1
                 : 0;
         const recoveryComplete = blockNumber >= recoveryTargetBlock;
-        if (!(await isScannerLockHeld())) {
-            console.warn(
-                `[Reorg] Scanner lock lost before committing recovery block ${blockNumber}`,
-            );
-            return true;
-        }
         const committedCheckpoint = await persistProcessedBlockBatch({
             candidates: prepared.candidates,
             blocks: [prepared.block],
@@ -320,17 +297,7 @@ async function markVerificationRecoveryBlocked(
     state: ScannerRuntimeState,
     error: BlockVerificationUnavailableError,
 ): Promise<void> {
-    if (!(await isScannerLockHeld())) {
-        console.error(
-            '[Reorg] Cannot persist blocked recovery state because scanner lock ownership was lost',
-        );
-        return;
-    }
     if (error instanceof ConsensusUnavailableError) recordReorgConsensusFailure();
-    if (!(await isScannerLockHeld()))
-        throw new Error(
-            'Scanner lock ownership was lost before persisting block-verification-blocked recovery state',
-        );
     const reasonPrefix =
         error instanceof ConsensusUnavailableError
             ? 'CONSENSUS_UNAVAILABLE'
@@ -352,17 +319,7 @@ async function markReceiptConsistencyRecoveryBlocked(
     state: ScannerRuntimeState,
     error: BlockReceiptConsistencyError,
 ): Promise<void> {
-    if (!(await isScannerLockHeld())) {
-        console.error(
-            '[Reorg] Cannot persist receipt-consistency-blocked recovery because scanner lock ownership was lost',
-        );
-        return;
-    }
 
-    if (!(await isScannerLockHeld()))
-        throw new Error(
-            'Scanner lock ownership was lost before persisting receipt-consistency-blocked recovery',
-        );
     await markReorgRecoveryBlocked({
         scannerStateId: state.id,
         reason: `RECEIPT_CONSISTENCY:block=${error.blockNumber}:${error.message}`,
@@ -403,16 +360,6 @@ async function markRecoverySafetyBlocked(
     state: ScannerRuntimeState,
     error: ReorgRecoverySafetyError,
 ): Promise<void> {
-    if (!(await isScannerLockHeld())) {
-        console.error(
-            '[Reorg] Cannot persist safety-blocked recovery state because scanner lock ownership was lost',
-        );
-        return;
-    }
-    if (!(await isScannerLockHeld()))
-        throw new Error(
-            'Scanner lock ownership was lost before persisting safety-blocked recovery state',
-        );
     await markReorgRecoveryBlocked({
         scannerStateId: state.id,
         reason: `SAFETY:${error.message}`,

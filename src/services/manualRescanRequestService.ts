@@ -5,7 +5,6 @@ import {
     releaseManualRescanReservation,
     tryReserveManualRescan,
 } from './blockMonitorService';
-import { isScannerLockHeld } from './scannerLockService';
 import { getScannerControlState } from './scannerControlService';
 import { countCanonicalBlocksInRange } from '../repositories/blockRepository';
 import {
@@ -55,12 +54,6 @@ async function requestManualRescanOperation(
     if (!scannerControl.paused) {
         return rejected('conflict', {
             message: 'Pause the scanner before starting a rescan.',
-        });
-    }
-    if (!(await isScannerLockHeld())) {
-        return rejected('conflict', {
-            message:
-                'Manual rescan must be started on the instance that currently owns the scanner lock.',
         });
     }
     if (isScannerProcessingBlocks()) {

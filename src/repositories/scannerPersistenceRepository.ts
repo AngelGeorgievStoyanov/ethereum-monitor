@@ -27,18 +27,13 @@ export interface PersistProcessedBlockBatchOptions {
     expectedCheckpoint: number;
     newCheckpoint: number;
     recoveryProgress?: ReorgRecoveryProgress;
-    assertScannerLockHeld: () => Promise<boolean>;
 }
 
 export async function reconcileBlockTransferItems(
     transferItems: readonly TransferBatchItem[],
     scannerStateId: string,
     expectedCheckpoint: number,
-    assertScannerLockHeld: () => Promise<boolean>,
 ): Promise<void> {
-    if (!(await assertScannerLockHeld())) {
-        throw new Error('Cannot reconcile rescan matches without owning the scanner lock');
-    }
     await sequelize.transaction(async (transaction) => {
         const state = await ScannerState.findByPk(scannerStateId, {
             transaction,
@@ -55,9 +50,6 @@ export async function reconcileBlockTransferItems(
                 'Cannot reconcile rescan matches while reorg recovery is active or blocked',
             );
         }
-        if (!(await assertScannerLockHeld())) {
-            throw new Error('Scanner lock ownership was lost before reconciling rescan matches');
-        }
         await createTransfersBatch(transferItems, transaction, true);
     });
 }
@@ -69,7 +61,6 @@ export async function persistProcessedBlockBatchTransaction({
     expectedCheckpoint,
     newCheckpoint,
     recoveryProgress,
-    assertScannerLockHeld,
 }: PersistProcessedBlockBatchOptions): Promise<number> {
     return sequelize.transaction(async (transaction) => {
         const state = await ScannerState.findByPk(scannerStateId, {
@@ -78,13 +69,8 @@ export async function persistProcessedBlockBatchTransaction({
         });
         if (!state) throw new Error(`Scanner state "${scannerStateId}" was not found`);
 
-        // Another replica may have committed this range while it was being fetched.
+        // Never commit a batch fetched from a stale checkpoint.
         if (state.lastProcessedBlock !== expectedCheckpoint) return state.lastProcessedBlock;
-        if (!(await assertScannerLockHeld())) {
-            throw new Error(
-                'Scanner lock ownership was lost before persisting the processed block batch',
-            );
-        }
 
         for (let index = 1; index < blocks.length; index += 1) {
             if (
