@@ -17,7 +17,6 @@ export function createDynamicConfigService() {
     let pendingReloadCount = 0;
     let initialized = false;
     let runtimeMetricsSnapshot: unknown = null;
-    let runtimeAnalyticsSnapshot: unknown = null;
     let scannerStatusSnapshot: unknown = null;
     let scannerControlPausedSnapshot: boolean | null = null;
 
@@ -129,14 +128,6 @@ export function createDynamicConfigService() {
         return runtimeMetricsSnapshot;
     }
 
-    function publishRuntimeAnalytics(snapshot: unknown): void {
-        runtimeAnalyticsSnapshot = snapshot;
-    }
-
-    function getRuntimeAnalyticsSnapshot(): unknown {
-        return runtimeAnalyticsSnapshot;
-    }
-
     function publishScannerControlSnapshot(paused: boolean): void {
         scannerControlPausedSnapshot = paused;
         updateScannerStatusSnapshot({ paused });
@@ -176,8 +167,6 @@ export function createDynamicConfigService() {
         getTxFilterSnapshot,
         publishRuntimeMetrics,
         getRuntimeMetricsSnapshot,
-        publishRuntimeAnalytics,
-        getRuntimeAnalyticsSnapshot,
         publishScannerControlSnapshot,
         getScannerControlSnapshot,
         publishScannerStatus,
