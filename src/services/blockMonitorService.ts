@@ -15,7 +15,7 @@ import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
 import { invalidateConfirmedBlockCache, processFinalizedBlocks } from './blockProcessor';
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
-import { getScannerControlState } from './scannerControlService';
+import { refreshScannerStatusSnapshot } from './scannerStatusService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
 import { recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
@@ -105,6 +105,7 @@ export function createBlockMonitorService() {
             console.log('[Scanner] Acquired PostgreSQL advisory lock');
             await markInterruptedRescanJobs();
             state = await initializeScannerState();
+            await refreshScannerStatusSnapshot();
             updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });
         } catch (error) {
             scannerStarted = false;
@@ -143,7 +144,7 @@ export function createBlockMonitorService() {
         let waitingForFilters = dynamicConfigService.getTxFilters().length === 0;
         let waitingForPause = false;
         let cachedControlPaused = false;
-        let lastControlStateCheckAt = 0;
+        let lastControlStateCheckAt = Date.now();
         if (waitingForFilters) {
             console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
         }
@@ -170,6 +171,12 @@ export function createBlockMonitorService() {
                     needsStateReload = false;
                 }
 
+                if (Date.now() - lastControlStateCheckAt >= SCANNER_CONTROL_REFRESH_INTERVAL_MS) {
+                    const statusSnapshot = await refreshScannerStatusSnapshot();
+                    cachedControlPaused = statusSnapshot.paused;
+                    lastControlStateCheckAt = Date.now();
+                }
+
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
                 updateScannerRuntimeContext({ running: true, activeFiltersCount: activeTxFilters.length, lastProcessedBlock: state.lastProcessedBlock, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });
@@ -183,11 +190,6 @@ export function createBlockMonitorService() {
                     waitingForFilters = true;
                     waitingForPause = false;
                 } else {
-                    const now = Date.now();
-                    if (now - lastControlStateCheckAt >= SCANNER_CONTROL_REFRESH_INTERVAL_MS) {
-                        cachedControlPaused = (await getScannerControlState()).paused;
-                        lastControlStateCheckAt = now;
-                    }
                     if (cachedControlPaused) {
                         if (!waitingForPause) {
                             console.log('[Scanner] Paused; skipping finalized-block RPC polling');
