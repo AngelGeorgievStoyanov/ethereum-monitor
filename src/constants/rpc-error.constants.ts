@@ -9,8 +9,8 @@ export const RPC_ERROR_CATEGORIES = {
 
 export const RPC_ERROR_HTTP_STATUS = {
     RATE_LIMIT: [429],
-    TIMEOUT: [504],
-    PROVIDER: [502, 503],
+    TIMEOUT: [408, 504],
+    PROVIDER: [500, 502, 503],
 } as const;
 
 export const RPC_ERROR_JSON_CODES = {
