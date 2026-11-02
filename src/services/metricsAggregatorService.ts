@@ -1,4 +1,5 @@
 import type { ScannerAnalyticsResponse } from '../types/scanner-analytics.types';
+import { performance } from 'node:perf_hooks';
 import { getDynamicConfigService } from './dynamicConfigService';
 import { subscribeToRpcMetricEvents, subscribeToRpcOperationMetricEvents, type RpcMetricEventInput, type RpcOperationMetricEvent } from '../metrics/metricsEventBus';
 import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
@@ -27,6 +28,9 @@ type RpcInput = RpcMetricEventInput;
 
 const startedAtMs = Date.now();
 const startedAt = new Date(startedAtMs).toISOString();
+let lastCpuUsage = process.cpuUsage();
+let lastCpuSampleAt = startedAtMs;
+let lastEventLoopUtilization = performance.eventLoopUtilization();
 const blockSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
@@ -154,6 +158,14 @@ function trimSamples(now: number): void {
 function getSnapshot() {
     const now = Date.now();
     trimSamples(now);
+    const cpuUsage = process.cpuUsage(lastCpuUsage);
+    lastCpuUsage = process.cpuUsage();
+    const cpuElapsedMs = Math.max(1, now - lastCpuSampleAt);
+    lastCpuSampleAt = now;
+    const cpuPercent = Number((((cpuUsage.user + cpuUsage.system) / 1000 / cpuElapsedMs) * 100).toFixed(2));
+    const eventLoopUtilization = performance.eventLoopUtilization(lastEventLoopUtilization);
+    lastEventLoopUtilization = performance.eventLoopUtilization();
+    const memoryUsage = process.memoryUsage();
     const recent = blockSamples.filter((sample) => now - sample.timestampMs <= 60000);
     const sum = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
     const average = (key: string) => recent.length ? Number((sum(key) / recent.length).toFixed(1)) : null;
@@ -203,6 +215,14 @@ function getSnapshot() {
     return {
         startedAt,
         updatedAt: new Date(now).toISOString(),
+        runtime: {
+            memoryRssMb: Number((memoryUsage.rss / 1048576).toFixed(1)),
+            memoryHeapUsedMb: Number((memoryUsage.heapUsed / 1048576).toFixed(1)),
+            memoryHeapTotalMb: Number((memoryUsage.heapTotal / 1048576).toFixed(1)),
+            memoryExternalMb: Number((memoryUsage.external / 1048576).toFixed(1)),
+            cpuPercent,
+            eventLoopUtilizationPercent: Number((eventLoopUtilization.utilization * 100).toFixed(2)),
+        },
         scanner: { running: scannerRunning, paused: scannerPaused, pauseMode, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount, maxBlocksPerCatchup, maxParallelBlocks, parallelProcessingLagBlocks },
         chain: { latestFinalizedBlock, latestFinalizedAt, lastProcessedBlock, lastProcessedAt, lagBlocks, rpcAvailable },
         processing: {
