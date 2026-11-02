@@ -121,6 +121,59 @@ function validateBlockReceipts(
     }
 }
 
+
+export async function fetchBlockDataFromVerifiedBlock(
+    blockNumber: number,
+    block: ethers.Block,
+    endpointIndex: number,
+    getBlockDurationMs: number,
+    consensusDurationMs: number,
+) {
+    for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
+        try {
+            if (block.number !== blockNumber) {
+                throw new BlockReceiptConsistencyError(
+                    blockNumber,
+                    `Verified provider returned block ${block.number}, expected ${blockNumber}`,
+                );
+            }
+
+            const { receipts, durationMs: getBlockReceiptsDurationMs } =
+                await evmRpcClient.getBlockReceiptsFromEndpoint(blockNumber, endpointIndex);
+            validateBlockReceipts(blockNumber, block, receipts);
+
+            return {
+                block,
+                receipts,
+                durationMs: consensusDurationMs + getBlockReceiptsDurationMs,
+                getBlockDurationMs,
+                getBlockReceiptsDurationMs,
+                attempt,
+            };
+        } catch (error) {
+            const message = formatError(error);
+            if (error instanceof BlockReceiptConsistencyError) {
+                console.error(`[RPC] Verified block ${blockNumber} receipt consistency failure: ${message}`);
+                throw error;
+            }
+            if (attempt === MAX_BLOCK_FETCH_ATTEMPTS) {
+                console.error(
+                    `[RPC] Receipts for verified block ${blockNumber} failed after ${attempt} attempts on provider P${endpointIndex}: ${message}`,
+                );
+                throw error;
+            }
+
+            const delayMs = Math.min(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1), RETRY_MAX_DELAY_MS);
+            console.warn(
+                `[RPC] Receipts for verified block ${blockNumber} failed on provider P${endpointIndex} (attempt ${attempt}/${MAX_BLOCK_FETCH_ATTEMPTS}); retrying in ${delayMs}ms: ${message}`,
+            );
+            await sleep(delayMs);
+        }
+    }
+
+    throw new Error(`Unable to fetch receipts for verified block ${blockNumber}`);
+}
+
 export async function fetchBlockData(blockNumber: number) {
     for (let attempt = 1; attempt <= MAX_BLOCK_FETCH_ATTEMPTS; attempt += 1) {
         const startedAt = Date.now();
