@@ -219,7 +219,7 @@
             <section>
                 <h2>Recent RPC errors</h2>
                 <div class="table-wrap">
-                    <table><thead><tr><th>Time</th><th>Method</th><th>Type</th><th>Message</th></tr></thead><tbody id="rpcErrorRows"><tr><td colspan="4" class="muted">Waiting for data</td></tr></tbody></table>
+                    <table><thead><tr><th>Time</th><th>Method</th><th>Type</th><th>HTTP</th><th>RPC code</th><th>Message</th></tr></thead><tbody id="rpcErrorRows"><tr><td colspan="6" class="muted">Waiting for data</td></tr></tbody></table>
                 </div>
             </section>
         </div>
@@ -470,7 +470,7 @@
         const methods = (rpc.methods || []).slice(-15);
         $('rpcMethodRows').innerHTML = methods.map((item) => '<tr><td>' + escapeHtml(item.method) + '</td><td>' + number(item.requests) + '</td><td>' + number(item.failures) + '</td><td>' + duration(item.requests ? item.totalDurationMs / item.requests : null) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No RPC methods reported</td></tr>';
         const errors = (data.rpcEvents || []).filter((item) => item.outcome === 'failure').slice(-12).reverse();
-        $('rpcErrorRows').innerHTML = errors.map((item) => '<tr><td>' + (item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '—') + '</td><td>' + escapeHtml(item.method) + '</td><td>' + escapeHtml(item.failureKind) + '</td><td>' + escapeHtml(item.message) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No RPC errors in this window</td></tr>';
+        $('rpcErrorRows').innerHTML = errors.map((item) => '<tr><td>' + (item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '—') + '</td><td>' + escapeHtml(item.method) + '</td><td>' + escapeHtml(item.failureKind) + '</td><td>' + number(item.httpStatus) + '</td><td>' + number(item.rpcCode) + '</td><td>' + escapeHtml(item.message) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No RPC errors in this window</td></tr>';
         const batch = (data.batches || []).slice(-1)[0];
         setText('lastBatchSummary', batch ? 'Last batch: blocks ' + number(batch.startBlock) + '–' + number(batch.endBlock) + ' · ' + number(batch.transactions) + ' transactions · ' + duration(batch.durationMs) + ' total · ' + duration(batch.databaseWriteDurationMs) + ' DB write' : 'No processing batch recorded');
     }
