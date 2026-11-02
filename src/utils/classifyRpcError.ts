@@ -37,6 +37,10 @@ function collectErrorDetails(error: unknown): ErrorDetails {
             const trimmed = value.trim();
             if (trimmed) {
                 details.messages.push(trimmed);
+                const httpStatusMatch = trimmed.match(/\\b(?:HTTP(?: status)?|status(?: code)?)\\s*[:=]?\\s*(\\d{3})\\b/i);
+                if (httpStatusMatch) details.httpStatuses.push(Number(httpStatusMatch[1]));
+                const rpcCodeMatch = trimmed.match(/\\bcode\\s*[:=]\\s*(-32\\d{3,4})\\b/i);
+                if (rpcCodeMatch) details.rpcCodes.push(Number(rpcCodeMatch[1]));
                 if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && current.depth < RPC_ERROR_MAX_NESTED_DEPTH) {
                     try {
                         queue.push({ value: JSON.parse(trimmed), depth: current.depth + 1 });
@@ -68,7 +72,7 @@ function collectErrorDetails(error: unknown): ErrorDetails {
             else if (code >= 100 && code <= 599) details.httpStatuses.push(code);
         }
 
-        for (const key of ['cause', 'error', 'response', 'data', 'body', 'result']) {
+        for (const key of ['cause', 'error', 'response', 'data', 'body', 'result', 'info', 'details', 'originalError', 'payload']) {
             if (record[key] !== undefined && record[key] !== value) {
                 queue.push({ value: record[key], depth: current.depth + 1 });
             }
