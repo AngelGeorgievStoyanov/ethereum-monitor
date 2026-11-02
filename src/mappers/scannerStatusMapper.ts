@@ -10,6 +10,7 @@ import type {
 
 export function mapScannerStatusResponse(input: {
     control: ScannerControlState;
+    scannerRunning: boolean;
     state: ScannerStatusState | null;
     rescanJob: ScannerRescanJobSummary | null;
     recoveryMetrics: RecoveryMetrics;
@@ -26,6 +27,7 @@ export function mapScannerStatusResponse(input: {
     const lastProcessedBlock = input.state?.lastProcessedBlock ?? null;
 
     return {
+        scannerRunning: input.scannerRunning,
         paused: input.control.paused,
         mode: input.control.mode,
         pauseRequestedAtBlock: input.control.pauseRequestedAtBlock,
