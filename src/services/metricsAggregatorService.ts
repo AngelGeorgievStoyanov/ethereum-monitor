@@ -3,6 +3,7 @@ import { getDynamicConfigService } from './dynamicConfigService';
 import { subscribeToRpcMetricEvents, subscribeToRpcOperationMetricEvents, type RpcMetricEventInput, type RpcOperationMetricEvent } from '../metrics/metricsEventBus';
 import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
 import { classifyRpcError } from '../utils/classifyRpcError';
+import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
 import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
@@ -86,6 +87,16 @@ let totalFilterMatchingDurationMs = 0;
 let totalBlockDurationMs = 0;
 let totalDatabaseWriteDurationMs = 0;
 const databaseMetrics = { writes: 0, failures: 0, totalWriteDurationMs: 0, lastErrorAt: null as string | null, lastError: null as string | null };
+const databaseQueryTotals = {
+    queries: 0,
+    reads: 0,
+    writes: 0,
+    other: 0,
+    totalDurationMs: 0,
+    maxDurationMs: 0,
+    lastQueryAt: null as string | null,
+    byOperation: {} as Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }>,
+};
 let recoveryMetrics: Record<string, number> = {
     reorgCount: 0,
     reorgDepthLast: 0,
@@ -262,7 +273,12 @@ function getSnapshot() {
                 };
             }),
         },
-        database: { ...databaseMetrics, averageWriteDurationMs: databaseMetrics.writes ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1)) : null },
+        database: {
+            ...databaseMetrics,
+            averageWriteDurationMs: databaseMetrics.writes ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1)) : null,
+            ...databaseQueryTotals,
+            averageQueryDurationMs: databaseQueryTotals.queries ? Number((databaseQueryTotals.totalDurationMs / databaseQueryTotals.queries).toFixed(1)) : null,
+        },
         recovery: { ...recoveryMetrics },
         recentRpcErrors: rpcEvents.filter((event) => event.outcome === 'failure').slice(-METRICS_SAMPLE_LIMITS.recentRpcErrors).map(({ timestampMs: _timestampMs, ...event }) => event),
         recentBlocks: recent.slice(-30).map(({ timestampMs: _timestampMs, ...sample }) => sample),
@@ -552,6 +568,24 @@ export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW
     return snapshot;
 }
 
+function recordDatabaseQuery(input: DatabaseMetricEvent): void {
+    databaseQueryTotals.queries += 1;
+    databaseQueryTotals[input.operation === 'read' ? 'reads' : input.operation === 'write' ? 'writes' : 'other'] += 1;
+    databaseQueryTotals.totalDurationMs += input.durationMs;
+    databaseQueryTotals.maxDurationMs = Math.max(databaseQueryTotals.maxDurationMs, input.durationMs);
+    databaseQueryTotals.lastQueryAt = new Date().toISOString();
+    const operation = databaseQueryTotals.byOperation[input.queryType] ?? {
+        count: 0,
+        totalDurationMs: 0,
+        maxDurationMs: 0,
+    };
+    operation.count += 1;
+    operation.totalDurationMs += input.durationMs;
+    operation.maxDurationMs = Math.max(operation.maxDurationMs, input.durationMs);
+    databaseQueryTotals.byOperation[input.queryType] = operation;
+    publish();
+}
+
 function recordRpcOperation(input: RpcOperationMetricEvent): void {
     rpcOperationTotals.totalOperations += 1;
     if (input.outcome === 'success') {
@@ -568,6 +602,7 @@ function recordRpcOperation(input: RpcOperationMetricEvent): void {
 
 subscribeToRpcMetricEvents(recordRpcRequest);
 subscribeToRpcOperationMetricEvents(recordRpcOperation);
+subscribeToDatabaseMetricEvents(recordDatabaseQuery);
 
 export function markScannerStopped(): void {
     scannerRunning = false;
