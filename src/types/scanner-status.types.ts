@@ -1,7 +1,6 @@
 export type ScannerPauseMode = 'manual' | 'temporary';
 
 export interface ScannerControlState {
-    scannerRunning: boolean;
     paused: boolean;
     mode: ScannerPauseMode | null;
     pauseRequestedAtBlock: number | null;
@@ -103,6 +102,7 @@ export interface BlockProcessingMetrics {
 }
 
 export interface ScannerStatusResponse {
+    scannerRunning: boolean;
     paused: boolean;
     mode: ScannerPauseMode | null;
     pauseRequestedAtBlock: number | null;
