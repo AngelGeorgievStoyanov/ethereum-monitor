@@ -38,7 +38,7 @@ The current runtime snapshot includes:
 ## RPC metric semantics
 
 - An RPC request is one actual JSON-RPC request attempt to one endpoint.
-- A logical RPC operation is one scanner-level operation. For example, `getBlockAndReceipts` is one logical operation containing separate `eth_getBlockByNumber` and `eth_getBlockReceipts` requests.
+- A logical RPC operation is one scanner-level operation. For example, `getBlockAndReceipts` is one logical operation containing separate `eth_getBlockByNumber` and `eth_getBlockReceipts` requests. Consensus and diagnostic fan-out methods are also counted once as logical operations, while each provider request remains a separate RPC request.
 - Request totals and endpoint statistics count actual endpoint requests. Logical-operation statistics count the outer operation once and track its retries/failovers separately.
 - A retry is an additional attempt of the same logical operation. An endpoint failover is an operation attempt moved to another configured endpoint.
 - RPC error extraction and classification are centralized in `src/utils/classifyRpcError.ts`; category names, HTTP/JSON-RPC codes and code ranges, message-property names, nested-property names, message patterns, and nested error depth are maintained in `src/constants/rpc-error.constants.ts`.
