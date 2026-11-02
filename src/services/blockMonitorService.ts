@@ -16,6 +16,7 @@ import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerR
 import { getScannerControlState } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
+import { recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
 
 let processingFinalizedBlocks = false;
 let manualRescanReserved = false;
@@ -102,6 +103,7 @@ export function createBlockMonitorService() {
             console.log('[Scanner] Acquired PostgreSQL advisory lock');
             await markInterruptedRescanJobs();
             state = await initializeScannerState();
+            updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length });
         } catch (error) {
             scannerStarted = false;
             throw error;
@@ -167,6 +169,7 @@ export function createBlockMonitorService() {
 
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
+                updateScannerRuntimeContext({ running: true, activeFiltersCount: activeTxFilters.length, lastProcessedBlock: state.lastProcessedBlock });
 
                 if (activeTxFilters.length === 0) {
                     if (!waitingForFilters) {
@@ -189,9 +192,15 @@ export function createBlockMonitorService() {
                         waitingForPause = true;
                     } else {
                         waitingForPause = false;
-                        const finalized = await evmRpcClient.getBlock('finalized');
-                        if (!finalized)
-                            throw new Error('Unable to resolve the latest finalized block');
+                        let finalized;
+                        try {
+                            finalized = await evmRpcClient.getBlock('finalized');
+                            if (!finalized) throw new Error('Unable to resolve the latest finalized block');
+                            recordFinalizedBlock(finalized.number);
+                        } catch (error) {
+                            recordFinalizedBlockFailure();
+                            throw error;
+                        }
 
                         if (finalized.number < state.lastProcessedBlock) {
                             const checkpoint = state.lastProcessedBlock;
@@ -241,6 +250,7 @@ export function createBlockMonitorService() {
                                 await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
                                     dynamicConfigService.getTxFilterSnapshot(),
                                 );
+                                updateScannerRuntimeContext({ lastProcessedBlock: state.lastProcessedBlock });
                             }
                         } finally {
                             processingFinalizedBlocks = false;
