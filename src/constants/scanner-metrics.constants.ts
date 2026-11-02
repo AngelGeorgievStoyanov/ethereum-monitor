@@ -6,11 +6,11 @@ export const METRICS_RPC_EVENT_COMPACTION_THRESHOLD = 1000;
 export const METRICS_SAMPLE_COMPACTION_THRESHOLD = 1000;
 
 export const METRICS_SAMPLE_LIMITS = {
-    blocks: 100000,
-    rpcEvents: 100000,
-    lag: 100000,
-    batches: 10000,
-    catchUpSessions: 1000,
+    blocks: 10000,
+    rpcEvents: 10000,
+    lag: 5000,
+    batches: 1000,
+    catchUpSessions: 100,
     recentRpcErrors: 100,
 } as const;
 
