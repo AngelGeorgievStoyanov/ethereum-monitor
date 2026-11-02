@@ -76,6 +76,7 @@ export function createRpcClient() {
         operation: (provider: JsonRpcProvider, endpointIndex: number) => Promise<T>,
         publishMetrics = true,
         timeoutMs = RPC_ENDPOINT_TIMEOUT_MS,
+        trackEndpointMetrics = true,
     ): Promise<T> {
         let lastError: unknown;
         const operationStartedAt = Date.now();
@@ -98,19 +99,19 @@ export function createRpcClient() {
 
             const startedAt = Date.now();
             attemptedEndpointIndices.push(endpoint.index);
-            recordEndpointAttempt(endpoint);
+            if (trackEndpointMetrics) recordEndpointAttempt(endpoint);
 
             try {
                 const result = await withTimeout(
                     operation(endpoint.provider, endpoint.index),
                     timeoutMs,
                 );
-                recordEndpointSuccess(endpoint, startedAt);
+                if (trackEndpointMetrics) recordEndpointSuccess(endpoint, startedAt);
                 if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'success' });
                 publishOperationResult('success');
                 return result;
             } catch (error) {
-                recordEndpointFailure(endpoint, startedAt, error);
+                if (trackEndpointMetrics) recordEndpointFailure(endpoint, startedAt, error);
                 if (publishMetrics) publishRpcMetricEvent({ method: operationName, endpointIndex: endpoint.index, durationMs: Date.now() - startedAt, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 lastError = error;
                 if (!isRetryableEndpointError(error)) {
@@ -231,11 +232,16 @@ export function createRpcClient() {
             const getBlockStartedAt = Date.now();
             let block;
             try {
+                const endpoint = endpoints[endpointIndex - 1];
+                recordEndpointAttempt(endpoint);
                 block = await withTimeout(provider.getBlock(blockNumber, true), RPC_ENDPOINT_TIMEOUT_MS);
                 getBlockDurationMs = Date.now() - getBlockStartedAt;
+                if (block) recordEndpointSuccess(endpoint, getBlockStartedAt);
+                else recordEndpointFailure(endpoint, getBlockStartedAt);
                 publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: block ? 'success' : 'failure', message: block ? undefined : 'EMPTY_BLOCK' });
             } catch (error) {
                 getBlockDurationMs = Date.now() - getBlockStartedAt;
+                recordEndpointFailure(endpoints[endpointIndex - 1], getBlockStartedAt, error);
                 publishRpcMetricEvent({ method: 'eth_getBlockByNumber', endpointIndex, durationMs: getBlockDurationMs, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 throw error;
             }
@@ -247,11 +253,15 @@ export function createRpcClient() {
             const getReceiptsStartedAt = Date.now();
             let response: unknown;
             try {
+                const endpoint = endpoints[endpointIndex - 1];
+                recordEndpointAttempt(endpoint);
                 response = await withTimeout(provider.send('eth_getBlockReceipts', [toQuantity(blockNumber)]), RPC_ENDPOINT_TIMEOUT_MS);
                 getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
+                recordEndpointSuccess(endpoint, getReceiptsStartedAt);
                 publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'success' });
             } catch (error) {
                 getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
+                recordEndpointFailure(endpoints[endpointIndex - 1], getReceiptsStartedAt, error);
                 publishRpcMetricEvent({ method: 'eth_getBlockReceipts', endpointIndex, durationMs: getBlockReceiptsDurationMs, outcome: 'failure', message: formatError(error), retryable: classifyRpcError(error).retryable, errorCategory: classifyRpcError(error).category, httpStatus: classifyRpcError(error).httpStatus, rpcCode: classifyRpcError(error).rpcCode });
                 throw error;
             }
@@ -261,7 +271,7 @@ export function createRpcClient() {
             }
 
             return { block, receipts: response as RpcTransactionReceipt[] };
-        }, false, RPC_ENDPOINT_TIMEOUT_MS * 2);
+        }, false, RPC_ENDPOINT_TIMEOUT_MS * 2, false);
 
         return { ...result, getBlockDurationMs, getBlockReceiptsDurationMs };
     }
