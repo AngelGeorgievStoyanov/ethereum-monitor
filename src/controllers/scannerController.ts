@@ -7,6 +7,7 @@ import {
 import { sendHttpError } from '../utils/httpError';
 import { validateScannerPauseInput } from '../validators/scannerControlValidator';
 import { getScannerStatusResponse } from '../services/scannerStatusService';
+import { getScannerAnalytics } from '../services/metricsAggregatorService';
 import { getRescanJobStatus as loadRescanJobStatus } from '../services/scannerRescanJobService';
 import { retryBlockedReorgRecovery as retryReorgRecovery } from '../services/reorgRecoveryService';
 import { requestManualRescan } from '../services/manualRescanRequestService';
@@ -18,6 +19,23 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
         res.json(await getScannerStatusResponse());
     } catch (error) {
         sendHttpError(res, 'Unable to retrieve scanner status', error);
+    }
+};
+
+
+export const getScannerAnalyticsController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const requestedWindow = typeof req.query.window === 'string' ? req.query.window : '1h';
+        const windows: Record<string, number> = {
+            '1h': 3600000,
+            '6h': 21600000,
+            '24h': 86400000,
+        };
+        const windowMs = windows[requestedWindow] ?? 3600000;
+        const analytics = getScannerAnalytics(windowMs);
+        res.json(analytics);
+    } catch (error) {
+        sendHttpError(res, 'Unable to retrieve scanner analytics', error);
     }
 };
 
