@@ -2,6 +2,7 @@ import type { ScannerAnalyticsResponse } from '../types/scanner-analytics.types'
 import { getDynamicConfigService } from './dynamicConfigService';
 import { subscribeToRpcMetricEvents, type RpcMetricEventInput } from '../metrics/metricsEventBus';
 import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
+import { classifyRpcError } from '../utils/classifyRpcError';
 
 type BlockInput = {
     blockNumber: number;
@@ -220,8 +221,13 @@ function completeCatchUp(status: 'completed' | 'interrupted'): void {
     session.endBlock = lastProcessedBlock;
     session.durationMs = durationMs;
     session.blocksPerSecond = durationMs > 0 ? Number((Number(session.processedBlocks) * 1000 / durationMs).toFixed(2)) : 0;
-    session.lagReductionBlocks = Number(session.initialLagBlocks);
-    session.lagReductionPerSecond = durationMs > 0 ? Number((Number(session.initialLagBlocks) * 1000 / durationMs).toFixed(2)) : 0;
+    const finalLagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
+        ? Math.max(0, latestFinalizedBlock - lastProcessedBlock)
+        : Number(session.initialLagBlocks);
+    const lagReductionBlocks = Math.max(0, Number(session.initialLagBlocks) - finalLagBlocks);
+    session.finalLagBlocks = finalLagBlocks;
+    session.lagReductionBlocks = lagReductionBlocks;
+    session.lagReductionPerSecond = durationMs > 0 ? Number((lagReductionBlocks * 1000 / durationMs).toFixed(2)) : 0;
     session.transactionsPerSecond = durationMs > 0 ? Number((Number(session.processedTransactions) * 1000 / durationMs).toFixed(2)) : 0;
     session.status = status;
     catchUpActive = false;
@@ -288,23 +294,17 @@ export function recordProcessedBlock(input: BlockInput): void {
 export function recordRpcRequest(input: RpcInput): void {
     const now = Date.now();
     const message = input.message ?? '';
-    const normalized = message.toLowerCase();
-    let failureKind: string | null = null;
+    const classification = classifyRpcError(message);
+    const failureKind = input.errorCategory ?? classification.category;
     if (input.outcome === 'failure') {
-        if (/429|too many requests|rate.?limit/.test(normalized)) failureKind = 'rateLimit';
-        else if (/timeout|timed out|etimedout/.test(normalized)) failureKind = 'timeout';
-        else if (/econn|enotfound|eai_again|socket hang up|network error/.test(normalized)) failureKind = 'connection';
-        else if (/\b5\d\d\b/.test(normalized)) failureKind = 'server';
-        else if (/\-32\d{3,4}|json.?rpc/.test(normalized)) failureKind = 'jsonRpc';
-        else failureKind = 'other';
         rpcTotals.failures += 1;
-        if (input.retryable) rpcTotals.retryableFailures += 1;
+        if (input.retryable ?? classification.retryable) rpcTotals.retryableFailures += 1;
         rpcTotals.lastErrorAt = new Date(now).toISOString();
         if (failureKind === 'rateLimit') rpcTotals.rateLimitErrors += 1;
         else if (failureKind === 'timeout') rpcTotals.timeoutErrors += 1;
-        else if (failureKind === 'connection') rpcTotals.connectionErrors += 1;
-        else if (failureKind === 'server') rpcTotals.serverErrors += 1;
-        else if (failureKind === 'jsonRpc') rpcTotals.jsonRpcErrors += 1;
+        else if (failureKind === 'network') rpcTotals.connectionErrors += 1;
+        else if (failureKind === 'provider') rpcTotals.serverErrors += 1;
+        else if (failureKind === 'rpc') rpcTotals.jsonRpcErrors += 1;
         else rpcTotals.otherErrors += 1;
     } else rpcTotals.successes += 1;
     rpcTotals.totalRequests += 1;
