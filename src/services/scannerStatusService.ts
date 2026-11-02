@@ -34,8 +34,9 @@ type RuntimeStatusMetrics = {
 
 /**
  * Loads persistent scanner state and publishes a ready-to-read runtime snapshot.
- * This function is called during scanner initialization and by the scanner's
- * existing periodic refresh cycle, never by the Dashboard request path.
+ * This function is called during scanner initialization and after scanner lock
+ * reacquisition, never by the Dashboard request path. Routine checkpoint,
+ * control, and rescan changes publish smaller snapshot updates directly.
  */
 export async function refreshScannerStatusSnapshot(): Promise<ScannerStatusResponse> {
     const [control, state, rescanJob] = await Promise.all([
