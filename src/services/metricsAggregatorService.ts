@@ -30,6 +30,7 @@ const blockSamples: Array<Record<string, unknown> & { timestampMs: number }> = [
 const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
 const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
+const finalizedSamples: Array<{ timestampMs: number; blockNumber: number }> = [];
 const endpointTotals = new Map<number, { attempts: number; successes: number; failures: number; retryableFailures: number; durationMs: number; lastFailureAt: string | null }>();
 const rpcTotals = {
     totalRequests: 0,
@@ -90,6 +91,7 @@ function trimSamples(now: number): void {
     while (rpcEvents.length > MAX_RPC_EVENTS) rpcEvents.shift();
     while (catchUpSessions.length > MAX_CATCHUP_SESSIONS) catchUpSessions.shift();
     while (batchSamples.length > MAX_BATCH_SAMPLES) batchSamples.shift();
+    while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > 3600000) finalizedSamples.shift();
 }
 
 function getSnapshot() {
@@ -102,6 +104,20 @@ function getSnapshot() {
     const lagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
         ? Math.max(0, latestFinalizedBlock - lastProcessedBlock) : null;
     const recentTransactions = sum('transactionCount');
+    const recentFinalized = finalizedSamples.filter((sample) => now - sample.timestampMs <= 60000);
+    const finalizedElapsedMs = recentFinalized.length > 1
+        ? recentFinalized[recentFinalized.length - 1].timestampMs - recentFinalized[0].timestampMs
+        : 0;
+    const chainBlocksPerSecond = finalizedElapsedMs > 0
+        ? Number(((recentFinalized[recentFinalized.length - 1].blockNumber - recentFinalized[0].blockNumber) * 1000 / finalizedElapsedMs).toFixed(2))
+        : null;
+    const blocksPerSecondLastMinute = Number((recent.length / 60).toFixed(2));
+    const lagReductionBlocksPerSecond = chainBlocksPerSecond === null
+        ? null
+        : Number((blocksPerSecondLastMinute - chainBlocksPerSecond).toFixed(2));
+    const estimatedCatchUpSeconds = lagBlocks !== null && lagBlocks > 0 && lagReductionBlocksPerSecond !== null && lagReductionBlocksPerSecond > 0
+        ? Number((lagBlocks / lagReductionBlocksPerSecond).toFixed(1))
+        : null;
     const endpoints = Array.from(endpointTotals.entries()).map(([index, value]) => ({
         index, attempts: value.attempts, successes: value.successes, failures: value.failures,
         retryableFailures: value.retryableFailures,
@@ -143,7 +159,7 @@ function getSnapshot() {
             totalFilterMatchingDurationMs,
             totalBlockDurationMs,
             totalDatabaseWriteDurationMs,
-            blocksPerSecondLastMinute: Number((recent.length / 60).toFixed(2)),
+            blocksPerSecondLastMinute,
             transactionsPerSecondLastMinute: Number((recentTransactions / 60).toFixed(2)),
             averageTransactionsPerBlock: totalProcessedBlocks ? Number((totalTransactions / totalProcessedBlocks).toFixed(1)) : 0,
             averageBlockDurationMs: average('blockDurationMs'),
@@ -163,7 +179,14 @@ function getSnapshot() {
             methods: Array.from(methodTotals.entries()).map(([method, value]) => ({ method, ...value })),
             endpoints,
         },
-        catchUp: { active: catchUpActive, sessions: catchUpSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session) },
+        catchUp: {
+            active: catchUpActive,
+            currentLagBlocks: lagBlocks,
+            chainBlocksPerSecond,
+            lagReductionBlocksPerSecond,
+            estimatedRemainingSeconds: estimatedCatchUpSeconds,
+            sessions: catchUpSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
+        },
         database: { ...databaseMetrics, averageWriteDurationMs: databaseMetrics.writes ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1)) : null },
         recovery: { ...recoveryMetrics },
         recentRpcErrors: rpcEvents.filter((event) => event.outcome === 'failure').slice(-100).map(({ timestampMs: _timestampMs, ...event }) => event),
@@ -180,6 +203,8 @@ function completeCatchUp(status: 'completed' | 'interrupted'): void {
     session.endBlock = lastProcessedBlock;
     session.durationMs = durationMs;
     session.blocksPerSecond = durationMs > 0 ? Number((Number(session.processedBlocks) * 1000 / durationMs).toFixed(2)) : 0;
+    session.lagReductionBlocks = Number(session.initialLagBlocks);
+    session.lagReductionPerSecond = durationMs > 0 ? Number((Number(session.initialLagBlocks) * 1000 / durationMs).toFixed(2)) : 0;
     session.transactionsPerSecond = durationMs > 0 ? Number((Number(session.processedTransactions) * 1000 / durationMs).toFixed(2)) : 0;
     session.status = status;
     catchUpActive = false;
@@ -188,6 +213,8 @@ function completeCatchUp(status: 'completed' | 'interrupted'): void {
 export function recordFinalizedBlock(blockNumber: number): void {
     latestFinalizedBlock = blockNumber;
     latestFinalizedAt = new Date().toISOString();
+    finalizedSamples.push({ timestampMs: Date.now(), blockNumber });
+    trimSamples(Date.now());
     rpcAvailable = true;
     const lag = lastProcessedBlock === null ? null : Math.max(0, blockNumber - lastProcessedBlock);
     if (lag !== null && lag > 0 && !catchUpActive) {
