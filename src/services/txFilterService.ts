@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
     countActiveTxFilters,
     createTxFilter as insertTxFilter,
@@ -25,6 +24,7 @@ import { compileTxFilterRule } from './txFilterCompilerService';
 import { validateTxFilterAddresses } from './txFilterAddressValidationService';
 import { ValidationError } from '../utils/validationError';
 import { formatError } from '../utils/formatError';
+import { createTxFilterRuleSignature } from '../utils/txFilterRuleSignature';
 
 interface InvalidFilterRetryState {
     attempts: number;
@@ -85,9 +85,7 @@ export function createTxFilterService() {
         const next: ActiveTxFilter[] = [];
 
         for (const filter of activeFilters) {
-            const ruleSignature = createHash('sha256')
-                .update(JSON.stringify(filter.rule))
-                .digest('hex');
+            const ruleSignature = createTxFilterRuleSignature(filter.rule);
             const cached = compiledFilters.get(filter.id);
 
             if (cached?.ruleSignature === ruleSignature) {

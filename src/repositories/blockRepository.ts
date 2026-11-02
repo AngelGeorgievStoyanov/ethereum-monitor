@@ -19,6 +19,30 @@ export interface CanonicalBlockIdentity {
     parentHash: string;
 }
 
+function toCanonicalBlockIdentity(block: Block): CanonicalBlockIdentity {
+    return {
+        blockNumber: block.blockNumber,
+        blockHash: block.blockHash,
+        parentHash: block.parentHash,
+    };
+}
+
+export async function findCanonicalBlockIdentitiesInRange(
+    fromBlock: number,
+    toBlock: number,
+): Promise<CanonicalBlockIdentity[]> {
+    const blocks = await Block.findAll({
+        where: {
+            status: 'CANONICAL',
+            blockNumber: { [Op.between]: [fromBlock, toBlock] },
+        },
+        attributes: ['blockNumber', 'blockHash', 'parentHash'],
+        order: [['blockNumber', 'ASC']],
+    });
+
+    return blocks.map(toCanonicalBlockIdentity);
+}
+
 export async function findCanonicalBlockIdentity(
     blockNumber: number,
 ): Promise<CanonicalBlockIdentity | null> {
@@ -27,9 +51,5 @@ export async function findCanonicalBlockIdentity(
         attributes: ['blockNumber', 'blockHash', 'parentHash'],
     });
     if (!block) return null;
-    return {
-        blockNumber: block.blockNumber,
-        blockHash: block.blockHash,
-        parentHash: block.parentHash,
-    };
+    return toCanonicalBlockIdentity(block);
 }

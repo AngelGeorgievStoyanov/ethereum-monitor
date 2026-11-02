@@ -1,7 +1,17 @@
-import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
-import { RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS } from '../constants/rescan.constants';
+import {
+    findCanonicalBlockIdentitiesInRange,
+    type CanonicalBlockIdentity,
+} from '../repositories/blockRepository';
+import {
+    RESCAN_BLOCK_IDENTITY_BATCH_SIZE,
+    RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS,
+    RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS,
+} from '../constants/rescan.constants';
 import { findScannerRescanState } from '../repositories/scannerStateRepository';
-import { processBlock } from './blockProcessingService';
+import {
+    fetchBlockForProcessing,
+    processFetchedBlock,
+} from './blockProcessingService';
 import { getBlockWithConsensus } from './blockConsensusService';
 import { reconcileBlockCandidates } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
@@ -65,55 +75,97 @@ async function runManualRescanInternal({
         throw new Error('Manual rescan cannot start while reorg recovery is active or blocked');
     }
 
-    // A single filter snapshot prevents one rescan from applying different rules to different blocks.
     const activeTxFilters = [...getActiveTxFilters()];
     console.log(
         `[Rescan] Started; range=${fromBlock}-${checkpoint}; checkpoint will not be changed`,
     );
     recordRescanStarted();
+
     let blocksProcessed = 0;
+    let currentBlock = fromBlock - 1;
+    let lastProgressReported = 0;
+    let cachedBatchStart = -1;
+    const canonicalIdentities = new Map<number, CanonicalBlockIdentity>();
 
-    for (let blockNumber = fromBlock; blockNumber <= checkpoint; blockNumber += 1) {
-        // The reconciliation transaction rechecks and locks ScannerState before writing.
-        // A separate read here would duplicate that per-block database check.
+    const reportProgress = async (): Promise<void> => {
+        if (!onProgress || blocksProcessed === lastProgressReported) return;
+        await onProgress(currentBlock, blocksProcessed);
+        lastProgressReported = blocksProcessed;
+    };
 
-        const storedBlock = await findCanonicalBlockIdentity(blockNumber);
-        if (!storedBlock) {
-            throw new Error(
-                `Cannot rescan block ${blockNumber}: canonical block history is missing`,
-            );
+    try {
+        for (let blockNumber = fromBlock; blockNumber <= checkpoint; blockNumber += 1) {
+            if (!canonicalIdentities.has(blockNumber)) {
+                const batchEnd = Math.min(
+                    blockNumber + RESCAN_BLOCK_IDENTITY_BATCH_SIZE - 1,
+                    checkpoint,
+                );
+                const batch = await findCanonicalBlockIdentitiesInRange(blockNumber, batchEnd);
+                canonicalIdentities.clear();
+                for (const identity of batch) {
+                    canonicalIdentities.set(identity.blockNumber, identity);
+                }
+                cachedBatchStart = blockNumber;
+            }
+
+            const storedBlock = canonicalIdentities.get(blockNumber);
+            if (!storedBlock) {
+                throw new Error(
+                    `Cannot rescan block ${blockNumber}: canonical block history is missing`,
+                );
+            }
+            canonicalIdentities.delete(blockNumber);
+
+            const fetched = await fetchBlockForProcessing(blockNumber);
+            if (!matchesBlock(storedBlock, fetched.block)) {
+                const consensusBlock = await getBlockWithConsensus(blockNumber, 'manual rescan');
+                if (!matchesBlock(storedBlock, consensusBlock)) {
+                    recordReorgDetected();
+                    await markReorgRecoveryPending(scannerStateId, checkpoint);
+                    throw new RescanReorgDetectedError(
+                        `Chain mismatch found at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
+                    );
+                }
+
+                throw new Error(
+                    `RPC block response disagreed with provider consensus at block ${blockNumber}; stored canonical identity was confirmed by consensus. Rescan stopped without starting reorg recovery.`,
+                );
+            }
+
+            const prepared = await processFetchedBlock(fetched, activeTxFilters, true);
+            if (!matchesBlock(storedBlock, prepared.block)) {
+                recordReorgDetected();
+                await markReorgRecoveryPending(scannerStateId, checkpoint);
+                throw new RescanReorgDetectedError(
+                    `Fetched block data changed during processing at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
+                );
+            }
+
+            await reconcileBlockCandidates(prepared.candidates, scannerStateId, checkpoint);
+            currentBlock = blockNumber;
+            blocksProcessed += 1;
+            recordRescanBlockProcessed();
+
+            if (blocksProcessed % RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS === 0) {
+                await reportProgress();
+            }
+            if (blocksProcessed % RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS === 0) {
+                console.log(
+                    `[Rescan] Progress: processed ${blocksProcessed} block(s), current=${blockNumber}, range=${fromBlock}-${checkpoint}`,
+                );
+            }
         }
 
-        const consensusBlock = await getBlockWithConsensus(blockNumber, 'manual rescan');
-        if (!matchesBlock(storedBlock, consensusBlock)) {
-            recordReorgDetected();
-            await markReorgRecoveryPending(scannerStateId, checkpoint);
-            throw new RescanReorgDetectedError(
-                `Chain mismatch found at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
+        await reportProgress();
+    } catch (error) {
+        try {
+            await reportProgress();
+        } catch (progressError) {
+            console.error(
+                `[Rescan] Failed to publish final progress after an error: ${String(progressError)}`,
             );
         }
-
-        const prepared = await processBlock(blockNumber, activeTxFilters, true);
-        if (
-            !matchesBlock(storedBlock, prepared.block) ||
-            !matchesBlock(consensusBlock, prepared.block)
-        ) {
-            recordReorgDetected();
-            await markReorgRecoveryPending(scannerStateId, checkpoint);
-            throw new RescanReorgDetectedError(
-                `Fetched block data changed or disagreed with consensus at block ${blockNumber}; reorg recovery was marked pending at checkpoint ${checkpoint}. The scanner will automatically resume and enter recovery.`,
-            );
-        }
-
-        await reconcileBlockCandidates(prepared.candidates, scannerStateId, checkpoint);
-        blocksProcessed += 1;
-        recordRescanBlockProcessed();
-        if (onProgress) await onProgress(blockNumber, blocksProcessed);
-        if (blocksProcessed % RESCAN_PROGRESS_LOG_INTERVAL_BLOCKS === 0) {
-            console.log(
-                `[Rescan] Progress: processed ${blocksProcessed} block(s), current=${blockNumber}, range=${fromBlock}-${checkpoint}`,
-            );
-        }
+        throw error;
     }
 
     console.log(

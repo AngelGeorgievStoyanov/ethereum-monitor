@@ -4,6 +4,7 @@ import sequelize from '../database';
 import TxFilter from '../models/txFilter';
 import TxMatch from '../models/txMatch';
 import type { TxFilterRecord, TxFilterRule } from '../types/tx-filter.types';
+import { createTxFilterRuleSignature } from '../utils/txFilterRuleSignature';
 
 function toTxFilterRecord(filter: TxFilter): TxFilterRecord {
     return {
@@ -95,7 +96,11 @@ export async function deactivateInvalidTxFilter(
             transaction,
             lock: transaction.LOCK.UPDATE,
         });
-        if (!filter || !filter.isActive || JSON.stringify(filter.rule) !== expectedRuleSignature) {
+        if (
+            !filter ||
+            !filter.isActive ||
+            createTxFilterRuleSignature(filter.rule) !== expectedRuleSignature
+        ) {
             return false;
         }
 
