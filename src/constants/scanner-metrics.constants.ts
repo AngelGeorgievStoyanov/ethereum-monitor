@@ -1,4 +1,6 @@
 export const METRICS_RETENTION_MS = 86400000;
+export const METRICS_BUCKET_INTERVAL_MS = 60000;
+export const METRICS_MAX_BUCKETS = 1440;
 
 export const METRICS_SAMPLE_LIMITS = {
     blocks: 100000,
