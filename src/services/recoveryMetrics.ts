@@ -16,7 +16,7 @@ const metrics: RecoveryMetrics = {
 let recoveryStartedAt: number | null = null;
 
 function publishRecoveryMetrics(): void {
-    updateScannerRuntimeContext({ recovery: metrics });
+    updateScannerRuntimeContext({ recovery: { ...metrics } });
 }
 
 export function recordReorgDetected(): void {
