@@ -492,26 +492,17 @@
         setText('analyticsRetention', coverage + ' · ' + availableMinutes + ' minutes available since ' + new Date(data.historyStartedAt).toLocaleTimeString() + ' · ' + number(retention.blockSamples) + ' block samples · ' + number(retention.lagSamples) + ' lag samples · ' + number(retention.rpcEvents) + ' RPC requests · ' + number(retention.batches) + ' batches · ' + number(retention.minuteBuckets) + ' minute buckets');
         const sessions = (data.catchUpSessions || []).slice(-10).reverse();
         $('catchUpRows').innerHTML = sessions.map((item) => '<tr><td>' + (item.startedAt ? new Date(item.startedAt).toLocaleTimeString() : '—') + '</td><td>' + number(item.processedBlocks) + '</td><td>' + number(item.processedTransactions) + '</td><td>' + duration(item.durationMs) + '</td><td>' + number(item.blocksPerSecond) + '</td><td>' + escapeHtml(item.status) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No catch-up sessions retained</td></tr>';
-        const methodTotals = new Map();
-        for (const event of data.rpcEvents || []) {
-            const method = String(event.method);
-            const item = methodTotals.get(method) || { method, requests: 0, failures: 0, totalDurationMs: 0 };
-            item.requests += 1;
-            item.totalDurationMs += Number(event.durationMs || 0);
-            if (event.outcome === 'failure') item.failures += 1;
-            methodTotals.set(method, item);
-        }
-        const methods = Array.from(methodTotals.values()).sort((left, right) => right.requests - left.requests).slice(0, 15);
+        const methods = (windowRpc.methods || []).slice().sort((left, right) => right.requests - left.requests).slice(0, 15);
         $('rpcMethodRows').innerHTML = methods.map((item) => '<tr><td>' + escapeHtml(item.method) + '</td><td>' + number(item.requests) + '</td><td>' + number(item.failures) + '</td><td>' + duration(item.requests ? item.totalDurationMs / item.requests : null) + '</td></tr>').join('') || '<tr><td colspan="4" class="muted">No RPC methods reported in this window</td></tr>';
         const errors = (data.rpcEvents || []).filter((item) => item.outcome === 'failure').slice(-12).reverse();
         $('rpcErrorRows').innerHTML = errors.map((item) => '<tr><td>' + (item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '—') + '</td><td>' + escapeHtml(item.method) + '</td><td>' + escapeHtml(item.failureKind) + '</td><td>' + number(item.httpStatus) + '</td><td>' + number(item.rpcCode) + '</td><td>' + escapeHtml(item.message) + '</td></tr>').join('') || '<tr><td colspan="6" class="muted">No RPC errors in this window</td></tr>';
-        const filterRows = Object.entries(filters.byFilter || {}).map(([id, item]) => ({
+        const filterRows = Object.entries(windowFilters.byFilter || {}).map(([id, item]) => ({
             id,
             ...item,
             averageDurationMs: item.evaluations ? item.totalDurationMs / item.evaluations : null,
         })).sort((left, right) => right.totalDurationMs - left.totalDurationMs).slice(0, 10);
         $('filterMetricRows').innerHTML = filterRows.map((item) => '<tr><td>' + escapeHtml(item.id) + '</td><td>' + number(item.evaluations) + '</td><td>' + number(item.matches) + '</td><td>' + number(item.failures) + '</td><td>' + duration(item.averageDurationMs) + '</td></tr>').join('') || '<tr><td colspan="5" class="muted">No filter evaluations recorded</td></tr>';
-        const queryRows = Object.entries(database.byOperation || {}).map(([query, item]) => ({
+        const queryRows = Object.entries(windowDatabase.byOperation || {}).map(([query, item]) => ({
             query,
             ...item,
             averageDurationMs: item.count ? item.totalDurationMs / item.count : null,
