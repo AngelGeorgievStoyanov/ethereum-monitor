@@ -14,7 +14,7 @@
 The current snapshot includes:
 
 - Scanner running/paused state, active filter count, configured catch-up cap, parallel block count, and parallel-processing lag threshold.
-- Latest finalized block and its update time, last processed block, current lag, and RPC availability based on the scanner's own finalized-block request.
+- Latest finalized block and its update time, last processed block, current lag, bounded lag history, and RPC availability based on the scanner's own finalized-block request.
 - Processed blocks and transactions, average transactions per block, blocks/sec, transactions/sec, transfer matches, and processing timings.
 - RPC request totals, per-method and per-endpoint counts, latency percentiles, 429/rate-limit errors, timeouts, connection errors, server errors, JSON-RPC errors, and recent failures.
 - Database batch write duration and persistence failures.
@@ -47,14 +47,15 @@ Returns runtime history for the requested window. Supported values are:
 - `6h`
 - `24h`
 
-The response includes the current snapshot, block samples, RPC events, catch-up sessions, processing batches, and retention metadata.
+The response includes the current snapshot, block samples, lag samples, RPC events, catch-up sessions, processing batches, and retention metadata.
 
 ## Measurement semantics
 
 - RPC request counts represent individual endpoint attempts. Retried requests are counted separately.
 - Block and receipt fetching are measured as separate RPC methods.
 - Blocks/sec and transactions/sec use completed block samples from the trailing 60-second window.
-- Catch-up sessions begin when the scanner observes a positive finalized-block lag and finish when the processed checkpoint reaches the latest observed finalized block.
+- Catch-up sessions begin when lag exceeds the configured parallel-processing threshold and finish when the processed checkpoint reaches the latest observed finalized block. Normal one-block/finality polling lag does not create a catch-up session.
+- Actual lag reduction speed is estimated from processed block rate minus finalized-chain growth rate. An ETA is shown only while that net rate is positive.
 - Processing batch samples report the actual block range, number of blocks, transaction count, total batch duration, and database write duration.
 - Database write failures are counted separately from RPC and processing failures.
 
