@@ -165,6 +165,10 @@ export function createBlockMonitorService() {
                         waitingForPause = true;
                     } else {
                         waitingForPause = false;
+                        if (manualRescanReserved) {
+                            await sleep(SCANNER_POLL_INTERVAL_MS);
+                            continue;
+                        }
                         let finalized: Awaited<ReturnType<typeof evmRpcClient.getBlock>>;
                         try {
                             finalized = await evmRpcClient.getBlock('finalized');

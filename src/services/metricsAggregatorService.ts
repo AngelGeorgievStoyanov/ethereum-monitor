@@ -388,6 +388,56 @@ function getRpcSummary(now: number): RpcSummary {
     return rpcSummaryCache;
 }
 
+type RecentBlockSummary = {
+    count: number;
+    totals: {
+        transactionCount: number;
+        blockDurationMs: number;
+        fetchDurationMs: number;
+        getBlockDurationMs: number;
+        getBlockReceiptsDurationMs: number;
+        filterMatchingDurationMs: number;
+        databaseWriteDurationMs: number;
+    };
+    recentBlocks: Array<Record<string, unknown>>;
+};
+
+function getRecentBlockSummary(now: number): RecentBlockSummary {
+    const summary: RecentBlockSummary = {
+        count: 0,
+        totals: {
+            transactionCount: 0,
+            blockDurationMs: 0,
+            fetchDurationMs: 0,
+            getBlockDurationMs: 0,
+            getBlockReceiptsDurationMs: 0,
+            filterMatchingDurationMs: 0,
+            databaseWriteDurationMs: 0,
+        },
+        recentBlocks: [],
+    };
+
+    for (let index = blockSamplesStartIndex; index < blockSamples.length; index += 1) {
+        const sample = blockSamples[index];
+        if (now - sample.timestampMs > 60000) continue;
+
+        summary.count += 1;
+        summary.totals.transactionCount += Number(sample.transactionCount ?? 0);
+        summary.totals.blockDurationMs += Number(sample.blockDurationMs ?? 0);
+        summary.totals.fetchDurationMs += Number(sample.fetchDurationMs ?? 0);
+        summary.totals.getBlockDurationMs += Number(sample.getBlockDurationMs ?? 0);
+        summary.totals.getBlockReceiptsDurationMs += Number(sample.getBlockReceiptsDurationMs ?? 0);
+        summary.totals.filterMatchingDurationMs += Number(sample.filterMatchingDurationMs ?? 0);
+        summary.totals.databaseWriteDurationMs += Number(sample.databaseWriteDurationMs ?? 0);
+
+        const { timestampMs: _timestampMs, ...recentBlock } = sample;
+        if (summary.recentBlocks.length === 30) summary.recentBlocks.shift();
+        summary.recentBlocks.push(recentBlock);
+    }
+
+    return summary;
+}
+
 function getSnapshot() {
     const now = Date.now();
     trimSamples(now);
@@ -400,14 +450,14 @@ function getSnapshot() {
     const eventLoopUtilization = performance.eventLoopUtilization(lastEventLoopUtilization);
     lastEventLoopUtilization = performance.eventLoopUtilization();
     const memoryUsage = process.memoryUsage();
-    const recent = blockSamples.slice(blockSamplesStartIndex).filter((sample) => now - sample.timestampMs <= 60000);
+    const recent = getRecentBlockSummary(now);
     const recentWindowSeconds = Math.max(1, Math.min(60, (now - startedAtMs) / 1000));
-    const sum = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
-    const average = (key: string) => recent.length ? Number((sum(key) / recent.length).toFixed(1)) : null;
+    const average = (key: keyof RecentBlockSummary['totals']) =>
+        recent.count ? Number((recent.totals[key] / recent.count).toFixed(1)) : null;
     const totalTransactions = totalProcessedTransactions;
     const lagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
         ? Math.max(0, latestFinalizedBlock - lastProcessedBlock) : null;
-    const recentTransactions = sum('transactionCount');
+    const recentTransactions = recent.totals.transactionCount;
     const recentFinalized = finalizedSamples.filter((sample) => now - sample.timestampMs <= 900000);
     const finalizedElapsedMs = recentFinalized.length > 1
         ? recentFinalized[recentFinalized.length - 1].timestampMs - recentFinalized[0].timestampMs
@@ -415,7 +465,7 @@ function getSnapshot() {
     const chainBlocksPerSecond = finalizedElapsedMs > 0
         ? Number(((recentFinalized[recentFinalized.length - 1].blockNumber - recentFinalized[0].blockNumber) * 1000 / finalizedElapsedMs).toFixed(2))
         : null;
-    const blocksPerSecondLastMinute = Number((recent.length / recentWindowSeconds).toFixed(2));
+    const blocksPerSecondLastMinute = Number((recent.count / recentWindowSeconds).toFixed(2));
     const activeCatchUpSession = catchUpSessions[catchUpSessions.length - 1];
     const activeCatchUpElapsedMs = activeCatchUpSession?.status === 'running'
         ? now - activeCatchUpSession.startedAtMs
@@ -528,7 +578,7 @@ function getSnapshot() {
         },
         recovery: { ...recoveryMetrics },
         recentRpcErrors: rpcSummary.recentErrors,
-        recentBlocks: recent.slice(-30).map(({ timestampMs: _timestampMs, ...sample }) => sample),
+        recentBlocks: recent.recentBlocks,
     };
 }
 
@@ -706,10 +756,10 @@ export function updateScannerRuntimeContext(input: {
 
 export function getBlockProcessingMetrics() {
     const now = Date.now();
-    const recent = blockSamples.slice(blockSamplesStartIndex).filter((sample) => now - sample.timestampMs <= 60000);
+    const recent = getRecentBlockSummary(now);
     const recentWindowSeconds = Math.max(1, Math.min(60, (now - startedAtMs) / 1000));
-    const recentTotal = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
-    const average = (key: string) => recent.length ? Number((recentTotal(key) / recent.length).toFixed(1)) : null;
+    const average = (key: keyof RecentBlockSummary['totals']) =>
+        recent.count ? Number((recent.totals[key] / recent.count).toFixed(1)) : null;
     const last = blockSamples.length > blockSamplesStartIndex ? blockSamples[blockSamples.length - 1] : undefined;
     return {
         processedBlocks: totalProcessedBlocks,
@@ -729,12 +779,12 @@ export function getBlockProcessingMetrics() {
         lastProcessedBlock,
         lastProcessedAt,
         lastBlockDurationMs: last ? Number(last.blockDurationMs) : null,
-        blocksProcessedLastMinute: recent.length,
-        blocksPerSecondLastMinute: Number((recent.length / recentWindowSeconds).toFixed(2)),
+        blocksProcessedLastMinute: recent.count,
+        blocksPerSecondLastMinute: Number((recent.count / recentWindowSeconds).toFixed(2)),
         averageBlockDurationLastMinuteMs: average('blockDurationMs'),
         averageFetchDurationLastMinuteMs: average('fetchDurationMs'),
         averageDatabaseWriteDurationLastMinuteMs: average('databaseWriteDurationMs'),
-        recentBlocks: recent.slice(-30).map((sample) => ({
+        recentBlocks: recent.recentBlocks.map((sample) => ({
             blockNumber: Number(sample.blockNumber),
             processedAt: String(sample.timestamp),
             blockDurationMs: Number(sample.blockDurationMs),
@@ -795,9 +845,7 @@ function buildScannerAnalytics(
     sortedRpcDurations: Array<{ timestampMs: number; durationMs: number }>,
 ): ScannerAnalyticsResponse {
     const now = Date.now();
-    const requestedWindowMs = windowLabel === 'available'
-        ? METRICS_RETENTION_MS
-        : Math.max(60000, Math.min(windowMs, METRICS_RETENTION_MS));
+    const requestedWindowMs = Math.max(60000, Math.min(windowMs, METRICS_RETENTION_MS));
     const availableWindowMs = Math.max(0, Math.min(requestedWindowMs, now - startedAtMs));
     const since = now - availableWindowMs;
     const selectedBlocks = blockSamples.slice(blockSamplesStartIndex).filter((sample) => sample.timestampMs >= since);
@@ -935,14 +983,9 @@ function buildScannerAnalytics(
         window: windowLabel,
         requestedWindowMs,
         availableWindowMs,
-        windowCoverage: windowLabel === 'available'
-            ? 'available'
-            : now - startedAtMs >= requestedWindowMs ? 'complete' : 'partial',
+        windowCoverage: now - startedAtMs >= requestedWindowMs ? 'complete' : 'partial',
         historyStartedAt: startedAt,
-        availableWindows: [
-            ...METRICS_TIME_WINDOWS.map(({ value, label }) => ({ value, label })),
-            { value: 'available', label: 'Available history' },
-        ],
+        availableWindows: METRICS_TIME_WINDOWS.map(({ value, label }) => ({ value, label })),
         current,
         windowMetrics,
         blockSamples: selectedBlocks.map(({ timestampMs: _timestampMs, ...sample }) => sample),
@@ -972,7 +1015,7 @@ let scannerAnalyticsCache: {
 
 export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
     const selectedWindow = METRICS_TIME_WINDOWS.find((window) => window.value === windowLabel);
-    if (windowLabel !== 'available' && !selectedWindow) {
+    if (!selectedWindow) {
         throw new Error(`Analytics window "${windowLabel}" is not configured`);
     }
 
@@ -991,7 +1034,7 @@ export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW
         .filter((sample) => Number.isFinite(sample.durationMs))
         .sort((left, right) => left.durationMs - right.durationMs);
     const snapshot = buildScannerAnalytics(
-        windowLabel === 'available' ? METRICS_RETENTION_MS : selectedWindow!.durationMs,
+        selectedWindow.durationMs,
         windowLabel,
         current,
         sortedRpcDurations,

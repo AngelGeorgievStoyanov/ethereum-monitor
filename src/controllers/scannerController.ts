@@ -29,11 +29,8 @@ export const getScannerAnalyticsController = async (req: Request, res: Response)
         const requestedWindow = typeof req.query.window === 'string'
             ? req.query.window
             : DEFAULT_METRICS_WINDOW.value;
-        const isAvailableWindow = requestedWindow === 'available';
         const configuredWindow = METRICS_TIME_WINDOWS.find((window) => window.value === requestedWindow);
-        const analytics = getScannerAnalytics(
-            isAvailableWindow ? 'available' : configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value,
-        );
+        const analytics = getScannerAnalytics(configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value);
         res.json(analytics);
     } catch (error) {
         sendHttpError(res, 'Unable to retrieve scanner analytics', error);

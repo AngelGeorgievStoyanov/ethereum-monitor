@@ -46,13 +46,12 @@ The current runtime snapshot includes:
 
 History is bounded in memory using generic retention settings in `src/constants/scanner-metrics.constants.ts`. These limits are not based on Ethereum block time and can be adjusted centrally.
 
-- Metric samples are retained for up to 24 hours, subject to per-category memory safety limits.
+- Metric samples are retained for up to 3 hours, subject to per-category memory safety limits.
 - The configured sample limits are capacity safeguards, not an assumption about how many blocks a network produces.
-- Analytics windows are configured centrally and currently include `1h`, `3h`, `6h`, `9h`, `12h`, and `24h`.
+- Analytics exposes only two windows: `1h` and `3h`.
 - Network-independent one-minute buckets retain throughput, lag, RPC failure/latency, database query, filter evaluation, and batch timing aggregates. Throughput, RPC, component-latency, and lag charts use the selected window's buckets rather than relying on a fixed number of block samples.
-- An `available` window returns all history available in the current process, up to the retention period.
 - Each analytics response reports requested duration, available duration, history start time, and whether the requested window is complete or partial.
-- A process that has been running for 40 minutes can therefore return 40 minutes of partial data for a 1-hour window and complete 30/40-minute analysis through the `available` window. It does not need to run for 24 hours.
+- A process that has been running for 40 minutes can return 40 minutes of partial data for a 1-hour window. It does not need to run for 3 hours.
 - Analytics snapshots are prepared by the metrics aggregator and published to Dynamic Config on the configured refresh interval. The analytics endpoint only selects and returns the requested snapshot.
 - Summary counters and breakdown tables are calculated for the selected window from minute buckets, including processing throughput, RPC request/error/retry/failover counts, database query counts/failures, filter evaluations, RPC methods, database query types, and per-filter performance. Percentile latency uses the retained raw RPC request samples for the selected window.
 
@@ -64,7 +63,7 @@ Returns the prepared scanner status snapshot from Dynamic Config. It does not qu
 
 ### GET /api/scanner/analytics?window=1h
 
-Returns the prepared runtime analytics snapshot for the requested window. Supported values are configured in `src/constants/scanner-metrics.constants.ts`, plus `available`.
+Returns the prepared runtime analytics snapshot for the requested window. Supported values are `1h` and `3h`, configured in `src/constants/scanner-metrics.constants.ts`.
 
 The response includes the current metrics snapshot, block samples, lag samples, RPC events, catch-up sessions, processing batches, minute-level aggregates, retention metadata, and window coverage.
 

@@ -54,7 +54,7 @@ export interface ScannerAnalyticsResponse {
     window: string;
     requestedWindowMs: number;
     availableWindowMs: number;
-    windowCoverage: 'complete' | 'partial' | 'available';
+    windowCoverage: 'complete' | 'partial';
     historyStartedAt: string;
     availableWindows: Array<{ value: string; label: string }>;
     current: Record<string, unknown>;
