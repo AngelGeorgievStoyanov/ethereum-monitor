@@ -644,7 +644,7 @@ function buildScannerAnalytics(
     const selectedRpc = rpcEvents.filter((event) => event.timestampMs >= since);
     const selectedSessions = catchUpSessions.filter((session) => session.startedAtMs >= since);
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
-    const selectedMinuteBuckets = minuteBuckets.filter((bucket) => bucket.timestampMs >= since);
+    const selectedMinuteBuckets = minuteBuckets.filter((bucket) => bucket.timestampMs + METRICS_BUCKET_INTERVAL_MS > since);
 
     return {
         generatedAt: new Date(now).toISOString(),
@@ -655,6 +655,10 @@ function buildScannerAnalytics(
             ? 'available'
             : now - startedAtMs >= requestedWindowMs ? 'complete' : 'partial',
         historyStartedAt: startedAt,
+        availableWindows: [
+            ...METRICS_TIME_WINDOWS.map(({ value, label }) => ({ value, label })),
+            { value: 'available', label: 'Available history' },
+        ],
         current,
         blockSamples: selectedBlocks.map(({ timestampMs: _timestampMs, ...sample }) => sample),
         lagSamples: selectedLag.map(({ timestampMs: _timestampMs, ...sample }) => sample),
