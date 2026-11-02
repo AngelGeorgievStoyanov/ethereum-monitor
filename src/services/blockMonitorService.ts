@@ -16,6 +16,7 @@ import { initializeScannerState } from './scannerInitializationService';
 import { invalidateConfirmedBlockCache, processFinalizedBlocks } from './blockProcessor';
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
 import { refreshScannerStatusSnapshot } from './scannerStatusService';
+import { getScannerControlState } from './scannerControlService';
 import { isScannerLockHeld, tryAcquireScannerLock } from './scannerLockService';
 import { processReorgRecovery } from './reorgRecoveryService';
 import { recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
@@ -145,7 +146,7 @@ export function createBlockMonitorService() {
         let waitingForFilters = dynamicConfigService.getTxFilters().length === 0;
         let waitingForPause = false;
         let cachedControlPaused = false;
-        let lastControlStateCheckAt = Date.now();
+        let lastControlStateCheckAt = 0;
         if (waitingForFilters) {
             console.log('[Scanner] No active tx filters; waiting without advancing checkpoint');
         }
@@ -176,8 +177,7 @@ export function createBlockMonitorService() {
                 }
 
                 if (Date.now() - lastControlStateCheckAt >= SCANNER_CONTROL_REFRESH_INTERVAL_MS) {
-                    const statusSnapshot = await refreshScannerStatusSnapshot();
-                    cachedControlPaused = statusSnapshot.paused;
+                    cachedControlPaused = (await getScannerControlState()).paused;
                     lastControlStateCheckAt = Date.now();
                 }
 
