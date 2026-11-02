@@ -51,11 +51,10 @@ function rejected(
 async function requestManualRescanOperation(
     requestedFromBlock: number,
 ): Promise<ManualRescanRequestResult> {
-    const scannerControl = await getScannerControlState();
-    if (!scannerControl.paused || scannerControl.mode !== 'manual') {
+    const scannerControl = getScannerControlState();
+    if (!scannerControl.paused) {
         return rejected('conflict', {
-            message:
-                'Pause the scanner with mode="manual" before starting a rescan; temporary pauses may expire during the operation.',
+            message: 'Pause the scanner before starting a rescan.',
         });
     }
     if (!(await isScannerLockHeld())) {
