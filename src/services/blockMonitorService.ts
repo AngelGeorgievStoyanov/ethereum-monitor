@@ -14,7 +14,7 @@ import { sleep } from '../utils/sleep';
 import { initializeScannerState } from './scannerInitializationService';
 import { registerScannerState } from './scannerStateService';
 import { processFinalizedBlocks } from './blockProcessor';
-import { invalidateConfirmedBlockCache } from './scannerCheckpointCache';
+
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
 import { refreshScannerStatusSnapshot } from './scannerStatusService';
 import { processReorgRecovery } from './reorgRecoveryService';
@@ -217,10 +217,7 @@ export function createBlockMonitorService() {
                                 finalized.hash ?? '',
                                 () => dynamicConfigService.getTxFilterSnapshot(),
                             );
-                            if (recoveryHandled) {
-                                // Recovery can roll the checkpoint back and later replace its canonical hash.
-                                invalidateConfirmedBlockCache();
-                            } else {
+                            if (!recoveryHandled) {
                                 await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
                                     dynamicConfigService.getTxFilterSnapshot(),
                                 );
