@@ -3,6 +3,14 @@
 > **Project scope:** These are lightweight project guidelines for a single-network EVM blockchain monitoring system, not a claim that every existing module already follows every rule. The current codebase contains some existing deviations (including services that call repository functions directly). Treat the guidelines as the intended direction for future changes and identify existing deviations explicitly during reviews. Do not add layers or abstractions solely to satisfy the document when they do not provide practical value. For a substantially larger system or production deployment, the architecture must be redesigned and the main responsibilities must be separated into independent services that can be scaled independently.
 
 
+## Related development documents
+
+Use these documents together:
+
+- [Development Guidelines](./development-guidelines.md) — coding principles, generic and loosely coupled design, dependencies, simplicity, errors, and code reviews.
+- [Performance Guidelines](./performance-guidelines.md) — evidence-based optimization, avoiding unnecessary DB/RPC work, caching, memory, batching, and correctness.
+- This document — module responsibilities, dependency direction, and approved runtime behavior.
+
 ## 1. Controllers
 
 Controllers are responsible for the HTTP layer only.
