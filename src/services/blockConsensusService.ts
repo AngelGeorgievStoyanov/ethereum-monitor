@@ -42,7 +42,6 @@ function describeDisagreement(
     return '';
 }
 
-
 export interface ConsensusVerifiedBlockData extends ConsensusBlock {
     block: NonNullable<Awaited<ReturnType<typeof evmRpcClient.getBlock>>>;
     endpointIndex: number;
