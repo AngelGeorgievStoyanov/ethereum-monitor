@@ -1,6 +1,7 @@
 import type { ScannerAnalyticsResponse } from '../types/scanner-analytics.types';
 import { getDynamicConfigService } from './dynamicConfigService';
 import { subscribeToRpcMetricEvents, type RpcMetricEventInput } from '../metrics/metricsEventBus';
+import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -217,7 +218,7 @@ export function recordFinalizedBlock(blockNumber: number): void {
     trimSamples(Date.now());
     rpcAvailable = true;
     const lag = lastProcessedBlock === null ? null : Math.max(0, blockNumber - lastProcessedBlock);
-    if (lag !== null && lag > 0 && !catchUpActive) {
+    if (lag !== null && lag > SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS && !catchUpActive) {
         const now = Date.now();
         catchUpSessions.push({
             startedAt: new Date(now).toISOString(), startedAtMs: now, completedAt: null,
