@@ -11,8 +11,12 @@ type BlockInput = {
     getBlockReceiptsDurationMs: number;
     filterMatchingDurationMs: number;
     databaseWriteDurationMs: number;
+    nativeTransfersSeen: number;
     nativeMatches: number;
+    erc20TransferLogsSeen: number;
     erc20Matches: number;
+    erc20FailedAttemptsSeen: number;
+    erc20FailedAttemptsMatched: number;
 };
 
 type RpcInput = RpcMetricEventInput;
@@ -31,6 +35,7 @@ const rpcTotals = {
     totalRequests: 0,
     successes: 0,
     failures: 0,
+    retryableFailures: 0,
     rateLimitErrors: 0,
     timeoutErrors: 0,
     connectionErrors: 0,
@@ -56,8 +61,12 @@ let catchUpActive = false;
 let publishTimer: ReturnType<typeof setTimeout> | undefined;
 let totalProcessedBlocks = 0;
 let totalProcessedTransactions = 0;
+let totalNativeTransfersSeen = 0;
 let totalNativeMatches = 0;
+let totalErc20TransferLogsSeen = 0;
 let totalErc20Matches = 0;
+let totalErc20FailedAttemptsSeen = 0;
+let totalErc20FailedAttemptsMatched = 0;
 const databaseMetrics = { writes: 0, failures: 0, totalWriteDurationMs: 0, lastErrorAt: null as string | null, lastError: null as string | null };
 let recoveryMetrics: Record<string, number> = {};
 
@@ -116,8 +125,12 @@ function getSnapshot() {
         processing: {
             processedBlocks: totalProcessedBlocks,
             processedTransactions: totalTransactions,
+            totalNativeTransfersSeen,
             totalNativeMatches,
+            totalErc20TransferLogsSeen,
             totalErc20Matches,
+            totalErc20FailedAttemptsSeen,
+            totalErc20FailedAttemptsMatched,
             blocksPerSecondLastMinute: Number((recent.length / 60).toFixed(2)),
             transactionsPerSecondLastMinute: Number((recentTransactions / 60).toFixed(2)),
             averageTransactionsPerBlock: totalProcessedBlocks ? Number((totalTransactions / totalProcessedBlocks).toFixed(1)) : 0,
@@ -189,8 +202,12 @@ export function recordProcessedBlock(input: BlockInput): void {
     blockSamples.push({ ...input, timestamp, timestampMs: now });
     totalProcessedBlocks += 1;
     totalProcessedTransactions += input.transactionCount;
+    totalNativeTransfersSeen += input.nativeTransfersSeen;
     totalNativeMatches += input.nativeMatches;
+    totalErc20TransferLogsSeen += input.erc20TransferLogsSeen;
     totalErc20Matches += input.erc20Matches;
+    totalErc20FailedAttemptsSeen += input.erc20FailedAttemptsSeen;
+    totalErc20FailedAttemptsMatched += input.erc20FailedAttemptsMatched;
     lastProcessedBlock = input.blockNumber;
     lastProcessedAt = timestamp;
     const session = catchUpSessions[catchUpSessions.length - 1];
@@ -216,6 +233,7 @@ export function recordRpcRequest(input: RpcInput): void {
         else if (/\-32\d{3,4}|json.?rpc/.test(normalized)) failureKind = 'jsonRpc';
         else failureKind = 'other';
         rpcTotals.failures += 1;
+        if (input.retryable) rpcTotals.retryableFailures += 1;
         rpcTotals.lastErrorAt = new Date(now).toISOString();
         if (failureKind === 'rateLimit') rpcTotals.rateLimitErrors += 1;
         else if (failureKind === 'timeout') rpcTotals.timeoutErrors += 1;
