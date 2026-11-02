@@ -274,6 +274,7 @@ function getSnapshot() {
     lastEventLoopUtilization = performance.eventLoopUtilization();
     const memoryUsage = process.memoryUsage();
     const recent = blockSamples.filter((sample) => now - sample.timestampMs <= 60000);
+    const recentWindowSeconds = Math.max(1, Math.min(60, (now - startedAtMs) / 1000));
     const sum = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
     const average = (key: string) => recent.length ? Number((sum(key) / recent.length).toFixed(1)) : null;
     const totalTransactions = totalProcessedTransactions;
@@ -287,7 +288,7 @@ function getSnapshot() {
     const chainBlocksPerSecond = finalizedElapsedMs > 0
         ? Number(((recentFinalized[recentFinalized.length - 1].blockNumber - recentFinalized[0].blockNumber) * 1000 / finalizedElapsedMs).toFixed(2))
         : null;
-    const blocksPerSecondLastMinute = Number((recent.length / 60).toFixed(2));
+    const blocksPerSecondLastMinute = Number((recent.length / recentWindowSeconds).toFixed(2));
     const activeCatchUpSession = catchUpSessions[catchUpSessions.length - 1];
     const activeCatchUpElapsedMs = activeCatchUpSession?.status === 'running'
         ? now - activeCatchUpSession.startedAtMs
@@ -348,7 +349,7 @@ function getSnapshot() {
             totalBlockDurationMs,
             totalDatabaseWriteDurationMs,
             blocksPerSecondLastMinute,
-            transactionsPerSecondLastMinute: Number((recentTransactions / 60).toFixed(2)),
+            transactionsPerSecondLastMinute: Number((recentTransactions / recentWindowSeconds).toFixed(2)),
             averageTransactionsPerBlock: totalProcessedBlocks ? Number((totalTransactions / totalProcessedBlocks).toFixed(1)) : 0,
             averageBlockDurationMs: average('blockDurationMs'),
             averageFetchDurationMs: average('fetchDurationMs'),
@@ -573,6 +574,7 @@ export function updateScannerRuntimeContext(input: {
 export function getBlockProcessingMetrics() {
     const now = Date.now();
     const recent = blockSamples.filter((sample) => now - sample.timestampMs <= 60000);
+    const recentWindowSeconds = Math.max(1, Math.min(60, (now - startedAtMs) / 1000));
     const recentTotal = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
     const average = (key: string) => recent.length ? Number((recentTotal(key) / recent.length).toFixed(1)) : null;
     const last = blockSamples[blockSamples.length - 1];
@@ -595,7 +597,7 @@ export function getBlockProcessingMetrics() {
         lastProcessedAt,
         lastBlockDurationMs: last ? Number(last.blockDurationMs) : null,
         blocksProcessedLastMinute: recent.length,
-        blocksPerSecondLastMinute: Number((recent.length / 60).toFixed(2)),
+        blocksPerSecondLastMinute: Number((recent.length / recentWindowSeconds).toFixed(2)),
         averageBlockDurationLastMinuteMs: average('blockDurationMs'),
         averageFetchDurationLastMinuteMs: average('fetchDurationMs'),
         averageDatabaseWriteDurationLastMinuteMs: average('databaseWriteDurationMs'),
