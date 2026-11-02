@@ -13,6 +13,7 @@ import { retryBlockedReorgRecovery as retryReorgRecovery } from '../services/reo
 import { requestManualRescan } from '../services/manualRescanRequestService';
 import { validateManualRescanFromBlock } from '../validators/manualRescanValidator';
 import { getManualRescanHttpStatus } from '../mappers/manualRescanMapper';
+import { METRICS_TIME_WINDOWS, METRICS_RETENTION_MS, DEFAULT_METRICS_WINDOW } from '../constants/scanner-metrics.constants';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -25,14 +26,16 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
 
 export const getScannerAnalyticsController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const requestedWindow = typeof req.query.window === 'string' ? req.query.window : '1h';
-        const windows: Record<string, number> = {
-            '1h': 3600000,
-            '6h': 21600000,
-            '24h': 86400000,
-        };
-        const windowMs = windows[requestedWindow] ?? 3600000;
-        const analytics = getScannerAnalytics(windowMs);
+        const requestedWindow = typeof req.query.window === 'string'
+            ? req.query.window
+            : DEFAULT_METRICS_WINDOW.value;
+        const configuredWindow = METRICS_TIME_WINDOWS.find((window) => window.value === requestedWindow);
+        const analytics = requestedWindow === 'available'
+            ? getScannerAnalytics(METRICS_RETENTION_MS, 'available')
+            : getScannerAnalytics(
+                configuredWindow?.durationMs ?? DEFAULT_METRICS_WINDOW.durationMs,
+                configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value,
+            );
         res.json(analytics);
     } catch (error) {
         sendHttpError(res, 'Unable to retrieve scanner analytics', error);
