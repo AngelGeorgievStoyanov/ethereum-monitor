@@ -20,7 +20,6 @@ import { BlockReceiptConsistencyError, evmRpcClient } from './evmBlockDataServic
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
 import {
-    findCanonicalBlockIdentity,
     findCanonicalBlockIdentitiesInRange,
     type CanonicalBlockIdentity,
 } from '../repositories/blockRepository';
@@ -120,7 +119,8 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
     let ancestorDepth = 0;
     const lowestBlock = Math.max(0, originalCheckpoint - MAX_REORG_LOOKBACK_BLOCKS);
 
-    for (const range of iterateBlockRangeBatches({
+    if (originalCheckpoint > 0) {
+        for (const range of iterateBlockRangeBatches({
         fromBlock: lowestBlock,
         toBlock: originalCheckpoint - 1,
         batchSize: REORG_ANCESTOR_BATCH_SIZE,
@@ -154,6 +154,7 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
         }
 
         if (ancestor) break;
+        }
     }
 
     if (!ancestor) {
