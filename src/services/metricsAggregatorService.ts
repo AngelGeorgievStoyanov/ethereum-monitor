@@ -6,7 +6,7 @@ import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.con
 import { classifyRpcError } from '../utils/classifyRpcError';
 import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
 import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
-import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS, METRICS_RPC_EVENT_COMPACTION_THRESHOLD } from '../constants/scanner-metrics.constants';
+import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS, METRICS_RPC_EVENT_COMPACTION_THRESHOLD, METRICS_SAMPLE_COMPACTION_THRESHOLD } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -33,12 +33,14 @@ let lastCpuUsage = process.cpuUsage();
 let lastCpuSampleAt = startedAtMs;
 let lastEventLoopUtilization = performance.eventLoopUtilization();
 const blockSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
+let blockSamplesStartIndex = 0;
 const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
 let rpcEventsStartIndex = 0;
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
 const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const finalizedSamples: Array<{ timestampMs: number; blockNumber: number }> = [];
 const lagSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
+let lagSamplesStartIndex = 0;
 type MinuteMetricBucket = {
     timestamp: string;
     timestampMs: number;
@@ -284,7 +286,8 @@ function publish(): void {
 }
 
 function trimSamples(now: number): void {
-    while (blockSamples.length > 0 && (blockSamples.length > METRICS_SAMPLE_LIMITS.blocks || now - blockSamples[0].timestampMs > METRICS_RETENTION_MS)) blockSamples.shift();
+    while (blockSamplesStartIndex < blockSamples.length && (blockSamples.length - blockSamplesStartIndex > METRICS_SAMPLE_LIMITS.blocks || now - blockSamples[blockSamplesStartIndex].timestampMs > METRICS_RETENTION_MS)) blockSamplesStartIndex += 1;
+    const previousRpcEventsStartIndex = rpcEventsStartIndex;
     while (
         rpcEventsStartIndex < rpcEvents.length &&
         (
@@ -294,6 +297,7 @@ function trimSamples(now: number): void {
     ) {
         rpcEventsStartIndex += 1;
     }
+    if (rpcEventsStartIndex !== previousRpcEventsStartIndex) rpcSummaryCache = null;
     if (
         rpcEventsStartIndex >= METRICS_RPC_EVENT_COMPACTION_THRESHOLD &&
         rpcEventsStartIndex * 2 >= rpcEvents.length
@@ -304,7 +308,15 @@ function trimSamples(now: number): void {
     while (catchUpSessions.length > 0 && (catchUpSessions.length > METRICS_SAMPLE_LIMITS.catchUpSessions || now - catchUpSessions[0].startedAtMs > METRICS_RETENTION_MS)) catchUpSessions.shift();
     while (batchSamples.length > 0 && (batchSamples.length > METRICS_SAMPLE_LIMITS.batches || now - batchSamples[0].timestampMs > METRICS_RETENTION_MS)) batchSamples.shift();
     while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > METRICS_RETENTION_MS) finalizedSamples.shift();
-    while (lagSamples.length > 0 && (lagSamples.length > METRICS_SAMPLE_LIMITS.lag || now - lagSamples[0].timestampMs > METRICS_RETENTION_MS)) lagSamples.shift();
+    while (lagSamplesStartIndex < lagSamples.length && (lagSamples.length - lagSamplesStartIndex > METRICS_SAMPLE_LIMITS.lag || now - lagSamples[lagSamplesStartIndex].timestampMs > METRICS_RETENTION_MS)) lagSamplesStartIndex += 1;
+    if (blockSamplesStartIndex >= METRICS_SAMPLE_COMPACTION_THRESHOLD && blockSamplesStartIndex * 2 >= blockSamples.length) {
+        blockSamples.splice(0, blockSamplesStartIndex);
+        blockSamplesStartIndex = 0;
+    }
+    if (lagSamplesStartIndex >= METRICS_SAMPLE_COMPACTION_THRESHOLD && lagSamplesStartIndex * 2 >= lagSamples.length) {
+        lagSamples.splice(0, lagSamplesStartIndex);
+        lagSamplesStartIndex = 0;
+    }
     while (minuteBuckets.length > 0 && (minuteBuckets.length > METRICS_MAX_BUCKETS || now - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS)) {
         const removedBucket = minuteBuckets.shift();
         if (removedBucket) minuteBucketsByTimestamp.delete(removedBucket.timestampMs);
@@ -394,7 +406,7 @@ function getSnapshot() {
     const eventLoopUtilization = performance.eventLoopUtilization(lastEventLoopUtilization);
     lastEventLoopUtilization = performance.eventLoopUtilization();
     const memoryUsage = process.memoryUsage();
-    const recent = blockSamples.filter((sample) => now - sample.timestampMs <= 60000);
+    const recent = blockSamples.slice(blockSamplesStartIndex).filter((sample) => now - sample.timestampMs <= 60000);
     const recentWindowSeconds = Math.max(1, Math.min(60, (now - startedAtMs) / 1000));
     const sum = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
     const average = (key: string) => recent.length ? Number((sum(key) / recent.length).toFixed(1)) : null;
@@ -464,7 +476,7 @@ function getSnapshot() {
             averageGetBlockReceiptsDurationMs: average('getBlockReceiptsDurationMs'),
             averageFilterMatchingDurationMs: average('filterMatchingDurationMs'),
             averageDatabaseWriteDurationMs: average('databaseWriteDurationMs'),
-            lastBlockTransactionCount: blockSamples.length ? Number(blockSamples[blockSamples.length - 1].transactionCount) : null,
+            lastBlockTransactionCount: blockSamples.length > blockSamplesStartIndex ? Number(blockSamples[blockSamples.length - 1].transactionCount) : null,
         },
         rpc: {
             ...rpcTotals,
@@ -700,11 +712,11 @@ export function updateScannerRuntimeContext(input: {
 
 export function getBlockProcessingMetrics() {
     const now = Date.now();
-    const recent = blockSamples.filter((sample) => now - sample.timestampMs <= 60000);
+    const recent = blockSamples.slice(blockSamplesStartIndex).filter((sample) => now - sample.timestampMs <= 60000);
     const recentWindowSeconds = Math.max(1, Math.min(60, (now - startedAtMs) / 1000));
     const recentTotal = (key: string) => recent.reduce((total, sample) => total + Number(sample[key] ?? 0), 0);
     const average = (key: string) => recent.length ? Number((recentTotal(key) / recent.length).toFixed(1)) : null;
-    const last = blockSamples[blockSamples.length - 1];
+    const last = blockSamples.length > blockSamplesStartIndex ? blockSamples[blockSamples.length - 1] : undefined;
     return {
         processedBlocks: totalProcessedBlocks,
         totalTransactions: totalProcessedTransactions,
@@ -786,6 +798,7 @@ function buildScannerAnalytics(
     windowMs: number,
     windowLabel: string,
     current: ReturnType<typeof getSnapshot>,
+    sortedRpcDurations: Array<{ timestampMs: number; durationMs: number }>,
 ): ScannerAnalyticsResponse {
     const now = Date.now();
     const requestedWindowMs = windowLabel === 'available'
@@ -793,8 +806,8 @@ function buildScannerAnalytics(
         : Math.max(60000, Math.min(windowMs, METRICS_RETENTION_MS));
     const availableWindowMs = Math.max(0, Math.min(requestedWindowMs, now - startedAtMs));
     const since = now - availableWindowMs;
-    const selectedBlocks = blockSamples.filter((sample) => sample.timestampMs >= since);
-    const selectedLag = lagSamples.filter((sample) => sample.timestampMs >= since);
+    const selectedBlocks = blockSamples.slice(blockSamplesStartIndex).filter((sample) => sample.timestampMs >= since);
+    const selectedLag = lagSamples.slice(lagSamplesStartIndex).filter((sample) => sample.timestampMs >= since);
     const selectedRpc = rpcEvents.slice(rpcEventsStartIndex).filter((event) => event.timestampMs >= since);
     const selectedSessions = catchUpSessions.filter((session) =>
         session.status === 'running' ||
@@ -813,16 +826,21 @@ function buildScannerAnalytics(
     const logicalRpcOperations = sumBucketMetric('logicalRpcOperations');
     const failedRpcOperations = sumBucketMetric('rpcOperationFailures');
     const successfulRpcOperations = Math.max(0, logicalRpcOperations - failedRpcOperations);
-    const selectedRpcDurations = selectedRpc
-        .map((event) => Number(event.durationMs))
-        .filter((duration) => Number.isFinite(duration))
-        .sort((left, right) => left - right);
-    const windowPercentile = (ratio: number): number | null =>
-        selectedRpcDurations.length
-            ? selectedRpcDurations[
-                  Math.min(selectedRpcDurations.length - 1, Math.ceil(selectedRpcDurations.length * ratio) - 1)
-              ]
-            : null;
+    const selectedRpcDurationCount = sortedRpcDurations.reduce(
+        (count, sample) => count + (sample.timestampMs >= since ? 1 : 0),
+        0,
+    );
+    const windowPercentile = (ratio: number): number | null => {
+        if (!selectedRpcDurationCount) return null;
+        const targetIndex = Math.min(selectedRpcDurationCount - 1, Math.ceil(selectedRpcDurationCount * ratio) - 1);
+        let selectedIndex = 0;
+        for (const sample of sortedRpcDurations) {
+            if (sample.timestampMs < since) continue;
+            if (selectedIndex === targetIndex) return sample.durationMs;
+            selectedIndex += 1;
+        }
+        return null;
+    };
     const windowRpcMethods: Record<string, { requests: number; successes: number; failures: number; totalDurationMs: number }> = {};
     const windowFiltersById: Record<string, { evaluations: number; matches: number; failures: number; totalDurationMs: number }> = {};
     const windowDatabaseByOperation: Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }> = {};
@@ -940,10 +958,10 @@ function buildScannerAnalytics(
         batches: selectedBatches.map(({ timestampMs: _timestampMs, ...sample }) => sample),
         minuteBuckets: selectedMinuteBuckets.map(({ timestampMs: _timestampMs, ...bucket }) => bucket),
         retention: {
-            oldestBlockSampleAt: (blockSamples[0]?.timestamp as string | undefined) ?? null,
+            oldestBlockSampleAt: (blockSamples[blockSamplesStartIndex]?.timestamp as string | undefined) ?? null,
             oldestRpcEventAt: (rpcEvents[rpcEventsStartIndex]?.timestamp as string | undefined) ?? null,
-            blockSamples: blockSamples.length,
-            lagSamples: lagSamples.length,
+            blockSamples: blockSamples.length - blockSamplesStartIndex,
+            lagSamples: lagSamples.length - lagSamplesStartIndex,
             rpcEvents: rpcEvents.length - rpcEventsStartIndex,
             catchUpSessions: catchUpSessions.length,
             batches: batchSamples.length,
@@ -953,11 +971,16 @@ function buildScannerAnalytics(
 }
 
 function publishScannerAnalyticsSnapshots(current: ReturnType<typeof getSnapshot>): void {
+    const sortedRpcDurations = rpcEvents
+        .slice(rpcEventsStartIndex)
+        .map((event) => ({ timestampMs: event.timestampMs, durationMs: Number(event.durationMs) }))
+        .filter((sample) => Number.isFinite(sample.durationMs))
+        .sort((left, right) => left.durationMs - right.durationMs);
     const snapshots: Record<string, ScannerAnalyticsResponse> = {};
     for (const window of METRICS_TIME_WINDOWS) {
-        snapshots[window.value] = buildScannerAnalytics(window.durationMs, window.value, current);
+        snapshots[window.value] = buildScannerAnalytics(window.durationMs, window.value, current, sortedRpcDurations);
     }
-    snapshots.available = buildScannerAnalytics(METRICS_RETENTION_MS, 'available', current);
+    snapshots.available = buildScannerAnalytics(METRICS_RETENTION_MS, 'available', current, sortedRpcDurations);
     getDynamicConfigService().publishRuntimeAnalytics(snapshots);
 }
 
