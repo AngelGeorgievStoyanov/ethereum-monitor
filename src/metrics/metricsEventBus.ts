@@ -1,3 +1,5 @@
+import type { RpcErrorCategory } from '../utils/classifyRpcError';
+
 export interface RpcMetricEventInput {
     method: string;
     endpointIndex: number;
@@ -5,6 +7,9 @@ export interface RpcMetricEventInput {
     outcome: 'success' | 'failure';
     message?: string;
     retryable?: boolean;
+    errorCategory?: RpcErrorCategory;
+    httpStatus?: number | null;
+    rpcCode?: number | null;
 }
 
 type RpcMetricListener = (event: RpcMetricEventInput) => void;
