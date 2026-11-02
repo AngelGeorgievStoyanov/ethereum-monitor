@@ -17,7 +17,7 @@ export async function getScannerStatusResponse() {
 
     const runtimeMetrics = getScannerRuntimeMetrics() as {
         chain?: { latestFinalizedBlock?: number | null; rpcAvailable?: boolean | null };
-        rpc?: { endpoints?: Array<{ index: number; attempts: number; successes: number; failures: number; averageLatencyMs: number | null }> };
+        rpc?: { endpoints?: Array<{ index: number; attempts: number; successes: number; failures: number; retryableFailures: number; totalDurationMs: number; lastFailureAt: string | null }> };
     } | null;
     const latestFinalizedBlock = runtimeMetrics?.chain?.latestFinalizedBlock ?? null;
     const rpcAvailable = runtimeMetrics?.chain?.rpcAvailable ?? false;
@@ -26,9 +26,9 @@ export async function getScannerStatusResponse() {
         attempts: endpoint.attempts,
         successes: endpoint.successes,
         failures: endpoint.failures,
-        retryableFailures: endpoint.failures,
-        totalDurationMs: endpoint.averageLatencyMs === null ? 0 : endpoint.averageLatencyMs * endpoint.attempts,
-        lastFailureAt: null,
+        retryableFailures: endpoint.retryableFailures,
+        totalDurationMs: endpoint.totalDurationMs,
+        lastFailureAt: endpoint.lastFailureAt,
     }));
 
     const response = mapScannerStatusResponse({
