@@ -16,11 +16,12 @@ export async function getScannerStatusResponse() {
     ]);
 
     const runtimeMetrics = getScannerRuntimeMetrics() as {
-        chain?: { latestFinalizedBlock?: number | null; rpcAvailable?: boolean | null };
+        chain?: { latestFinalizedBlock?: number | null; lastProcessedBlock?: number | null; lagBlocks?: number | null; rpcAvailable?: boolean | null };
         rpc?: { endpoints?: Array<{ index: number; attempts: number; successes: number; failures: number; retryableFailures: number; totalDurationMs: number; lastFailureAt: string | null }> };
     } | null;
     const latestFinalizedBlock = runtimeMetrics?.chain?.latestFinalizedBlock ?? null;
     const rpcAvailable = runtimeMetrics?.chain?.rpcAvailable ?? false;
+    const lagBlocks = runtimeMetrics?.chain?.lagBlocks ?? null;
     const rpcMetrics = (runtimeMetrics?.rpc?.endpoints ?? []).map((endpoint) => ({
         index: endpoint.index,
         attempts: endpoint.attempts,
@@ -40,6 +41,7 @@ export async function getScannerStatusResponse() {
         activeFiltersCount: getDynamicConfigService().getTxFilters().length,
         processUptimeSeconds: Math.floor(process.uptime()),
         latestFinalizedBlock,
+        lagBlocks,
         rpcAvailable,
         rpcMetrics,
         checkedAt: new Date().toISOString(),
