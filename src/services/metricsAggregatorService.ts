@@ -108,9 +108,9 @@ function publish(): void {
 
 function trimSamples(now: number): void {
     while (blockSamples.length > 0 && (blockSamples.length > METRICS_SAMPLE_LIMITS.blocks || now - blockSamples[0].timestampMs > METRICS_RETENTION_MS)) blockSamples.shift();
-    while (rpcEvents.length > METRICS_SAMPLE_LIMITS.rpcEvents) rpcEvents.shift();
-    while (catchUpSessions.length > METRICS_SAMPLE_LIMITS.catchUpSessions) catchUpSessions.shift();
-    while (batchSamples.length > METRICS_SAMPLE_LIMITS.batches) batchSamples.shift();
+    while (rpcEvents.length > 0 && (rpcEvents.length > METRICS_SAMPLE_LIMITS.rpcEvents || now - rpcEvents[0].timestampMs > METRICS_RETENTION_MS)) rpcEvents.shift();
+    while (catchUpSessions.length > 0 && (catchUpSessions.length > METRICS_SAMPLE_LIMITS.catchUpSessions || now - catchUpSessions[0].startedAtMs > METRICS_RETENTION_MS)) catchUpSessions.shift();
+    while (batchSamples.length > 0 && (batchSamples.length > METRICS_SAMPLE_LIMITS.batches || now - batchSamples[0].timestampMs > METRICS_RETENTION_MS)) batchSamples.shift();
     while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > METRICS_RETENTION_MS) finalizedSamples.shift();
     while (lagSamples.length > 0 && (lagSamples.length > METRICS_SAMPLE_LIMITS.lag || now - lagSamples[0].timestampMs > METRICS_RETENTION_MS)) lagSamples.shift();
 }
@@ -240,7 +240,7 @@ function getSnapshot() {
         database: { ...databaseMetrics, averageWriteDurationMs: databaseMetrics.writes ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1)) : null },
         recovery: { ...recoveryMetrics },
         recentRpcErrors: rpcEvents.filter((event) => event.outcome === 'failure').slice(-METRICS_SAMPLE_LIMITS.recentRpcErrors).map(({ timestampMs: _timestampMs, ...event }) => event),
-        recentBlocks: blockSamples.slice(-30).map(({ timestampMs: _timestampMs, ...sample }) => sample),
+        recentBlocks: recent.slice(-30).map(({ timestampMs: _timestampMs, ...sample }) => sample),
     };
 }
 
