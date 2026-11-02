@@ -188,7 +188,7 @@
             <section>
                 <h2>RPC failures per minute</h2>
                 <svg id="rpcFailureChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="RPC failures per minute"></svg>
-                <div class="chart-legend"><span><i class="legend-dot" style="background:#fb7185"></i>All failures</span><span><i class="legend-dot" style="background:#fbbf24"></i>Rate limits</span></div>
+                <div class="chart-legend"><span><i class="legend-dot" style="background:#fb7185"></i>All failures</span><span><i class="legend-dot" style="background:#fbbf24"></i>Rate limits</span><span><i class="legend-dot" style="background:#a78bfa"></i>Retried operations</span></div>
             </section>
         </div>
         <div class="layout">
@@ -452,6 +452,7 @@
         drawMinuteChart('rpcFailureChart', minuteBuckets, [
             { color: '#fb7185', value: (bucket) => bucket.rpcFailures },
             { color: '#fbbf24', value: (bucket) => bucket.rpcRateLimitErrors },
+            { color: '#a78bfa', value: (bucket) => bucket.rpcRetriedOperations },
         ], 'No RPC samples in this window');
         drawMinuteChart('componentLatencyChart', minuteBuckets, [
             { color: '#60a5fa', value: (bucket) => bucket.rpcRequests ? bucket.rpcDurationMsTotal / bucket.rpcRequests : 0 },
