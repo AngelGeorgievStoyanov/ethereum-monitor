@@ -11,6 +11,7 @@ export interface ScannerAnalyticsResponse {
         oldestBlockSampleAt: string | null;
         oldestRpcEventAt: string | null;
         blockSamples: number;
+        lagSamples: number;
         rpcEvents: number;
         catchUpSessions: number;
         batches: number;
