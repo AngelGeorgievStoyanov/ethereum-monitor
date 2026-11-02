@@ -187,6 +187,20 @@
         </div>
         <div class="layout">
             <section>
+                <h2>Processing rate · blocks / minute</h2>
+                <svg id="throughputChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Blocks processed per minute"></svg>
+            </section>
+            <section>
+                <h2>RPC failures per minute</h2>
+                <svg id="rpcFailureChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="RPC failures per minute"></svg>
+            </section>
+        </div>
+        <div class="layout">
+            <section>
+                <h2>Average component latency</h2>
+                <svg id="componentLatencyChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Average RPC, filter, and database latency"></svg>
+            </section>
+            <section>
                 <h2>Lag history</h2>
                 <svg id="lagChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Scanner lag history chart"></svg>
                 <div class="hint" id="analyticsRetention">Waiting for analytics data</div>
@@ -364,6 +378,27 @@
         }).join('');
         svg.innerHTML = grid + '<path d="' + line + '" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
     }
+    function drawMinuteChart(id, buckets, series, emptyMessage) {
+        const svg = $(id);
+        const width = 700, height = 190, pad = 24;
+        if (!buckets || buckets.length === 0) {
+            svg.innerHTML = '<text x="350" y="96" text-anchor="middle" fill="#718096" font-size="13">' + emptyMessage + '</text>';
+            return;
+        }
+        const values = series.flatMap((item) => buckets.map((bucket) => Number(item.value(bucket) || 0)));
+        const max = Math.max(1, ...values);
+        const x = (index) => pad + (buckets.length === 1 ? (width - pad * 2) / 2 : index * (width - pad * 2) / (buckets.length - 1));
+        const y = (value) => height - pad - (Number(value || 0) / max) * (height - pad * 2);
+        const grid = [0, 1, 2, 3].map((i) => {
+            const gy = pad + i * (height - pad * 2) / 3;
+            return '<line x1="' + pad + '" y1="' + gy + '" x2="' + (width - pad) + '" y2="' + gy + '" stroke="#263249" stroke-dasharray="3 5"/>';
+        }).join('');
+        const lines = series.map((item) => {
+            const path = buckets.map((bucket, index) => (index === 0 ? 'M' : 'L') + x(index).toFixed(1) + ',' + y(item.value(bucket)).toFixed(1)).join(' ');
+            return '<path d="' + path + '" fill="none" stroke="' + item.color + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+        }).join('');
+        svg.innerHTML = grid + lines;
+    }
     function renderAnalytics(data) {
         const current = data.current || {};
         const processing = current.processing || {};
@@ -408,6 +443,19 @@
         setText('runtimeEventLoop', number(runtime.eventLoopUtilizationPercent) + '%');
         setText('avgFilterEvaluation', duration(processing.averageFilterMatchingDurationMs));
         setText('avgDbBatchWrite', duration(database.averageWriteDurationMs));
+        const minuteBuckets = data.minuteBuckets || [];
+        drawMinuteChart('throughputChart', minuteBuckets, [
+            { color: '#60a5fa', value: (bucket) => bucket.processedBlocks },
+        ], 'No processing samples in this window');
+        drawMinuteChart('rpcFailureChart', minuteBuckets, [
+            { color: '#fb7185', value: (bucket) => bucket.rpcFailures },
+            { color: '#fbbf24', value: (bucket) => bucket.rpcRateLimitErrors },
+        ], 'No RPC samples in this window');
+        drawMinuteChart('componentLatencyChart', minuteBuckets, [
+            { color: '#60a5fa', value: (bucket) => bucket.rpcRequests ? bucket.rpcDurationMsTotal / bucket.rpcRequests : 0 },
+            { color: '#a78bfa', value: (bucket) => bucket.filterEvaluations ? bucket.predicateDurationMsTotal / bucket.filterEvaluations : 0 },
+            { color: '#34d399', value: (bucket) => bucket.databaseQueries ? bucket.databaseDurationMsTotal / bucket.databaseQueries : 0 },
+        ], 'No component latency samples in this window');
         drawLagChart(data.lagSamples);
         const retention = data.retention || {};
         const coverage = data.windowCoverage === 'complete' ? 'Complete' : data.windowCoverage === 'available' ? 'Available history' : 'Partial';
