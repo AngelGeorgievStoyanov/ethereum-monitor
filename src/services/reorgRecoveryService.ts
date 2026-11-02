@@ -12,10 +12,13 @@ import {
     markReorgRecoveryPending as persistReorgRecoveryPending,
     rollbackToCommonAncestor,
 } from '../repositories/reorgRecoveryRepository';
-import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
+import { processFetchedBlock } from './blockProcessingService';
 import { BlockVerificationUnavailableError } from '../errors/blockVerificationUnavailableError';
 import { ConsensusUnavailableError } from './blockConsensusService';
-import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
+import {
+    getReorgVerifiedBlock,
+    getReorgVerifiedBlockForProcessing,
+} from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, evmRpcClient } from './evmBlockDataService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
@@ -266,7 +269,12 @@ async function processReorgRecoveryInternal(
         if (getDynamicConfigService().getScannerControlSnapshot()) return true;
 
         const blockNumber = state.lastProcessedBlock + 1;
-        const verifiedBlock = await getReorgVerifiedBlock(blockNumber, 'reorg recovery');
+        const fetched = await getReorgVerifiedBlockForProcessing(blockNumber, 'reorg recovery');
+        const verifiedBlock = {
+            blockNumber: fetched.block.number,
+            blockHash: fetched.block.hash,
+            parentHash: fetched.block.parentHash,
+        };
         const previousCanonicalBlock = await getConfirmedCheckpointBlock(state.lastProcessedBlock);
         if (
             previousCanonicalBlock &&
@@ -284,17 +292,6 @@ async function processReorgRecoveryInternal(
             );
             await findAncestorAndRollback(state);
             continue;
-        }
-
-        const fetched = await fetchBlockForProcessing(blockNumber);
-        if (
-            fetched.block.number !== verifiedBlock.blockNumber ||
-            fetched.block.hash.toLowerCase() !== verifiedBlock.blockHash.toLowerCase() ||
-            fetched.block.parentHash.toLowerCase() !== verifiedBlock.parentHash.toLowerCase()
-        ) {
-            throw new ReorgRecoverySafetyError(
-                `Block data fetched for recovery block ${blockNumber} does not match the verified provider block`,
-            );
         }
         const filterConfig = getActiveTxFilters();
         if (filterConfig.filters.length === 0) {
