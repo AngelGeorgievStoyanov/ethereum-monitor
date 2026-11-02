@@ -295,9 +295,80 @@ function trimSamples(now: number): void {
     }
 }
 
+type RpcSummary = {
+    latencyP50Ms: number | null;
+    latencyP95Ms: number | null;
+    latencyP99Ms: number | null;
+    methods: Array<{ method: string; requests: number; successes: number; failures: number; totalDurationMs: number }>;
+    recentErrors: Array<Record<string, unknown>>;
+};
+
+let rpcSummaryCache: RpcSummary | null = null;
+let rpcSummaryCalculatedAt = 0;
+
+function getRpcSummary(now: number): RpcSummary {
+    if (
+        rpcSummaryCache &&
+        now - rpcSummaryCalculatedAt < METRICS_ANALYTICS_REFRESH_INTERVAL_MS
+    ) {
+        return rpcSummaryCache;
+    }
+
+    const latencySamples = rpcEvents
+        .map((event) => Number(event.durationMs))
+        .filter(Number.isFinite)
+        .sort((left, right) => left - right);
+    const percentile = (ratio: number): number | null =>
+        latencySamples.length
+            ? latencySamples[
+                  Math.min(latencySamples.length - 1, Math.ceil(latencySamples.length * ratio) - 1)
+              ]
+            : null;
+
+    const methodTotals = new Map<
+        string,
+        { requests: number; successes: number; failures: number; totalDurationMs: number }
+    >();
+    for (const event of rpcEvents) {
+        const method = String(event.method);
+        const value = methodTotals.get(method) ?? {
+            requests: 0,
+            successes: 0,
+            failures: 0,
+            totalDurationMs: 0,
+        };
+        value.requests += 1;
+        value.totalDurationMs += Number(event.durationMs);
+        if (event.outcome === 'success') value.successes += 1;
+        else value.failures += 1;
+        methodTotals.set(method, value);
+    }
+
+    const recentErrors: Array<Record<string, unknown>> = [];
+    for (let index = rpcEvents.length - 1; index >= 0; index -= 1) {
+        const event = rpcEvents[index];
+        if (event.outcome !== 'failure') continue;
+        const { timestampMs: _timestampMs, ...error } = event;
+        recentErrors.push(error);
+        if (recentErrors.length >= METRICS_SAMPLE_LIMITS.recentRpcErrors) break;
+    }
+    recentErrors.reverse();
+
+    rpcSummaryCache = {
+        latencyP50Ms: percentile(0.5),
+        latencyP95Ms: percentile(0.95),
+        latencyP99Ms: percentile(0.99),
+        methods: Array.from(methodTotals.entries()).map(([method, value]) => ({ method, ...value })),
+        recentErrors,
+    };
+    rpcSummaryCalculatedAt = now;
+    return rpcSummaryCache;
+}
+
 function getSnapshot() {
     const now = Date.now();
     trimSamples(now);
+    const rpcSummary = getRpcSummary(now);
     const cpuUsage = process.cpuUsage(lastCpuUsage);
     lastCpuUsage = process.cpuUsage();
     const cpuElapsedMs = Math.max(1, now - lastCpuSampleAt);
@@ -339,20 +410,6 @@ function getSnapshot() {
         lastFailureAt: value.lastFailureAt,
         averageLatencyMs: value.attempts ? Number((value.durationMs / value.attempts).toFixed(1)) : null,
     }));
-    const latencySamples = rpcEvents.map((event) => Number(event.durationMs)).sort((a, b) => a - b);
-    const percentile = (ratio: number) => latencySamples.length
-        ? latencySamples[Math.min(latencySamples.length - 1, Math.ceil(latencySamples.length * ratio) - 1)]
-        : null;
-    const methodTotals = new Map<string, { requests: number; successes: number; failures: number; totalDurationMs: number }>();
-    for (const event of rpcEvents) {
-        const method = String(event.method);
-        const value = methodTotals.get(method) ?? { requests: 0, successes: 0, failures: 0, totalDurationMs: 0 };
-        value.requests += 1;
-        value.totalDurationMs += Number(event.durationMs);
-        if (event.outcome === 'success') value.successes += 1;
-        else value.failures += 1;
-        methodTotals.set(method, value);
-    }
     return {
         startedAt,
         updatedAt: new Date(now).toISOString(),
@@ -395,10 +452,10 @@ function getSnapshot() {
         rpc: {
             ...rpcTotals,
             averageLatencyMs: rpcTotals.totalRequests ? Number((rpcTotals.totalDurationMs / rpcTotals.totalRequests).toFixed(1)) : null,
-            latencyP50Ms: percentile(0.5),
-            latencyP95Ms: percentile(0.95),
-            latencyP99Ms: percentile(0.99),
-            methods: Array.from(methodTotals.entries()).map(([method, value]) => ({ method, ...value })),
+            latencyP50Ms: rpcSummary.latencyP50Ms,
+            latencyP95Ms: rpcSummary.latencyP95Ms,
+            latencyP99Ms: rpcSummary.latencyP99Ms,
+            methods: rpcSummary.methods,
             endpoints,
             operations: {
                 ...rpcOperationTotals,
@@ -447,7 +504,7 @@ function getSnapshot() {
             averageQueryDurationMs: databaseQueryTotals.queries ? Number((databaseQueryTotals.totalDurationMs / databaseQueryTotals.queries).toFixed(1)) : null,
         },
         recovery: { ...recoveryMetrics },
-        recentRpcErrors: rpcEvents.filter((event) => event.outcome === 'failure').slice(-METRICS_SAMPLE_LIMITS.recentRpcErrors).map(({ timestampMs: _timestampMs, ...event }) => event),
+        recentRpcErrors: rpcSummary.recentErrors,
         recentBlocks: recent.slice(-30).map(({ timestampMs: _timestampMs, ...sample }) => sample),
     };
 }
