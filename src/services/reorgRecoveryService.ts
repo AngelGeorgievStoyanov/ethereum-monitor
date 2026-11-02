@@ -1,6 +1,7 @@
 import { getDynamicConfigService } from './dynamicConfigService';
 import {
     MAX_REORG_LOOKBACK_BLOCKS,
+    REORG_ANCESTOR_BATCH_SIZE,
     REORG_RECOVERY_STABLE_BLOCKS,
     SCANNER_ID,
 } from '../constants/scanner.constants';
@@ -18,10 +19,16 @@ import { getReorgVerifiedBlock } from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, evmRpcClient } from './evmBlockDataService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
 import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
-import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
+import {
+    findCanonicalBlockIdentity,
+    findCanonicalBlockIdentitiesInRange,
+    type CanonicalBlockIdentity,
+} from '../repositories/blockRepository';
+import { iterateBlockRangeBatches } from '../utils/blockRangeBatch';
 import {
     getConfirmedCheckpointBlock,
     hasCanonicalHistoryForCheckpoint,
+    cacheConfirmedCheckpointBlock,
 } from './scannerCheckpointCache';
 import {
     findScannerStatusState,
@@ -109,26 +116,44 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
         throw new Error('Reorg recovery has no checkpoint to reconcile');
 
     console.warn(`[Reorg] Searching for a common ancestor at or below block ${originalCheckpoint}`);
-    let ancestor: { blockNumber: number; blockHash: string; parentHash: string } | null = null;
+    let ancestor: CanonicalBlockIdentity | null = null;
     let ancestorDepth = 0;
+    const lowestBlock = Math.max(0, originalCheckpoint - MAX_REORG_LOOKBACK_BLOCKS);
 
-    for (let depth = 0; depth <= MAX_REORG_LOOKBACK_BLOCKS; depth += 1) {
-        const blockNumber = originalCheckpoint - depth;
-        if (blockNumber < 0) break;
+    for (const range of iterateBlockRangeBatches({
+        fromBlock: lowestBlock,
+        toBlock: originalCheckpoint - 1,
+        batchSize: REORG_ANCESTOR_BATCH_SIZE,
+        direction: 'backward',
+    })) {
+        const storedBlocks = await findCanonicalBlockIdentitiesInRange(
+            range.fromBlock,
+            range.toBlock,
+        );
+        const storedBlocksByNumber = new Map(
+            storedBlocks.map((block) => [block.blockNumber, block]),
+        );
 
-        const storedBlock = await findCanonicalBlockIdentity(blockNumber);
-        if (!storedBlock) {
-            throw new ReorgRecoverySafetyError(
-                `Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`,
+        for (let blockNumber = range.toBlock; blockNumber >= range.fromBlock; blockNumber -= 1) {
+            const storedBlock = storedBlocksByNumber.get(blockNumber);
+            if (!storedBlock) {
+                throw new ReorgRecoverySafetyError(
+                    `Cannot safely recover reorg at block ${originalCheckpoint}: block history is missing at ${blockNumber}`,
+                );
+            }
+
+            const currentBlock = await getReorgVerifiedBlock(
+                blockNumber,
+                'common ancestor search',
             );
+            if (sameBlock(storedBlock, currentBlock)) {
+                ancestor = storedBlock;
+                ancestorDepth = originalCheckpoint - blockNumber;
+                break;
+            }
         }
 
-        const currentBlock = await getReorgVerifiedBlock(blockNumber, 'common ancestor search');
-        if (sameBlock(storedBlock, currentBlock)) {
-            ancestor = storedBlock;
-            ancestorDepth = depth;
-            break;
-        }
+        if (ancestor) break;
     }
 
     if (!ancestor) {
@@ -154,6 +179,7 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
             state.reorgRecoveryTargetBlock ?? originalCheckpoint + REORG_RECOVERY_STABLE_BLOCKS,
     });
     updateScannerRuntimeState(state);
+    cacheConfirmedCheckpointBlock(ancestor, rollback.checkpoint);
     recordReorgAncestorFound(ancestorDepth);
     console.warn(
         `[Reorg] Common ancestor=${ancestor.blockNumber}; marked ${rollback.orphanedBlockCount} block(s) as reorged; checkpoint rolled back to ${rollback.checkpoint}`,
@@ -236,7 +262,7 @@ async function processReorgRecoveryInternal(
 
         const blockNumber = state.lastProcessedBlock + 1;
         const verifiedBlock = await getReorgVerifiedBlock(blockNumber, 'reorg recovery');
-        const previousCanonicalBlock = await findCanonicalBlockIdentity(state.lastProcessedBlock);
+        const previousCanonicalBlock = await getConfirmedCheckpointBlock(state.lastProcessedBlock);
         if (
             previousCanonicalBlock &&
             verifiedBlock.parentHash.toLowerCase() !==
@@ -307,6 +333,7 @@ async function processReorgRecoveryInternal(
         }
 
         state.lastProcessedBlock = blockNumber;
+        cacheConfirmedCheckpointBlock(prepared.block, blockNumber);
         recordReorgBlockReprocessed();
         state.reorgRecoveryActive = !recoveryComplete;
         state.reorgRecoveryStableBlocks = recoveryComplete ? 0 : stableBlocks;
