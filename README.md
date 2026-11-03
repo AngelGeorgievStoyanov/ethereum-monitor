@@ -87,7 +87,7 @@ Finalized catch-up is processed in segments of up to 30 blocks. After each segme
 
 ## Monitoring dashboard
 
-Open http://localhost:8000/dashboard while the backend is running. The page requests GET /api/scanner/status every 5 seconds and GET /api/scanner/analytics every 30 seconds. These intervals are configurable in `public/dashboard.constants.js`. The page displays scanner state, block lag, processing totals, recent block timings, RPC endpoint statistics, and recovery/rescan information.
+Open http://localhost:8000/dashboard while the backend is running. The page requests GET /api/scanner/status every 5 seconds and GET /api/scanner/analytics every 30 seconds. For a compact, shareable diagnostic snapshot, use GET /api/scanner/analysis?window=1h (or window=3h). This endpoint returns the selected window's key processing, RPC, database, and filter metrics, together with current scanner/chain state, finalized cadence, runtime resource usage, catch-up, and recovery status. It omits detailed histories and non-core RPC method entries; the full analytics endpoint remains available for deeper investigation. These intervals are configurable in `public/dashboard.constants.js`. The page displays scanner state, block lag, processing totals, recent block timings, RPC endpoint statistics, and recovery/rescan information.
 
 Processing and recovery metrics are held in process memory and reset when the process restarts. RPC counters include requests made through the shared RPC client, including status checks and recovery diagnostics. The dashboard is intended for local or otherwise trusted use; the API does not implement authentication or authorization.
 
@@ -121,6 +121,8 @@ All routes use the /api prefix.
 | GET                 | /health/live                  | Process liveness.                                              |
 | GET                 | /health/ready                 | Database and RPC availability.                                 |
 | GET                 | /scanner/status               | Checkpoint, lag, pause, recovery, RPC, and processing metrics. |
+| GET                 | /scanner/analytics?window=1h   | Full analytics snapshot for the selected 1h or 3h window.      |
+| GET                 | /scanner/analysis?window=1h    | Compact diagnostic snapshot for sharing and performance analysis. |
 | POST                | /scanner/pause                | Request a manual pause.                                        |
 | POST                | /scanner/resume               | Resume scanning.                                               |
 | POST                | /scanner/rescan               | Start a manual rescan.                                         |
