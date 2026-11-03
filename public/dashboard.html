@@ -148,6 +148,14 @@
             <div class="metric-tile"><div class="label">DB write failures</div><div class="value" id="databaseFailures">—</div></div>
         </div>
         <div class="metric-grid" style="margin-top:12px">
+            <div class="metric-tile"><div class="label">Active batch time</div><div class="value" id="activeProcessingDuration">—</div></div>
+            <div class="metric-tile"><div class="label">Active blocks / sec</div><div class="value" id="activeBlocksPerSecond">—</div></div>
+            <div class="metric-tile"><div class="label">Active transactions / sec</div><div class="value" id="activeTransactionsPerSecond">—</div></div>
+            <div class="metric-tile"><div class="label">Active ms / block</div><div class="value" id="activeMsPerBlock">—</div></div>
+            <div class="metric-tile"><div class="label">Active ms / transaction</div><div class="value" id="activeMsPerTransaction">—</div></div>
+            <div class="metric-tile"><div class="label">DB batch write / block</div><div class="value" id="avgDbBatchWritePerBlock">—</div></div>
+        </div>
+        <div class="metric-grid" style="margin-top:12px">
             <div class="metric-tile"><div class="label">RPC connection errors</div><div class="value" id="rpcConnectionErrors">—</div></div>
             <div class="metric-tile"><div class="label">RPC provider errors</div><div class="value" id="rpcServerErrors">—</div></div>
             <div class="metric-tile"><div class="label">JSON-RPC errors</div><div class="value" id="rpcJsonErrors">—</div></div>
@@ -274,6 +282,7 @@
     let lastData = null;
     const number = (value) => value === null || value === undefined ? '—' : Number(value).toLocaleString();
     const duration = (value) => value === null || value === undefined ? '—' : Math.round(value) + ' ms';
+    const preciseDuration = (value) => value === null || value === undefined ? '—' : Number(value).toFixed(Number(value) < 10 ? 3 : 1) + ' ms';
     const setText = (id, value) => { $(id).textContent = value; };
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>\"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[character]));
     const setPipeline = (id, text, state) => {
@@ -283,8 +292,24 @@
     };
     const ago = (value) => {
         if (!value) return 'No block processed in this process';
-        const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
-        return seconds < 2 ? 'Just now' : seconds + 's ago';
+        const timestamp = new Date(value).getTime();
+        if (!Number.isFinite(timestamp)) return '—';
+        const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+        if (seconds < 2) return 'Just now';
+        if (seconds < 60) return seconds + 's ago';
+        if (seconds < 3600) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return minutes + 'm ' + remainingSeconds + 's ago';
+        }
+        if (seconds < 86400) {
+            const hours = Math.floor(seconds / 3600);
+            const remainingMinutes = Math.floor((seconds % 3600) / 60);
+            return hours + 'h ' + remainingMinutes + 'm ago';
+        }
+        const days = Math.floor(seconds / 86400);
+        const remainingHours = Math.floor((seconds % 86400) / 3600);
+        return days + 'd ' + remainingHours + 'h ago';
     };
     const uptime = (seconds) => {
         const days = Math.floor(seconds / 86400);
@@ -441,6 +466,12 @@
         setText('rpcAverageLatency', duration(windowRpc.averageLatencyMs));
         setText('rpcP95Latency', duration(windowRpc.latencyP95Ms));
         setText('avgTransactionsPerBlock', number(windowProcessing.averageTransactionsPerBlock));
+        setText('activeProcessingDuration', duration(windowProcessing.activeProcessingDurationMs));
+        setText('activeBlocksPerSecond', number(windowProcessing.activeBlocksPerSecond));
+        setText('activeTransactionsPerSecond', number(windowProcessing.activeTransactionsPerSecond));
+        setText('activeMsPerBlock', preciseDuration(windowProcessing.averageActiveProcessingMsPerBlock));
+        setText('activeMsPerTransaction', preciseDuration(windowProcessing.averageActiveProcessingMsPerTransaction));
+        setText('avgDbBatchWritePerBlock', duration(windowDatabase.averageBatchWriteDurationMsPerBlock));
         setText('catchUpCap', number(scanner.maxBlocksPerCatchup));
         setText('parallelBlocks', number(scanner.maxParallelBlocks));
         setText('databaseFailures', number(windowDatabase.failures));
