@@ -141,6 +141,13 @@
             <div class="metric-tile"><div class="label">RPC average latency</div><div class="value" id="rpcAverageLatency">—</div></div>
             <div class="metric-tile"><div class="label">RPC P95 latency</div><div class="value" id="rpcP95Latency">—</div></div>
         </div>
+        <h3 style="margin-top:20px">Finalized head cadence · last 3 hours</h3>
+        <div class="metric-grid" style="margin-top:12px">
+            <div class="metric-tile"><div class="label">Time between updates · min / avg / max</div><div class="value" id="finalizedIntervalStats">—</div></div>
+            <div class="metric-tile"><div class="label">Blocks per update · min / avg / max</div><div class="value" id="finalizedBlocksStats">—</div></div>
+            <div class="metric-tile"><div class="label">Last update interval</div><div class="value" id="finalizedLastInterval">—</div></div>
+            <div class="metric-tile"><div class="label">Blocks in last update</div><div class="value" id="finalizedLastBlocks">—</div></div>
+        </div>
         <div class="metric-grid" style="margin-top:12px">
             <div class="metric-tile"><div class="label">Transactions / block</div><div class="value" id="avgTransactionsPerBlock">—</div></div>
             <div class="metric-tile"><div class="label">Catch-up cap</div><div class="value" id="catchUpCap">—</div></div>
@@ -457,6 +464,15 @@
             windowSelect.value = data.window;
         }
         const runtime = current.runtime || {};
+        const chain = current.chain || {};
+        const cadence = chain.finalizedCadence || {};
+        const formatRange = (range, formatter) => range && range.min !== null && range.average !== null && range.max !== null
+            ? formatter(range.min) + ' / ' + formatter(range.average) + ' / ' + formatter(range.max)
+            : 'Collecting samples…';
+        setText('finalizedIntervalStats', formatRange(cadence.intervalMs, (value) => duration(value)));
+        setText('finalizedBlocksStats', formatRange(cadence.blocksPerUpdate, (value) => Number(value).toFixed(1)));
+        setText('finalizedLastInterval', cadence.lastIntervalMs === null || cadence.lastIntervalMs === undefined ? '—' : duration(cadence.lastIntervalMs));
+        setText('finalizedLastBlocks', number(cadence.lastBlocksAdvanced));
         setText('analyticsBlocksPerSecond', windowProcessing.blocksPerSecond ?? '—');
         setText('analyticsTransactionsPerSecond', windowProcessing.transactionsPerSecond ?? '—');
         setText('lagReductionRate', catchUp.lagReductionBlocksPerSecond === null || catchUp.lagReductionBlocksPerSecond === undefined ? '—' : catchUp.lagReductionBlocksPerSecond);
