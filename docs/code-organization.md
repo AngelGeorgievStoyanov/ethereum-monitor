@@ -222,8 +222,8 @@ These rules document the approved runtime design. They are intended to prevent f
 
 - The application is designed to run as a single scanner instance. Do not add a Scanner advisory lock or multi-instance coordination mechanism unless the deployment architecture explicitly changes.
 - Keep the normal Scanner polling interval at the configured `SCANNER_POLL_INTERVAL_MS` (currently 4000 ms). Do not reduce or increase it based on guesswork; use runtime metrics first.
-- Keep finalized catch-up bounded by `MAX_BLOCKS_PER_FINALIZED_CATCHUP` (currently 100 blocks per cycle).
-- When the scanner is close to the finalized head (lag at or below `SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS`, currently 100), process one block at a time. When further behind, parallel processing may use up to `SCANNER_MAX_PARALLEL_BLOCKS` (currently 3).
+- Keep each finalized catch-up segment bounded by `MAX_BLOCKS_PER_FINALIZED_CATCHUP` (currently 30 blocks). After processing a segment, return to the Scanner polling loop and fetch the latest finalized block again before starting another segment. If the finalized head has advanced, the next segment uses the updated target; it must not continue toward a stale target without rechecking.
+- When the scanner lag is at or below `SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS` (currently 100 blocks), process one block at a time. When the lag is greater than this threshold, process batches of up to `SCANNER_MAX_PARALLEL_BLOCKS` blocks in parallel (currently 3). Keep the threshold and parallel batch size as separate constants.
 - Keep checkpoint and other frequently needed scanner state in memory where safe. The database transaction must remain the final integrity guard: verify the expected checkpoint and parent-hash continuity before committing processed data.
 - Do not add a database read on every polling cycle merely to reload a checkpoint already held in the active runtime state.
 
