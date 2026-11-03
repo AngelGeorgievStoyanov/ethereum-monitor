@@ -5,6 +5,13 @@ export interface ScannerAnalyticsWindowMetrics {
         blocksPerSecond: number;
         transactionsPerSecond: number;
         averageTransactionsPerBlock: number | null;
+        /** Sum of successful batch execution durations; excludes waiting for new finalized blocks. */
+        activeProcessingDurationMs: number;
+        activeBlocksPerSecond: number;
+        activeTransactionsPerSecond: number;
+        averageActiveProcessingMsPerBlock: number | null;
+        averageActiveProcessingMsPerTransaction: number | null;
+        processingBatches: number;
         averageBlockDurationMs: number | null;
         averageFilterDurationMs: number | null;
         averageDatabaseBatchWriteDurationMs: number | null;
@@ -38,6 +45,11 @@ export interface ScannerAnalyticsWindowMetrics {
         writes: number;
         failures: number;
         averageQueryDurationMs: number | null;
+        /** Explicitly timed persistence transactions for successfully processed batches. */
+        batchWrites: number;
+        totalBatchWriteDurationMs: number;
+        averageBatchWriteDurationMs: number | null;
+        averageBatchWriteDurationMsPerBlock: number | null;
         byOperation: Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }>;
     };
     filters: {
