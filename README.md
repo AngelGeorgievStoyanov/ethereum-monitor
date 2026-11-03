@@ -83,7 +83,7 @@ The database keeps block hashes and parent hashes. When a reorg is detected, the
 
 With multiple RPC endpoints, reorg verification requires every configured endpoint to agree. With one endpoint, independent consensus is not possible. If provider verification fails after retries, receipt consistency fails during recovery, or the common ancestor is outside the stored block history, recovery is blocked rather than guessing or advancing the checkpoint. Receipt consistency failures during recovery stop automatic retries and record a reason in scanner state. Check GET /api/scanner/status and inspect the RPC providers before using POST /api/scanner/reorg-retry to retry blocked recovery.
 
-Catch-up is limited to 100 blocks per cycle. When far behind, normal processing can handle up to 3 blocks in parallel. Recovery remains sequential.
+Finalized catch-up is processed in segments of up to 30 blocks. After each segment, the scanner polls the latest finalized block again before continuing, so an advancing finalized head updates the next target instead of relying on a stale value. When the lag is greater than `SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS` (currently 100 blocks), normal processing handles batches of up to `SCANNER_MAX_PARALLEL_BLOCKS` blocks in parallel (currently 3). At or below the lag threshold, blocks are processed one at a time. These limits are configured independently in `src/constants/scanner.constants.ts`. Recovery remains sequential.
 
 ## Monitoring dashboard
 
