@@ -59,7 +59,7 @@ export interface ScannerAnalyticsResponse {
     availableWindows: Array<{ value: string; label: string }>;
     current: Record<string, unknown>;
     windowMetrics: ScannerAnalyticsWindowMetrics;
-    /** Last retained RPC errors within the selected analytics window. */
+    /** Up to 12 most recent RPC errors within the selected analytics window. */
     rpcEvents: Array<Record<string, unknown>>;
     catchUpSessions: Array<Record<string, unknown>>;
     batches: Array<Record<string, unknown>>;
