@@ -21,6 +21,7 @@ export function mapScannerStatusResponse(input: {
     latestFinalizedAt: string | null;
     lagBlocks: number | null;
     finalizedRegression: boolean;
+    finalizedRegressionMessage: string | null;
     rpcAvailable: boolean;
     rpcMetrics: RpcEndpointMetrics[];
     checkedAt: string;
@@ -46,6 +47,7 @@ export function mapScannerStatusResponse(input: {
         latestFinalizedAt: input.latestFinalizedAt,
         lagBlocks: input.lagBlocks,
         finalizedRegression: input.finalizedRegression,
+        finalizedRegressionMessage: input.finalizedRegressionMessage,
         rpcAvailable: input.rpcAvailable,
         rpcMetrics: input.rpcMetrics,
         checkedAt: input.checkedAt,
