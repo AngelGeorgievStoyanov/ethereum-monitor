@@ -257,6 +257,7 @@ function publish(): void {
                 latestFinalizedAt: string | null;
                 lastProcessedBlock: number | null;
                 lagBlocks: number | null;
+                finalizedRegression: boolean;
                 rpcAvailable: boolean | null;
             };
             rpc: { endpoints: Array<Record<string, unknown>> };
@@ -271,6 +272,7 @@ function publish(): void {
             latestFinalizedAt: runtime.chain.latestFinalizedAt,
             lastProcessedBlock: runtime.chain.lastProcessedBlock,
             lagBlocks: runtime.chain.lagBlocks,
+            finalizedRegression: runtime.chain.finalizedRegression,
             rpcAvailable: runtime.chain.rpcAvailable ?? false,
             rpcMetrics: runtime.rpc.endpoints,
             recoveryMetrics: runtime.recovery,
