@@ -183,7 +183,8 @@
             <div class="metric-tile"><div class="label">Database queries</div><div class="value" id="dbQueryCount">—</div></div>
             <div class="metric-tile"><div class="label">Database reads</div><div class="value" id="dbReadCount">—</div></div>
             <div class="metric-tile"><div class="label">Database writes</div><div class="value" id="dbWriteCount">—</div></div>
-            <div class="metric-tile"><div class="label">Average query latency</div><div class="value" id="dbQueryLatency">—</div></div>
+            <div class="metric-tile"><div class="label">Other SQL operations</div><div class="value" id="dbOtherCount">—</div></div>
+            <div class="metric-tile"><div class="label">Average query duration</div><div class="value" id="dbQueryLatency">—</div></div>
         </div>
         <div class="metric-grid" style="margin-top:12px">
             <div class="metric-tile"><div class="label">Process CPU</div><div class="value" id="runtimeCpu">—</div></div>
@@ -291,12 +292,27 @@
     let analyticsRequestInProgress = false;
     let lastData = null;
     const number = (value) => value === null || value === undefined ? '—' : Number(value).toLocaleString();
-    const duration = (value) => value === null || value === undefined ? '—' : Math.round(value) + ' ms';
-    const elapsed = (value) => value === null || value === undefined
-        ? '—'
-        : Number(value) < 1000
-            ? Math.round(value) + ' ms'
-            : (Number(value) / 1000).toFixed(Number(value) >= 10000 ? 1 : 2) + ' s';
+    const formatSeconds = (value) => {
+        if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+        const totalSeconds = Math.max(0, Number(value));
+        const formatPart = (part) => Number.isInteger(part) ? String(part) : part.toFixed(1);
+        if (totalSeconds < 60) return formatPart(totalSeconds) + 's';
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+        if (days > 0) return days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds + 's';
+        if (hours > 0) return hours + 'h ' + minutes + 'm ' + seconds + 's';
+        return minutes + 'm ' + seconds + 's';
+    };
+    const duration = (value) => {
+        if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+        const milliseconds = Math.max(0, Number(value));
+        return milliseconds < 1000
+            ? (Number.isInteger(milliseconds) ? String(milliseconds) : milliseconds.toFixed(1)) + ' ms'
+            : formatSeconds(milliseconds / 1000);
+    };
+    const elapsed = duration;
     const preciseDuration = (value) => value === null || value === undefined ? '—' : Number(value).toFixed(Number(value) < 10 ? 3 : 1) + ' ms';
     const setText = (id, value) => { $(id).textContent = value; };
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>\"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[character]));
@@ -325,12 +341,7 @@
         if (hours > 0) return hours + 'h ' + minutes + 'm ' + remainingSeconds + 's ago';
         return Math.floor(seconds / 60) + 'm ' + remainingSeconds + 's ago';
     };
-    const uptime = (seconds) => {
-        const days = Math.floor(seconds / 86400);
-        const hours = Math.floor((seconds % 86400) / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        return (days ? days + 'd ' : '') + hours + 'h ' + minutes + 'm';
-    };
+    const uptime = (seconds) => formatSeconds(seconds);
     function drawChart(samples) {
         const svg = $('performanceChart');
         const width = 700, height = 190, pad = 24;
@@ -488,7 +499,7 @@
         setText('analyticsBlocksPerSecond', windowProcessing.blocksPerSecond ?? '—');
         setText('analyticsTransactionsPerSecond', windowProcessing.transactionsPerSecond ?? '—');
         setText('lagReductionRate', catchUp.lagReductionBlocksPerSecond === null || catchUp.lagReductionBlocksPerSecond === undefined ? '—' : catchUp.lagReductionBlocksPerSecond);
-        setText('catchUpEta', catchUp.estimatedRemainingSeconds === null || catchUp.estimatedRemainingSeconds === undefined ? '—' : Math.round(catchUp.estimatedRemainingSeconds) + 's');
+        setText('catchUpEta', formatSeconds(catchUp.estimatedRemainingSeconds));
         setText('rpc429', number(windowRpc.rateLimitErrors));
         setText('rpcTimeouts', number(windowRpc.timeoutErrors));
         setText('rpcAverageLatency', duration(windowRpc.averageLatencyMs));
@@ -516,6 +527,7 @@
         setText('dbQueryCount', number(windowDatabase.queries));
         setText('dbReadCount', number(windowDatabase.reads));
         setText('dbWriteCount', number(windowDatabase.writes));
+        setText('dbOtherCount', number(windowDatabase.other));
         setText('dbQueryLatency', duration(windowDatabase.averageQueryDurationMs));
         setText('filterEvaluations', number(windowFilters.evaluations));
         setText('filterMatches', number(windowFilters.matches));
