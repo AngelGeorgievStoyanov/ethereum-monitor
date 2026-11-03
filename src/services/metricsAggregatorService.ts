@@ -2,7 +2,7 @@ import type { ScannerAnalyticsResponse } from '../types/scanner-analytics.types'
 import { performance } from 'node:perf_hooks';
 import { getDynamicConfigService } from './dynamicConfigService';
 import { subscribeToRpcMetricEvents, subscribeToRpcOperationMetricEvents, type RpcMetricEventInput, type RpcOperationMetricEvent } from '../metrics/metricsEventBus';
-import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
+import { FINALIZED_REGRESSION_WAIT_MS, SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.constants';
 import { classifyRpcError } from '../utils/classifyRpcError';
 import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
 import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
@@ -273,6 +273,7 @@ function publish(): void {
             lastProcessedBlock: runtime.chain.lastProcessedBlock,
             lagBlocks: runtime.chain.lagBlocks,
             finalizedRegression: runtime.chain.finalizedRegression,
+            finalizedRegressionMessage: runtime.chain.finalizedRegressionMessage,
             rpcAvailable: runtime.chain.rpcAvailable ?? false,
             rpcMetrics: runtime.rpc.endpoints,
             recoveryMetrics: runtime.recovery,
@@ -498,7 +499,18 @@ function getSnapshot() {
             eventLoopUtilizationPercent: Number((eventLoopUtilization.utilization * 100).toFixed(2)),
         },
         scanner: { running: scannerRunning, paused: scannerPaused, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount, maxBlocksPerCatchup, maxParallelBlocks, parallelProcessingLagBlocks },
-        chain: { latestFinalizedBlock, latestFinalizedAt, lastProcessedBlock, lastProcessedAt, lagBlocks, rpcAvailable, finalizedRegression },
+        chain: {
+            latestFinalizedBlock,
+            latestFinalizedAt,
+            lastProcessedBlock,
+            lastProcessedAt,
+            lagBlocks,
+            rpcAvailable,
+            finalizedRegression,
+            finalizedRegressionMessage: finalizedRegression && latestFinalizedBlock !== null && lastProcessedBlock !== null
+                ? `RPC returned finalized block ${latestFinalizedBlock}, below checkpoint ${lastProcessedBlock}. Scanner processing is paused and will retry in ${FINALIZED_REGRESSION_WAIT_MS / 1000}s. If this persists, manual intervention and investigation may be required.`
+                : null,
+        },
         processing: {
             processedBlocks: totalProcessedBlocks,
             processedTransactions: totalTransactions,
