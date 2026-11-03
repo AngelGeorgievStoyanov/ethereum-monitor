@@ -644,7 +644,7 @@ export function recordFinalizedBlock(blockNumber: number): void {
     latestFinalizedAt = new Date().toISOString();
     const observedAtMs = Date.now();
     const previousFinalizedSample = finalizedSamples[finalizedSamples.length - 1];
-    if (finalizedRegression) {
+    if (finalizedRegression || (previousFinalizedSample && blockNumber < previousFinalizedSample.blockNumber)) {
         finalizedSamples.length = 0;
     } else if (!previousFinalizedSample || blockNumber > previousFinalizedSample.blockNumber) {
         // Keep only actual finalized-head advances. Repeated 4s polls of the same
