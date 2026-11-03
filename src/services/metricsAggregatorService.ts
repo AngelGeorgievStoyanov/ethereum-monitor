@@ -6,7 +6,7 @@ import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.con
 import { classifyRpcError } from '../utils/classifyRpcError';
 import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
 import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
-import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS, METRICS_RPC_EVENT_COMPACTION_THRESHOLD, METRICS_SAMPLE_COMPACTION_THRESHOLD, METRICS_RECENT_BLOCK_WINDOW_MS, METRICS_RECENT_RATE_WINDOW_MS, METRICS_FINALIZED_SAMPLE_WINDOW_MS, METRICS_CATCH_UP_ETA_MIN_DURATION_MS, METRICS_MIN_ANALYTICS_WINDOW_MS } from '../constants/scanner-metrics.constants';
+import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS, METRICS_RPC_EVENT_COMPACTION_THRESHOLD, METRICS_SAMPLE_COMPACTION_THRESHOLD, METRICS_RECENT_BLOCK_WINDOW_MS, METRICS_RECENT_RATE_WINDOW_MS, METRICS_FINALIZED_SAMPLE_WINDOW_MS, METRICS_CATCH_UP_ETA_MIN_DURATION_MS, METRICS_MIN_ANALYTICS_WINDOW_MS, METRICS_ANALYTICS_RECENT_RPC_ERRORS } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -855,7 +855,7 @@ function buildScannerAnalytics(
         if (event.outcome !== 'failure') continue;
         const { timestampMs: _timestampMs, ...error } = event;
         recentRpcErrors.push(error);
-        if (recentRpcErrors.length >= METRICS_SAMPLE_LIMITS.recentRpcErrors) break;
+        if (recentRpcErrors.length >= METRICS_ANALYTICS_RECENT_RPC_ERRORS) break;
     }
     recentRpcErrors.reverse();
     const selectedSessions = catchUpSessions.filter((session) =>
