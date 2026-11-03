@@ -45,8 +45,9 @@ export const getScannerAnalysisController = async (req: Request, res: Response):
             : DEFAULT_METRICS_WINDOW.value;
         const configuredWindow = METRICS_TIME_WINDOWS.find((window) => window.value === requestedWindow);
         const analytics = getScannerAnalytics(configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value);
-        const current = analytics.current as Record<string, any>;
-        const chain = current.chain as Record<string, unknown>;
+        const current = analytics.current as Record<string, unknown>;
+        const chain = (current.chain ?? {}) as Record<string, unknown>;
+        const currentProcessing = (current.processing ?? {}) as Record<string, unknown>;
         const rpc = analytics.windowMetrics.rpc;
         const coreRpcMethods = rpc.methods.filter(({ method }) =>
             method === 'getBlock(finalized)' ||
@@ -71,8 +72,8 @@ export const getScannerAnalysisController = async (req: Request, res: Response):
             runtime: current.runtime,
             processing: {
                 ...analytics.windowMetrics.processing,
-                totalBlocksSinceStart: (current.processing as Record<string, unknown>).processedBlocks,
-                totalTransactionsSinceStart: (current.processing as Record<string, unknown>).processedTransactions,
+                totalBlocksSinceStart: currentProcessing.processedBlocks,
+                totalTransactionsSinceStart: currentProcessing.processedTransactions,
             },
             rpc: {
                 ...rpc,
