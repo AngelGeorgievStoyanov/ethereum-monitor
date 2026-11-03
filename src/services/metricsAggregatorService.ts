@@ -848,9 +848,16 @@ function buildScannerAnalytics(
     const requestedWindowMs = Math.max(METRICS_MIN_ANALYTICS_WINDOW_MS, Math.min(windowMs, METRICS_RETENTION_MS));
     const availableWindowMs = Math.max(0, Math.min(requestedWindowMs, now - startedAtMs));
     const since = now - availableWindowMs;
-    const selectedBlocks = blockSamples.slice(blockSamplesStartIndex).filter((sample) => sample.timestampMs >= since);
-    const selectedLag = lagSamples.slice(lagSamplesStartIndex).filter((sample) => sample.timestampMs >= since);
-    const selectedRpc = rpcEvents.slice(rpcEventsStartIndex).filter((event) => event.timestampMs >= since);
+    const recentRpcErrors: Array<Record<string, unknown>> = [];
+    for (let index = rpcEvents.length - 1; index >= rpcEventsStartIndex; index -= 1) {
+        const event = rpcEvents[index];
+        if (event.timestampMs < since) break;
+        if (event.outcome !== 'failure') continue;
+        const { timestampMs: _timestampMs, ...error } = event;
+        recentRpcErrors.push(error);
+        if (recentRpcErrors.length >= METRICS_SAMPLE_LIMITS.recentRpcErrors) break;
+    }
+    recentRpcErrors.reverse();
     const selectedSessions = catchUpSessions.filter((session) =>
         session.status === 'running' ||
         session.startedAtMs >= since ||
@@ -988,11 +995,14 @@ function buildScannerAnalytics(
         availableWindows: METRICS_TIME_WINDOWS.map(({ value, label }) => ({ value, label })),
         current,
         windowMetrics,
-        blockSamples: selectedBlocks.map(({ timestampMs: _timestampMs, ...sample }) => sample),
-        lagSamples: selectedLag.map(({ timestampMs: _timestampMs, ...sample }) => sample),
-        rpcEvents: selectedRpc.map(({ timestampMs: _timestampMs, ...event }) => event),
+        rpcEvents: recentRpcErrors,
         catchUpSessions: selectedSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
-        batches: selectedBatches.map(({ timestampMs: _timestampMs, ...sample }) => sample),
+        batches: selectedBatches.length
+            ? (() => {
+                const { timestampMs: _timestampMs, ...latestBatch } = selectedBatches[selectedBatches.length - 1];
+                return [latestBatch];
+            })()
+            : [],
         minuteBuckets: selectedMinuteBuckets.map(({ timestampMs: _timestampMs, ...bucket }) => bucket),
         retention: {
             oldestBlockSampleAt: (blockSamples[blockSamplesStartIndex]?.timestamp as string | undefined) ?? null,
