@@ -322,6 +322,7 @@
         else if (!data.rpcAvailable) { label = 'RPC UNAVAILABLE'; statusClass = 'bad'; }
         else if (data.reorgRecoveryBlocked) { label = 'RECOVERY BLOCKED'; statusClass = 'bad'; }
         else if (data.reorgRecoveryActive) { label = 'REORG RECOVERY'; statusClass = 'warn'; }
+        else if (data.finalizedRegression) { label = 'FINALIZED BEHIND CHECKPOINT'; statusClass = 'warn'; }
         else if (data.paused) { label = 'PAUSED'; statusClass = 'warn'; }
         else if (data.activeFiltersCount === 0) { label = 'WAITING FOR FILTERS'; statusClass = 'warn'; }
         else if (lag === 0) { label = 'UP TO DATE'; statusClass = 'ok'; }
