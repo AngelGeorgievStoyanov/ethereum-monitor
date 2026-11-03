@@ -309,14 +309,13 @@
             const remainingSeconds = seconds % 60;
             return minutes + 'm ' + remainingSeconds + 's ago';
         }
-        if (seconds < 86400) {
-            const hours = Math.floor(seconds / 3600);
-            const remainingMinutes = Math.floor((seconds % 3600) / 60);
-            return hours + 'h ' + remainingMinutes + 'm ago';
-        }
         const days = Math.floor(seconds / 86400);
-        const remainingHours = Math.floor((seconds % 86400) / 3600);
-        return days + 'd ' + remainingHours + 'h ago';
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const remainingSeconds = seconds % 60;
+        if (days > 0) return days + 'd ' + hours + 'h ' + minutes + 'm ' + remainingSeconds + 's ago';
+        if (hours > 0) return hours + 'h ' + minutes + 'm ' + remainingSeconds + 's ago';
+        return Math.floor(seconds / 60) + 'm ' + remainingSeconds + 's ago';
     };
     const uptime = (seconds) => {
         const days = Math.floor(seconds / 86400);
