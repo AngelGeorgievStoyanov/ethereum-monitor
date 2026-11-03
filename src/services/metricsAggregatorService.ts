@@ -503,6 +503,25 @@ function getSnapshot() {
         chain: {
             latestFinalizedBlock,
             latestFinalizedAt,
+            finalizedCadence: (() => {
+                const samples = finalizedSamples.filter((sample) => now - sample.timestampMs <= METRICS_RETENTION_MS);
+                const intervals = samples.slice(1).map((sample, index) => ({
+                    intervalMs: sample.timestampMs - samples[index].timestampMs,
+                    blocksAdvanced: sample.blockNumber - samples[index].blockNumber,
+                })).filter((sample) => sample.intervalMs > 0 && sample.blocksAdvanced > 0);
+                const summarize = (values: number[]) => values.length ? {
+                    min: Number(Math.min(...values).toFixed(1)),
+                    average: Number((values.reduce((total, value) => total + value, 0) / values.length).toFixed(1)),
+                    max: Number(Math.max(...values).toFixed(1)),
+                } : { min: null, average: null, max: null };
+                return {
+                    updates: intervals.length,
+                    intervalMs: summarize(intervals.map((sample) => sample.intervalMs)),
+                    blocksPerUpdate: summarize(intervals.map((sample) => sample.blocksAdvanced)),
+                    lastIntervalMs: intervals.length ? intervals[intervals.length - 1].intervalMs : null,
+                    lastBlocksAdvanced: intervals.length ? intervals[intervals.length - 1].blocksAdvanced : null,
+                };
+            })(),
             lastProcessedBlock,
             lastProcessedAt,
             lagBlocks,
@@ -623,9 +642,16 @@ export function recordFinalizedBlock(blockNumber: number): void {
     finalizedRegression = lastProcessedBlock !== null && blockNumber < lastProcessedBlock;
     latestFinalizedBlock = blockNumber;
     latestFinalizedAt = new Date().toISOString();
-    if (finalizedRegression) finalizedSamples.length = 0;
-    finalizedSamples.push({ timestampMs: Date.now(), blockNumber });
-    trimSamples(Date.now());
+    const observedAtMs = Date.now();
+    const previousFinalizedSample = finalizedSamples[finalizedSamples.length - 1];
+    if (finalizedRegression) {
+        finalizedSamples.length = 0;
+    } else if (!previousFinalizedSample || blockNumber > previousFinalizedSample.blockNumber) {
+        // Keep only actual finalized-head advances. Repeated 4s polls of the same
+        // height must not distort the observed update cadence.
+        finalizedSamples.push({ timestampMs: observedAtMs, blockNumber });
+    }
+    trimSamples(observedAtMs);
     rpcAvailable = true;
     const lag = finalizedRegression || lastProcessedBlock === null
         ? null
