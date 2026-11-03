@@ -59,8 +59,7 @@ export interface ScannerAnalyticsResponse {
     availableWindows: Array<{ value: string; label: string }>;
     current: Record<string, unknown>;
     windowMetrics: ScannerAnalyticsWindowMetrics;
-    blockSamples: Array<Record<string, unknown>>;
-    lagSamples: Array<Record<string, unknown>>;
+    /** Last retained RPC errors within the selected analytics window. */
     rpcEvents: Array<Record<string, unknown>>;
     catchUpSessions: Array<Record<string, unknown>>;
     batches: Array<Record<string, unknown>>;
