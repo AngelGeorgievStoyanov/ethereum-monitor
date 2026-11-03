@@ -68,6 +68,7 @@ type MinuteMetricBucket = {
     databaseQueries: number;
     databaseReads: number;
     databaseWrites: number;
+    databaseOther: number;
     databaseFailures: number;
     databaseDurationMsTotal: number;
     filterEvaluations: number;
@@ -119,6 +120,7 @@ function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
             databaseQueries: 0,
             databaseReads: 0,
             databaseWrites: 0,
+            databaseOther: 0,
             databaseFailures: 0,
             databaseDurationMsTotal: 0,
             filterEvaluations: 0,
@@ -1068,6 +1070,7 @@ function buildScannerAnalytics(
             queries: sumBucketMetric('databaseQueries'),
             reads: sumBucketMetric('databaseReads'),
             writes: sumBucketMetric('databaseWrites'),
+            other: sumBucketMetric('databaseOther'),
             failures: sumBucketMetric('databaseFailures'),
             averageQueryDurationMs: sumBucketMetric('databaseQueries')
                 ? Number((sumBucketMetric('databaseDurationMsTotal') / sumBucketMetric('databaseQueries')).toFixed(1))
@@ -1213,7 +1216,8 @@ function recordDatabaseQuery(input: DatabaseMetricEvent): void {
     const bucket = getMinuteBucket(Date.now());
     bucket.databaseQueries += 1;
     if (input.operation === 'read') bucket.databaseReads += 1;
-    if (input.operation === 'write') bucket.databaseWrites += 1;
+    else if (input.operation === 'write') bucket.databaseWrites += 1;
+    else bucket.databaseOther += 1;
     bucket.databaseDurationMsTotal += input.durationMs;
     const operationBucket = bucket.databaseByOperation[input.queryType] ?? {
         count: 0,
