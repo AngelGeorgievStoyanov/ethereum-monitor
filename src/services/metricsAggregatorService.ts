@@ -6,7 +6,7 @@ import { SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS } from '../constants/scanner.con
 import { classifyRpcError } from '../utils/classifyRpcError';
 import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
 import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
-import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS, METRICS_RPC_EVENT_COMPACTION_THRESHOLD, METRICS_SAMPLE_COMPACTION_THRESHOLD } from '../constants/scanner-metrics.constants';
+import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_PUBLISH_INTERVAL_MS, METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS, METRICS_RPC_EVENT_COMPACTION_THRESHOLD, METRICS_SAMPLE_COMPACTION_THRESHOLD, METRICS_RECENT_BLOCK_WINDOW_MS, METRICS_RECENT_RATE_WINDOW_MS, METRICS_FINALIZED_SAMPLE_WINDOW_MS, METRICS_CATCH_UP_ETA_MIN_DURATION_MS, METRICS_MIN_ANALYTICS_WINDOW_MS } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -419,7 +419,7 @@ function getRecentBlockSummary(now: number): RecentBlockSummary {
 
     for (let index = blockSamplesStartIndex; index < blockSamples.length; index += 1) {
         const sample = blockSamples[index];
-        if (now - sample.timestampMs > 60000) continue;
+        if (now - sample.timestampMs > METRICS_RECENT_BLOCK_WINDOW_MS) continue;
 
         summary.count += 1;
         summary.totals.transactionCount += Number(sample.transactionCount ?? 0);
@@ -451,14 +451,14 @@ function getSnapshot() {
     lastEventLoopUtilization = performance.eventLoopUtilization();
     const memoryUsage = process.memoryUsage();
     const recent = getRecentBlockSummary(now);
-    const recentWindowSeconds = Math.max(1, Math.min(60, (now - startedAtMs) / 1000));
+    const recentWindowSeconds = Math.max(1, Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000));
     const average = (key: keyof RecentBlockSummary['totals']) =>
         recent.count ? Number((recent.totals[key] / recent.count).toFixed(1)) : null;
     const totalTransactions = totalProcessedTransactions;
     const lagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
         ? Math.max(0, latestFinalizedBlock - lastProcessedBlock) : null;
     const recentTransactions = recent.totals.transactionCount;
-    const recentFinalized = finalizedSamples.filter((sample) => now - sample.timestampMs <= 900000);
+    const recentFinalized = finalizedSamples.filter((sample) => now - sample.timestampMs <= METRICS_FINALIZED_SAMPLE_WINDOW_MS);
     const finalizedElapsedMs = recentFinalized.length > 1
         ? recentFinalized[recentFinalized.length - 1].timestampMs - recentFinalized[0].timestampMs
         : 0;
@@ -470,7 +470,7 @@ function getSnapshot() {
     const activeCatchUpElapsedMs = activeCatchUpSession?.status === 'running'
         ? now - activeCatchUpSession.startedAtMs
         : 0;
-    const lagReductionBlocksPerSecond = activeCatchUpSession?.status === 'running' && lagBlocks !== null && activeCatchUpElapsedMs >= 10000
+    const lagReductionBlocksPerSecond = activeCatchUpSession?.status === 'running' && lagBlocks !== null && activeCatchUpElapsedMs >= METRICS_CATCH_UP_ETA_MIN_DURATION_MS
         ? Number(((Number(activeCatchUpSession.initialLagBlocks) - lagBlocks) * 1000 / activeCatchUpElapsedMs).toFixed(2))
         : null;
     const estimatedCatchUpSeconds = lagBlocks !== null && lagBlocks > 0 && lagReductionBlocksPerSecond !== null && lagReductionBlocksPerSecond > 0
@@ -757,7 +757,7 @@ export function updateScannerRuntimeContext(input: {
 export function getBlockProcessingMetrics() {
     const now = Date.now();
     const recent = getRecentBlockSummary(now);
-    const recentWindowSeconds = Math.max(1, Math.min(60, (now - startedAtMs) / 1000));
+    const recentWindowSeconds = Math.max(1, Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000));
     const average = (key: keyof RecentBlockSummary['totals']) =>
         recent.count ? Number((recent.totals[key] / recent.count).toFixed(1)) : null;
     const last = blockSamples.length > blockSamplesStartIndex ? blockSamples[blockSamples.length - 1] : undefined;
@@ -845,7 +845,7 @@ function buildScannerAnalytics(
     sortedRpcDurations: Array<{ timestampMs: number; durationMs: number }>,
 ): ScannerAnalyticsResponse {
     const now = Date.now();
-    const requestedWindowMs = Math.max(60000, Math.min(windowMs, METRICS_RETENTION_MS));
+    const requestedWindowMs = Math.max(METRICS_MIN_ANALYTICS_WINDOW_MS, Math.min(windowMs, METRICS_RETENTION_MS));
     const availableWindowMs = Math.max(0, Math.min(requestedWindowMs, now - startedAtMs));
     const since = now - availableWindowMs;
     const selectedBlocks = blockSamples.slice(blockSamplesStartIndex).filter((sample) => sample.timestampMs >= since);

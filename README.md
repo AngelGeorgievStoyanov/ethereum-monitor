@@ -87,7 +87,7 @@ Catch-up is limited to 100 blocks per cycle. When far behind, normal processing 
 
 ## Monitoring dashboard
 
-Open http://localhost:8000/dashboard while the backend is running. The page requests GET /api/scanner/status every 5 seconds and displays scanner state, block lag, processing totals, recent block timings, RPC endpoint statistics, and recovery/rescan information.
+Open http://localhost:8000/dashboard while the backend is running. The page requests GET /api/scanner/status every 5 seconds and GET /api/scanner/analytics every 30 seconds. These intervals are configurable in `public/dashboard.constants.js`. The page displays scanner state, block lag, processing totals, recent block timings, RPC endpoint statistics, and recovery/rescan information.
 
 Processing and recovery metrics are held in process memory and reset when the process restarts. RPC counters include requests made through the shared RPC client, including status checks and recovery diagnostics. The dashboard is intended for local or otherwise trusted use; the API does not implement authentication or authorization.
 

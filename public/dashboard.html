@@ -265,6 +265,7 @@
     </div>
     <footer><span>Metrics are held in process memory and reset on restart.</span><span id="updatedAt">Last update: —</span></footer>
 </main>
+<script src="/dashboard.constants.js"></script>
 <script>
 (() => {
     const $ = (id) => document.getElementById(id);
@@ -324,7 +325,7 @@
         else if (data.paused) { label = 'PAUSED'; statusClass = 'warn'; }
         else if (data.activeFiltersCount === 0) { label = 'WAITING FOR FILTERS'; statusClass = 'warn'; }
         else if (lag === 0) { label = 'UP TO DATE'; statusClass = 'ok'; }
-        else if (metrics.lastProcessedAt && Date.now() - new Date(metrics.lastProcessedAt).getTime() > 60000) { label = 'POSSIBLY STALLED'; statusClass = 'warn'; }
+        else if (metrics.lastProcessedAt && Date.now() - new Date(metrics.lastProcessedAt).getTime() > window.DASHBOARD_CONFIG.STALLED_THRESHOLD_MS) { label = 'POSSIBLY STALLED'; statusClass = 'warn'; }
 
         $('overallStatus').className = 'status ' + statusClass;
         setText('overallStatusText', label);
@@ -541,8 +542,8 @@
     }
     refresh();
     refreshAnalytics();
-    window.setInterval(refresh, 5000);
-    window.setInterval(refreshAnalytics, 30000);
+    window.setInterval(refresh, window.DASHBOARD_CONFIG.STATUS_REFRESH_INTERVAL_MS);
+    window.setInterval(refreshAnalytics, window.DASHBOARD_CONFIG.ANALYTICS_REFRESH_INTERVAL_MS);
     $('analyticsWindow').addEventListener('change', refreshAnalytics);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); refreshAnalytics(); } });
 })();

@@ -52,8 +52,18 @@ History is bounded in memory using generic retention settings in `src/constants/
 - Network-independent one-minute buckets retain throughput, lag, RPC failure/latency, database query, filter evaluation, and batch timing aggregates. Throughput, RPC, component-latency, and lag charts use the selected window's buckets rather than relying on a fixed number of block samples.
 - Each analytics response reports requested duration, available duration, history start time, and whether the requested window is complete or partial.
 - A process that has been running for 40 minutes can return 40 minutes of partial data for a 1-hour window. It does not need to run for 3 hours.
-- Analytics snapshots are prepared by the metrics aggregator and published to Dynamic Config on the configured refresh interval. The analytics endpoint only selects and returns the requested snapshot.
+- Analytics are calculated on demand by the metrics aggregator for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms). Dynamic Config does not own or periodically publish analytics snapshots.
 - Summary counters and breakdown tables are calculated for the selected window from minute buckets, including processing throughput, RPC request/error/retry/failover counts, database query counts/failures, filter evaluations, RPC methods, database query types, and per-filter performance. Percentile latency uses the retained raw RPC request samples for the selected window.
+
+## Dashboard polling
+
+Dashboard polling intervals and the stale-progress display threshold are configured in `public/dashboard.constants.js`:
+
+- `STATUS_REFRESH_INTERVAL_MS` (currently 5000 ms) controls requests to `GET /api/scanner/status`.
+- `ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms) controls requests to `GET /api/scanner/analytics`.
+- `STALLED_THRESHOLD_MS` (currently 60000 ms) controls when the Dashboard displays `POSSIBLY STALLED`. This is a display threshold, not a scanner polling interval.
+
+These Dashboard requests read in-memory snapshots and do not issue PostgreSQL or RPC requests.
 
 ## Endpoints
 
