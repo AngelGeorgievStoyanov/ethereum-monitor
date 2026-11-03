@@ -28,7 +28,7 @@ The current runtime snapshot includes:
 - Processed blocks and transactions, average transactions per block, blocks/sec, transactions/sec, transfer matches, and processing timings.
 - Actual RPC request totals, per-method and per-endpoint counts, latency percentiles, rate-limit errors, timeouts, network errors, provider errors, JSON-RPC errors, and recent failures.
 - Logical RPC operation totals, successful/failed operations, retried operations, total retry attempts, endpoint failovers, and average attempts per successful operation.
-- Database query volume and latency by operation type, database batch write duration, and persistence failures.
+- Database query volume split into reads, writes, and other SQL operations; query latency by operation type; database batch write duration; and persistence failures.
 - Transaction filter evaluations, matches, predicate failures, and evaluation latency.
 - Process RSS/heap/external memory, CPU usage, and event-loop utilization.
 - Reorg and rescan counters.
@@ -84,7 +84,7 @@ The response includes the current metrics snapshot, block samples, lag samples, 
 - Active catch-up duration, blocks/sec, transactions/sec, lag reduction, and lag reduction/sec are calculated from the current session state. Final lag reduction is initial lag minus actual final lag.
 - An ETA is shown only after at least 10 seconds and while the measured net lag-reduction rate is positive. Finalized-chain growth rate is also exposed separately.
 - Processing batch samples report the actual block range, number of blocks, transaction count, total batch duration, and database write duration.
-- Database query metrics use Sequelize benchmark timings and classify statements as reads, writes, or other operations. Successful query durations are measured centrally. Sequelize persistence errors from transaction creation, block-batch persistence, and rescan reconciliation are counted separately; arbitrary failed read queries outside those persistence paths are not yet comprehensively counted.
+- Database query metrics use Sequelize benchmark timings and classify statements as reads, writes, or other operations. The Dashboard reports all three categories so `queries = reads + writes + other` for the selected window. Successful query durations are measured centrally. Sequelize persistence errors from transaction creation, block-batch persistence, and rescan reconciliation are counted separately; arbitrary failed read queries outside those persistence paths are not yet comprehensively counted.
 - Filter metrics are emitted by the shared filter predicate wrapper, so evaluation counts and duration represent actual predicate invocations rather than an estimate based on transaction count.
 
 Metrics collection is in-process and non-persistent. It must never block scanner progress or issue extra RPC requests.
