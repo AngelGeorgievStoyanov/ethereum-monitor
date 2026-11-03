@@ -516,9 +516,6 @@ function getSnapshot() {
                     average: Number((values.reduce((total, value) => total + value, 0) / values.length).toFixed(1)),
                     max: Number(Math.max(...values).toFixed(1)),
                 } : { min: null, average: null, max: null };
-                const perBatchBlockIntervals = intervals.map((sample) => sample.intervalMs / sample.blocksAdvanced);
-                const totalObservedBlocks = intervals.reduce((total, sample) => total + sample.blocksAdvanced, 0);
-                const totalObservedIntervalMs = intervals.reduce((total, sample) => total + sample.intervalMs, 0);
                 const lastInterval = intervals[intervals.length - 1];
                 return {
                     // A detection is recorded only when the observed finalized height advances.
@@ -528,19 +525,8 @@ function getSnapshot() {
                     observedIntervals: intervals.length,
                     detectionIntervalMs: summarize(intervals.map((sample) => sample.intervalMs)),
                     blocksPerUpdate: summarize(intervals.map((sample) => sample.blocksAdvanced)),
-                    // Estimate the average time per block within each observed batch.
-                    // Min/max are batch-level estimates; average is weighted by blocks.
-                    blockIntervalMs: perBatchBlockIntervals.length ? {
-                        min: Number(Math.min(...perBatchBlockIntervals).toFixed(1)),
-                        average: Number((totalObservedIntervalMs / totalObservedBlocks).toFixed(1)),
-                        max: Number(Math.max(...perBatchBlockIntervals).toFixed(1)),
-                    } : { min: null, average: null, max: null },
                     lastIntervalMs: lastInterval?.intervalMs ?? null,
                     lastBlocksAdvanced: lastInterval?.blocksAdvanced ?? null,
-                    lastBlockIntervalMs: lastInterval
-                        ? Number((lastInterval.intervalMs / lastInterval.blocksAdvanced).toFixed(1))
-                        : null,
-                    observedBlocks: totalObservedBlocks,
                 };
             })(),
             lastProcessedBlock,
