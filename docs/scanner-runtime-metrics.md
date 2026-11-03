@@ -73,7 +73,7 @@ Returns the prepared scanner status snapshot from Dynamic Config. It does not qu
 
 ### GET /api/scanner/analytics?window=1h
 
-Returns the prepared runtime analytics snapshot for the requested window. Supported values are `1h` and `3h`, configured in `src/constants/scanner-metrics.constants.ts`.
+Returns the calculated and cached runtime analytics result for the requested window. Supported values are `1h` and `3h`, configured in `src/constants/scanner-metrics.constants.ts`.
 
 The response includes the current metrics snapshot, block samples, lag samples, RPC events, catch-up sessions, processing batches, minute-level aggregates, retention metadata, and window coverage.
 
