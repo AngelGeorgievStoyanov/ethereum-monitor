@@ -895,6 +895,17 @@ function buildScannerAnalytics(
         break;
     }
     const selectedMinuteBuckets = minuteBuckets.filter((bucket) => bucket.timestampMs + METRICS_BUCKET_INTERVAL_MS > since);
+    const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
+    const batchTotals = selectedBatches.reduce(
+        (totals, sample) => {
+            totals.blocks += Number(sample.blocks ?? 0);
+            totals.transactions += Number(sample.transactions ?? 0);
+            totals.activeDurationMs += Number(sample.durationMs ?? 0);
+            totals.databaseWriteDurationMs += Number(sample.databaseWriteDurationMs ?? 0);
+            return totals;
+        },
+        { blocks: 0, transactions: 0, activeDurationMs: 0, databaseWriteDurationMs: 0 },
+    );
     const sumBucketMetric = (key: keyof MinuteMetricBucket): number =>
         selectedMinuteBuckets.reduce((total, bucket) => total + Number(bucket[key] ?? 0), 0);
     const windowSeconds = Math.max(1, availableWindowMs / 1000);
@@ -954,9 +965,23 @@ function buildScannerAnalytics(
             processedTransactions,
             blocksPerSecond: Number((processedBlocks / windowSeconds).toFixed(2)),
             transactionsPerSecond: Number((processedTransactions / windowSeconds).toFixed(2)),
-            averageTransactionsPerBlock: processedBlocks
-                ? Number((processedTransactions / processedBlocks).toFixed(2))
+            averageTransactionsPerBlock: batchTotals.blocks
+                ? Number((batchTotals.transactions / batchTotals.blocks).toFixed(2))
                 : null,
+            activeProcessingDurationMs: Number(batchTotals.activeDurationMs.toFixed(1)),
+            activeBlocksPerSecond: batchTotals.activeDurationMs > 0
+                ? Number((batchTotals.blocks * 1000 / batchTotals.activeDurationMs).toFixed(2))
+                : 0,
+            activeTransactionsPerSecond: batchTotals.activeDurationMs > 0
+                ? Number((batchTotals.transactions * 1000 / batchTotals.activeDurationMs).toFixed(2))
+                : 0,
+            averageActiveProcessingMsPerBlock: batchTotals.blocks
+                ? Number((batchTotals.activeDurationMs / batchTotals.blocks).toFixed(1))
+                : null,
+            averageActiveProcessingMsPerTransaction: batchTotals.transactions
+                ? Number((batchTotals.activeDurationMs / batchTotals.transactions).toFixed(4))
+                : null,
+            processingBatches: selectedBatches.length,
             averageBlockDurationMs: processedBlocks
                 ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
                 : null,
@@ -1001,6 +1026,14 @@ function buildScannerAnalytics(
             failures: sumBucketMetric('databaseFailures'),
             averageQueryDurationMs: sumBucketMetric('databaseQueries')
                 ? Number((sumBucketMetric('databaseDurationMsTotal') / sumBucketMetric('databaseQueries')).toFixed(1))
+                : null,
+            batchWrites: selectedBatches.length,
+            totalBatchWriteDurationMs: Number(batchTotals.databaseWriteDurationMs.toFixed(1)),
+            averageBatchWriteDurationMs: selectedBatches.length
+                ? Number((batchTotals.databaseWriteDurationMs / selectedBatches.length).toFixed(1))
+                : null,
+            averageBatchWriteDurationMsPerBlock: batchTotals.blocks
+                ? Number((batchTotals.databaseWriteDurationMs / batchTotals.blocks).toFixed(1))
                 : null,
             byOperation: windowDatabaseByOperation,
         },
