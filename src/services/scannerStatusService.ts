@@ -17,6 +17,7 @@ type RuntimeStatusMetrics = {
         latestFinalizedAt?: string | null;
         lastProcessedBlock?: number | null;
         lagBlocks?: number | null;
+        finalizedRegression?: boolean;
         rpcAvailable?: boolean | null;
     };
     rpc?: {
@@ -50,6 +51,7 @@ export async function refreshScannerStatusSnapshot(): Promise<ScannerStatusRespo
     const latestFinalizedAt = runtimeMetrics?.chain?.latestFinalizedAt ?? null;
     const rpcAvailable = runtimeMetrics?.chain?.rpcAvailable ?? false;
     const lagBlocks = runtimeMetrics?.chain?.lagBlocks ?? null;
+    const finalizedRegression = runtimeMetrics?.chain?.finalizedRegression ?? false;
     const rpcMetrics = (runtimeMetrics?.rpc?.endpoints ?? []).map((endpoint) => ({
         index: endpoint.index,
         attempts: endpoint.attempts,
@@ -76,6 +78,7 @@ export async function refreshScannerStatusSnapshot(): Promise<ScannerStatusRespo
         latestFinalizedBlock,
         latestFinalizedAt,
         lagBlocks,
+        finalizedRegression,
         rpcAvailable,
         rpcMetrics,
         checkedAt: new Date().toISOString(),
