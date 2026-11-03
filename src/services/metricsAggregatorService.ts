@@ -863,7 +863,14 @@ function buildScannerAnalytics(
         session.startedAtMs >= since ||
         (session.completedAt !== null && Date.parse(String(session.completedAt)) >= since),
     );
-    const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
+    const latestBatch: Array<Record<string, unknown>> = [];
+    for (let index = batchSamples.length - 1; index >= 0; index -= 1) {
+        const sample = batchSamples[index];
+        if (sample.timestampMs < since) break;
+        const { timestampMs: _timestampMs, ...batch } = sample;
+        latestBatch.push(batch);
+        break;
+    }
     const selectedMinuteBuckets = minuteBuckets.filter((bucket) => bucket.timestampMs + METRICS_BUCKET_INTERVAL_MS > since);
     const sumBucketMetric = (key: keyof MinuteMetricBucket): number =>
         selectedMinuteBuckets.reduce((total, bucket) => total + Number(bucket[key] ?? 0), 0);
@@ -997,12 +1004,7 @@ function buildScannerAnalytics(
         windowMetrics,
         rpcEvents: recentRpcErrors,
         catchUpSessions: selectedSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
-        batches: selectedBatches.length
-            ? (() => {
-                const { timestampMs: _timestampMs, ...latestBatch } = selectedBatches[selectedBatches.length - 1];
-                return [latestBatch];
-            })()
-            : [],
+        batches: latestBatch,
         minuteBuckets: selectedMinuteBuckets.map(({ timestampMs: _timestampMs, ...bucket }) => bucket),
         retention: {
             oldestBlockSampleAt: (blockSamples[blockSamplesStartIndex]?.timestamp as string | undefined) ?? null,
