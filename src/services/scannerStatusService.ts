@@ -18,6 +18,7 @@ type RuntimeStatusMetrics = {
         lastProcessedBlock?: number | null;
         lagBlocks?: number | null;
         finalizedRegression?: boolean;
+        finalizedRegressionMessage?: string | null;
         rpcAvailable?: boolean | null;
     };
     rpc?: {
@@ -79,6 +80,7 @@ export async function refreshScannerStatusSnapshot(): Promise<ScannerStatusRespo
         latestFinalizedAt,
         lagBlocks,
         finalizedRegression,
+        finalizedRegressionMessage: runtimeMetrics?.chain?.finalizedRegressionMessage ?? null,
         rpcAvailable,
         rpcMetrics,
         checkedAt: new Date().toISOString(),
