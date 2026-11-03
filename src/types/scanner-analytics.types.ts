@@ -43,6 +43,7 @@ export interface ScannerAnalyticsWindowMetrics {
         queries: number;
         reads: number;
         writes: number;
+        other: number;
         failures: number;
         averageQueryDurationMs: number | null;
         /** Explicitly timed persistence transactions for successfully processed batches. */
