@@ -109,6 +109,7 @@ export interface ScannerStatusResponse {
     latestFinalizedAt: string | null;
     lagBlocks: number | null;
     finalizedRegression: boolean;
+    finalizedRegressionMessage: string | null;
     rpcAvailable: boolean;
     rpcMetrics: RpcEndpointMetrics[];
     checkedAt: string;
