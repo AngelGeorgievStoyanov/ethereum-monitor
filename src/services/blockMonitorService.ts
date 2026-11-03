@@ -6,7 +6,7 @@ import {
     SCANNER_POLL_INTERVAL_MS,
     SCANNER_STALL_CHECK_INTERVAL_MS,
     SCANNER_STALL_WARNING_INTERVAL_MS,
-    FINALIZED_REGRESSION_DIAGNOSTIC_COOLDOWN_MS,
+    FINALIZED_REGRESSION_WAIT_MS,
 } from '../constants/scanner.constants';
 import { evmRpcClient } from './evmBlockDataService';
 import { getDynamicConfigService } from './dynamicConfigService';
@@ -47,84 +47,6 @@ export function tryReserveManualRescan(): boolean {
 
 export function releaseManualRescanReservation(): void {
     manualRescanReserved = false;
-}
-
-let finalizedDiagnosticsInFlight = false;
-let lastFinalizedDiagnosticsAt = 0;
-
-async function logFinalizedRegressionDiagnostics(
-    checkpoint: number,
-    primaryFinalized: number,
-): Promise<void> {
-    try {
-        const providerResults = await evmRpcClient.getFinalizedFromAllEndpoints();
-        const successfulResults = providerResults.filter(
-            (result) => result.error === null && result.blockNumber !== null && result.blockHash !== null,
-        );
-        const hasConsensus =
-            evmRpcClient.getEndpointCount() > 1 &&
-            successfulResults.length === evmRpcClient.getEndpointCount() &&
-            successfulResults.every(
-                (result) =>
-                    result.blockNumber === successfulResults[0].blockNumber &&
-                    result.blockHash?.toLowerCase() === successfulResults[0].blockHash?.toLowerCase(),
-            );
-        const heights = new Set(successfulResults.map((result) => result.blockNumber));
-        const hashesByHeight = new Map<number, Set<string>>();
-        for (const result of successfulResults) {
-            const hashes = hashesByHeight.get(result.blockNumber!) ?? new Set<string>();
-            hashes.add(result.blockHash!.toLowerCase());
-            hashesByHeight.set(result.blockNumber!, hashes);
-        }
-        const heightMismatch = heights.size > 1;
-        const hashMismatch = Array.from(hashesByHeight.values()).some((hashes) => hashes.size > 1);
-        const providerErrors = providerResults.filter((result) => result.error !== null);
-        let diagnosticConsensus = 'NO';
-        if (evmRpcClient.getEndpointCount() === 1) {
-            diagnosticConsensus = 'NOT_APPLICABLE_SINGLE_PROVIDER';
-        } else if (hasConsensus) {
-            diagnosticConsensus = 'YES';
-        }
-        const providerSummary = providerResults
-            .map((result) =>
-                result.error
-                    ? `P${result.endpointIndex}=ERROR(${result.error.slice(0, 200)})`
-                    : `P${result.endpointIndex}=${result.blockNumber}(hash=${result.blockHash})`,
-            )
-            .join('; ');
-        if (heightMismatch || hashMismatch || providerErrors.length > 0) {
-            console.warn(
-                `[Finalized] RPC provider disagreement: heightMismatch=${heightMismatch}, hashMismatch=${hashMismatch}, providerErrors=${providerErrors.length}; checkpoint=${checkpoint}, primaryFinalized=${primaryFinalized}; ${providerSummary}`,
-            );
-        } else {
-            console.warn(
-                `[Finalized] RPC providers agree during regression: checkpoint=${checkpoint}, primaryFinalized=${primaryFinalized}; diagnosticConsensus=${diagnosticConsensus}; ${providerSummary}`,
-            );
-        }
-    } catch (error) {
-        console.error(
-            `[Finalized] Failed to collect non-blocking regression diagnostics: ${formatError(error)}`,
-        );
-    }
-}
-
-function scheduleFinalizedRegressionDiagnostics(
-    checkpoint: number,
-    primaryFinalized: number,
-): void {
-    const now = Date.now();
-    if (
-        finalizedDiagnosticsInFlight ||
-        now - lastFinalizedDiagnosticsAt < FINALIZED_REGRESSION_DIAGNOSTIC_COOLDOWN_MS
-    ) {
-        return;
-    }
-
-    finalizedDiagnosticsInFlight = true;
-    lastFinalizedDiagnosticsAt = now;
-    void logFinalizedRegressionDiagnostics(checkpoint, primaryFinalized).finally(() => {
-        finalizedDiagnosticsInFlight = false;
-    });
 }
 
 export function createBlockMonitorService() {
@@ -223,13 +145,12 @@ export function createBlockMonitorService() {
                         if (finalized.number < state.lastProcessedBlock) {
                             const checkpoint = state.lastProcessedBlock;
                             if (!finalizedRegressionActive) {
-                                console.warn(
-                                    `[Finalized] Regression detected: finalized=${finalized.number} is ${checkpoint - finalized.number} block(s) behind checkpoint=${checkpoint}; scanner processing is waiting for finalized height to recover. Checkpoint is preserved.`,
+                                console.error(
+                                    `[Finalized] RPC returned a lower finalized block: finalized=${finalized.number}, checkpoint=${checkpoint} (${checkpoint - finalized.number} block(s) behind). Scanner processing is paused; checkpoint is preserved. Retrying in ${FINALIZED_REGRESSION_WAIT_MS / 1000}s to check whether the RPC returns a higher finalized block. If this persists, manual intervention and investigation may be required.`,
                                 );
                                 finalizedRegressionActive = true;
                             }
-                            scheduleFinalizedRegressionDiagnostics(checkpoint, finalized.number);
-                            await sleep(SCANNER_POLL_INTERVAL_MS);
+                            await sleep(FINALIZED_REGRESSION_WAIT_MS);
                             continue;
                         }
 
