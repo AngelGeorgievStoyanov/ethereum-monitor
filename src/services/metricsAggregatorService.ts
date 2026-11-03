@@ -182,6 +182,7 @@ const rpcTotals = {
 };
 let latestFinalizedBlock: number | null = null;
 let latestFinalizedAt: string | null = null;
+let finalizedRegression = false;
 let lastProcessedBlock: number | null = null;
 let lastProcessedAt: string | null = null;
 let rpcAvailable: boolean | null = null;
@@ -455,7 +456,7 @@ function getSnapshot() {
     const average = (key: keyof RecentBlockSummary['totals']) =>
         recent.count ? Number((recent.totals[key] / recent.count).toFixed(1)) : null;
     const totalTransactions = totalProcessedTransactions;
-    const lagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
+    const lagBlocks = !finalizedRegression && latestFinalizedBlock !== null && lastProcessedBlock !== null
         ? Math.max(0, latestFinalizedBlock - lastProcessedBlock) : null;
     const recentTransactions = recent.totals.transactionCount;
     const recentFinalized = finalizedSamples.filter((sample) => now - sample.timestampMs <= METRICS_FINALIZED_SAMPLE_WINDOW_MS);
@@ -495,7 +496,7 @@ function getSnapshot() {
             eventLoopUtilizationPercent: Number((eventLoopUtilization.utilization * 100).toFixed(2)),
         },
         scanner: { running: scannerRunning, paused: scannerPaused, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount, maxBlocksPerCatchup, maxParallelBlocks, parallelProcessingLagBlocks },
-        chain: { latestFinalizedBlock, latestFinalizedAt, lastProcessedBlock, lastProcessedAt, lagBlocks, rpcAvailable },
+        chain: { latestFinalizedBlock, latestFinalizedAt, lastProcessedBlock, lastProcessedAt, lagBlocks, rpcAvailable, finalizedRegression },
         processing: {
             processedBlocks: totalProcessedBlocks,
             processedTransactions: totalTransactions,
@@ -604,12 +605,16 @@ function completeCatchUp(status: 'completed' | 'interrupted'): void {
 }
 
 export function recordFinalizedBlock(blockNumber: number): void {
+    finalizedRegression = lastProcessedBlock !== null && blockNumber < lastProcessedBlock;
     latestFinalizedBlock = blockNumber;
     latestFinalizedAt = new Date().toISOString();
+    if (finalizedRegression) finalizedSamples.length = 0;
     finalizedSamples.push({ timestampMs: Date.now(), blockNumber });
     trimSamples(Date.now());
     rpcAvailable = true;
-    const lag = lastProcessedBlock === null ? null : Math.max(0, blockNumber - lastProcessedBlock);
+    const lag = finalizedRegression || lastProcessedBlock === null
+        ? null
+        : Math.max(0, blockNumber - lastProcessedBlock);
     const finalizedTimestampMs = Date.now();
     lagSamples.push({ timestamp: latestFinalizedAt, timestampMs: finalizedTimestampMs, latestFinalizedBlock: blockNumber, lastProcessedBlock, lagBlocks: lag });
     recordMinuteLag(finalizedTimestampMs, lag);
@@ -651,7 +656,10 @@ export function recordProcessedBlock(input: BlockInput): void {
     totalDatabaseWriteDurationMs += input.databaseWriteDurationMs;
     lastProcessedBlock = input.blockNumber;
     lastProcessedAt = timestamp;
-    const currentLag = latestFinalizedBlock === null ? null : Math.max(0, latestFinalizedBlock - lastProcessedBlock);
+    finalizedRegression = latestFinalizedBlock !== null && latestFinalizedBlock < lastProcessedBlock;
+    const currentLag = finalizedRegression || latestFinalizedBlock === null
+        ? null
+        : Math.max(0, latestFinalizedBlock - lastProcessedBlock);
     lagSamples.push({ timestamp, timestampMs: now, latestFinalizedBlock, lastProcessedBlock, lagBlocks: currentLag });
     const minuteBucket = getMinuteBucket(now);
     minuteBucket.processedBlocks += 1;
