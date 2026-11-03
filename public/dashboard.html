@@ -141,14 +141,14 @@
             <div class="metric-tile"><div class="label">RPC average latency</div><div class="value" id="rpcAverageLatency">—</div></div>
             <div class="metric-tile"><div class="label">RPC P95 latency</div><div class="value" id="rpcP95Latency">—</div></div>
         </div>
-        <h3 style="margin-top:20px">Finalized block arrival · last 3 hours</h3>
-        <p class="hint">Measured when the scanner observes a higher finalized head. The 4-second polling interval adds detection delay; per-block values for multi-block jumps are estimates.</p>
+        <h3 style="margin-top:20px">Finalized detection wait · last 3 hours</h3>
+        <p class="hint">Wall-clock time between successful observations of a higher finalized block number. Repeated polls of the same height are ignored. Each interval is measured directly; it is not divided by the number of blocks received.</p>
         <div class="metric-grid" style="margin-top:12px">
-            <div class="metric-tile"><div class="label">Time per finalized block · min / avg / max (estimated)</div><div class="value" id="finalizedBlockIntervalStats">—</div></div>
-            <div class="metric-tile"><div class="label">Last estimated time per block</div><div class="value" id="finalizedLastBlockInterval">—</div></div>
-            <div class="metric-tile"><div class="label">Time between head updates · min / avg / max</div><div class="value" id="finalizedIntervalStats">—</div></div>
+            <div class="metric-tile"><div class="label">Wait between finalized detections · min / avg / max</div><div class="value" id="finalizedIntervalStats">—</div></div>
+            <div class="metric-tile"><div class="label">Last detection wait</div><div class="value" id="finalizedLastInterval">—</div></div>
+            <div class="metric-tile"><div class="label">Successful finalized detections</div><div class="value" id="finalizedDetectionCount">—</div></div>
+            <div class="metric-tile"><div class="label">Measured detection intervals</div><div class="value" id="finalizedIntervalCount">—</div></div>
             <div class="metric-tile"><div class="label">Blocks per update · min / avg / max</div><div class="value" id="finalizedBlocksStats">—</div></div>
-            <div class="metric-tile"><div class="label">Last update interval</div><div class="value" id="finalizedLastInterval">—</div></div>
             <div class="metric-tile"><div class="label">Blocks in last update</div><div class="value" id="finalizedLastBlocks">—</div></div>
         </div>
         <div class="metric-grid" style="margin-top:12px">
@@ -490,11 +490,11 @@
             range.max !== null && range.max !== undefined
             ? formatter(range.min) + ' / ' + formatter(range.average) + ' / ' + formatter(range.max)
             : 'Collecting samples…';
-        setText('finalizedBlockIntervalStats', formatRange(cadence.blockIntervalMs, elapsed));
-        setText('finalizedLastBlockInterval', elapsed(cadence.lastBlockIntervalMs));
-        setText('finalizedIntervalStats', formatRange(cadence.intervalMs, elapsed));
-        setText('finalizedBlocksStats', formatRange(cadence.blocksPerUpdate, (value) => Number(value).toFixed(1)));
+        setText('finalizedIntervalStats', formatRange(cadence.detectionIntervalMs, elapsed));
         setText('finalizedLastInterval', elapsed(cadence.lastIntervalMs));
+        setText('finalizedDetectionCount', number(cadence.detections));
+        setText('finalizedIntervalCount', number(cadence.observedIntervals));
+        setText('finalizedBlocksStats', formatRange(cadence.blocksPerUpdate, (value) => Number(value).toFixed(1)));
         setText('finalizedLastBlocks', number(cadence.lastBlocksAdvanced));
         setText('analyticsBlocksPerSecond', windowProcessing.blocksPerSecond ?? '—');
         setText('analyticsTransactionsPerSecond', windowProcessing.transactionsPerSecond ?? '—');
