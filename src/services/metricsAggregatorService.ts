@@ -521,8 +521,12 @@ function getSnapshot() {
                 const totalObservedIntervalMs = intervals.reduce((total, sample) => total + sample.intervalMs, 0);
                 const lastInterval = intervals[intervals.length - 1];
                 return {
-                    updates: intervals.length,
-                    intervalMs: summarize(intervals.map((sample) => sample.intervalMs)),
+                    // A detection is recorded only when the observed finalized height advances.
+                    // Intervals measure wall-clock time between those detections, regardless of
+                    // how many finalized blocks arrived in each update.
+                    detections: samples.length,
+                    observedIntervals: intervals.length,
+                    detectionIntervalMs: summarize(intervals.map((sample) => sample.intervalMs)),
                     blocksPerUpdate: summarize(intervals.map((sample) => sample.blocksAdvanced)),
                     // Estimate the average time per block within each observed batch.
                     // Min/max are batch-level estimates; average is weighted by blocks.
