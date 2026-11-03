@@ -150,7 +150,7 @@ function getCteMainStatement(sql: string): string | null {
 function getQueryOperation(sql: string): { operation: 'read' | 'write' | 'other'; queryType: string } {
     // Sequelize prefixes benchmark log messages with "Executing (connection):".
     // Strip that wrapper before classifying the actual SQL statement.
-    const statement = sql.replace(/^\\s*Executing\\s+\\([^)]*\\):\\s*/i, '');
+    const statement = sql.replace(/^\s*Executing\s+\([^)]*\):\s*/i, '');
     const firstKeywordIndex = skipSqlTrivia(statement, 0);
     const firstKeyword = readSqlWord(statement, firstKeywordIndex).word || 'UNKNOWN';
     const queryType = firstKeyword === 'WITH' ? getCteMainStatement(statement) ?? 'WITH' : firstKeyword;
