@@ -5,8 +5,8 @@
 - Scanner, RPC, processing, persistence, filters, and recovery components publish measurements from operations they already perform.
 - The RPC client emits request events and logical-operation events through the metrics event bus. It does not depend on the metrics aggregator.
 - The metrics aggregator calculates rates, rolling statistics, catch-up sessions, RPC error categories, logical-operation retry statistics, and processing batch statistics.
-- Dynamic Config passively stores and returns runtime metrics, scanner status, and analytics snapshots. It does not calculate metrics or query other services.
-- Status and analytics endpoints read prepared snapshots. Dashboard polling does not issue PostgreSQL or RPC requests.
+- Dynamic Config passively stores and returns runtime metrics and scanner status snapshots. It does not calculate metrics, analytics, or query other services.
+- The status endpoint reads the prepared Dynamic Config snapshot. The analytics endpoint asks the metrics aggregator for the requested window; the aggregator calculates the result on demand and caches it for the configured cache duration. Dashboard polling does not issue PostgreSQL or RPC requests.
 - Runtime metrics and history are held in process memory only. They reset when the process restarts and are not written to PostgreSQL.
 
 ## Scanner status snapshots
