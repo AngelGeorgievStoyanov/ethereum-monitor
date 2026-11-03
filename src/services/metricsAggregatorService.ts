@@ -514,12 +514,27 @@ function getSnapshot() {
                     average: Number((values.reduce((total, value) => total + value, 0) / values.length).toFixed(1)),
                     max: Number(Math.max(...values).toFixed(1)),
                 } : { min: null, average: null, max: null };
+                const perBatchBlockIntervals = intervals.map((sample) => sample.intervalMs / sample.blocksAdvanced);
+                const totalObservedBlocks = intervals.reduce((total, sample) => total + sample.blocksAdvanced, 0);
+                const totalObservedIntervalMs = intervals.reduce((total, sample) => total + sample.intervalMs, 0);
+                const lastInterval = intervals[intervals.length - 1];
                 return {
                     updates: intervals.length,
                     intervalMs: summarize(intervals.map((sample) => sample.intervalMs)),
                     blocksPerUpdate: summarize(intervals.map((sample) => sample.blocksAdvanced)),
-                    lastIntervalMs: intervals.length ? intervals[intervals.length - 1].intervalMs : null,
-                    lastBlocksAdvanced: intervals.length ? intervals[intervals.length - 1].blocksAdvanced : null,
+                    // Estimate the average time per block within each observed batch.
+                    // Min/max are batch-level estimates; average is weighted by blocks.
+                    blockIntervalMs: perBatchBlockIntervals.length ? {
+                        min: Number(Math.min(...perBatchBlockIntervals).toFixed(1)),
+                        average: Number((totalObservedIntervalMs / totalObservedBlocks).toFixed(1)),
+                        max: Number(Math.max(...perBatchBlockIntervals).toFixed(1)),
+                    } : { min: null, average: null, max: null },
+                    lastIntervalMs: lastInterval?.intervalMs ?? null,
+                    lastBlocksAdvanced: lastInterval?.blocksAdvanced ?? null,
+                    lastBlockIntervalMs: lastInterval
+                        ? Number((lastInterval.intervalMs / lastInterval.blocksAdvanced).toFixed(1))
+                        : null,
+                    observedBlocks: totalObservedBlocks,
                 };
             })(),
             lastProcessedBlock,
@@ -640,17 +655,21 @@ function completeCatchUp(status: 'completed' | 'interrupted'): void {
 
 export function recordFinalizedBlock(blockNumber: number): void {
     finalizedRegression = lastProcessedBlock !== null && blockNumber < lastProcessedBlock;
-    latestFinalizedBlock = blockNumber;
-    latestFinalizedAt = new Date().toISOString();
     const observedAtMs = Date.now();
     const previousFinalizedSample = finalizedSamples[finalizedSamples.length - 1];
+    const headChanged = latestFinalizedBlock === null || blockNumber !== latestFinalizedBlock;
+    latestFinalizedBlock = blockNumber;
     if (finalizedRegression || (previousFinalizedSample && blockNumber < previousFinalizedSample.blockNumber)) {
         finalizedSamples.length = 0;
+        finalizedSamples.push({ timestampMs: observedAtMs, blockNumber });
     } else if (!previousFinalizedSample || blockNumber > previousFinalizedSample.blockNumber) {
         // Keep only actual finalized-head advances. Repeated 4s polls of the same
         // height must not distort the observed update cadence.
         finalizedSamples.push({ timestampMs: observedAtMs, blockNumber });
     }
+    // This timestamp means when the observed finalized head last changed,
+    // not when the same head was polled again.
+    if (headChanged) latestFinalizedAt = new Date(observedAtMs).toISOString();
     trimSamples(observedAtMs);
     rpcAvailable = true;
     const lag = finalizedRegression || lastProcessedBlock === null
