@@ -258,6 +258,7 @@ function publish(): void {
                 lastProcessedBlock: number | null;
                 lagBlocks: number | null;
                 finalizedRegression: boolean;
+                finalizedRegressionMessage: string | null;
                 rpcAvailable: boolean | null;
             };
             rpc: { endpoints: Array<Record<string, unknown>> };
