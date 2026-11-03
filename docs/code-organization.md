@@ -54,8 +54,10 @@ A service should decide what operation needs to happen, not implement database a
 Repositories are the only application layer that accesses ORM models and performs database queries and writes.
 
 - Provide purpose-specific methods that reflect application needs.
-- Do not expose raw ORM model instances to services.
-- Convert ORM results into clearly defined data structures before returning them to services.
+- Do not expose raw ORM model instances to services by default.
+- A narrowly scoped exception is acceptable when a service must reuse a row already locked within an active transaction. For example, the TxFilter PUT flow passes the locked filter model from the repository through the service and back to the repository for updating, avoiding a redundant SELECT while preserving the transaction and row lock.
+- Keep this exception limited to the same transaction and operation. Do not use ORM models as general service-layer data contracts.
+- Otherwise, convert ORM results into clearly defined data structures before returning them to services.
 - Accept explicit persistence input structures prepared by the appropriate mapper.
 - Do not contain HTTP concerns or coordinate entire business workflows.
 - Avoid generic methods when they force services to understand query details or interpret raw persistence results.
@@ -193,7 +195,7 @@ When reviewing or changing code, check that:
 2. Validation is separated from controllers.
 3. Services coordinate business operations without directly accessing ORM.
 4. Repository methods have clear, purpose-specific responsibilities.
-5. Repositories return defined data structures rather than raw ORM instances.
+5. Repositories return defined data structures rather than raw ORM instances, except for a narrowly justified transaction-scoped reuse of an already locked model.
 6. Services use dedicated clients for external communication.
 7. Client methods are reusable and purpose-specific.
 8. Mappers are used for persistence inputs and API responses where required.
