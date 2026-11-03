@@ -37,6 +37,57 @@ export const getScannerAnalyticsController = async (req: Request, res: Response)
     }
 };
 
+
+export const getScannerAnalysisController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const requestedWindow = typeof req.query.window === 'string'
+            ? req.query.window
+            : DEFAULT_METRICS_WINDOW.value;
+        const configuredWindow = METRICS_TIME_WINDOWS.find((window) => window.value === requestedWindow);
+        const analytics = getScannerAnalytics(configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value);
+        const current = analytics.current as Record<string, any>;
+        const chain = current.chain as Record<string, unknown>;
+        const rpc = analytics.windowMetrics.rpc;
+        const coreRpcMethods = rpc.methods.filter(({ method }) =>
+            method === 'getBlock(finalized)' ||
+            method === 'eth_getBlockByNumber' ||
+            method === 'eth_getBlockReceipts'
+        );
+
+        res.json({
+            generatedAt: analytics.generatedAt,
+            window: analytics.window,
+            windowCoverage: analytics.windowCoverage,
+            availableWindowMs: analytics.availableWindowMs,
+            scanner: current.scanner,
+            chain: {
+                latestFinalizedBlock: chain.latestFinalizedBlock,
+                lastProcessedBlock: chain.lastProcessedBlock,
+                lagBlocks: chain.lagBlocks,
+                rpcAvailable: chain.rpcAvailable,
+                finalizedRegression: chain.finalizedRegression,
+                finalizedCadence: chain.finalizedCadence,
+            },
+            runtime: current.runtime,
+            processing: {
+                ...analytics.windowMetrics.processing,
+                totalBlocksSinceStart: (current.processing as Record<string, unknown>).processedBlocks,
+                totalTransactionsSinceStart: (current.processing as Record<string, unknown>).processedTransactions,
+            },
+            rpc: {
+                ...rpc,
+                methods: coreRpcMethods,
+            },
+            database: analytics.windowMetrics.database,
+            filters: analytics.windowMetrics.filters,
+            catchUp: current.catchUp,
+            recovery: current.recovery,
+        });
+    } catch (error) {
+        sendHttpError(res, 'Unable to retrieve compact scanner analysis', error);
+    }
+};
+
 export const pauseScanner = async (req: Request, res: Response): Promise<void> => {
     try {
         validateScannerPauseInput(req.body);
