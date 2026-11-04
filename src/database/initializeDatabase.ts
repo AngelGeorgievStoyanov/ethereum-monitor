@@ -41,7 +41,7 @@ export async function initializeDatabase(): Promise<void> {
         const tuples = entries.map(([settingKey, value], index) => {
             replacements[`key${index}`] = settingKey;
             replacements[`value${index}`] = String(value);
-            replacements[`description${index}`] = descriptions[settingKey as keyof typeof DYNAMIC_SETTINGS_DEFAULTS];
+            replacements[`description${index}`] = descriptions[settingKey];
             return `(:key${index}, :value${index}, :description${index})`;
         });
         await sequelize.query(
