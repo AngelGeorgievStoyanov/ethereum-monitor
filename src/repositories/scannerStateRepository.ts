@@ -1,4 +1,4 @@
-import ScannerState from '../models/scannerState';
+import ScannerStateModel from '../models/scannerState';
 import type { ScannerState } from '../types/scanner-state.types';
 import type { ScannerStatusState } from '../types/scanner-status.types';
 
@@ -29,7 +29,7 @@ const scannerStateAttributes = [
 ] as const;
 
 export async function findScannerState(id: string): Promise<ScannerState | null> {
-    const state = await ScannerState.findByPk(id, { attributes: [...scannerStateAttributes] });
+    const state = await ScannerStateModel.findByPk(id, { attributes: [...scannerStateAttributes] });
     return state ? toScannerState(state) : null;
 }
 
@@ -38,12 +38,12 @@ export async function createScannerState(data: {
     lastProcessedBlock: number;
     lastRescanFromBlock: number | null;
 }): Promise<ScannerState> {
-    const state = await ScannerState.create(data);
+    const state = await ScannerStateModel.create(data);
     return toScannerState(state);
 }
 
 export async function updateScannerCheckpoint(id: string, lastProcessedBlock: number) {
-    const [updatedRows] = await ScannerState.update({ lastProcessedBlock }, { where: { id } });
+    const [updatedRows] = await ScannerStateModel.update({ lastProcessedBlock }, { where: { id } });
 
     if (updatedRows !== 1) {
         throw new Error(`Unable to update scanner checkpoint for "${id}"`);
@@ -51,7 +51,7 @@ export async function updateScannerCheckpoint(id: string, lastProcessedBlock: nu
 }
 
 export async function findScannerStatusState(id: string): Promise<ScannerStatusState | null> {
-    const state = await ScannerState.findByPk(id, {
+    const state = await ScannerStateModel.findByPk(id, {
         attributes: [
             'lastProcessedBlock',
             'reorgRecoveryActive',
@@ -76,7 +76,7 @@ export async function findScannerStatusState(id: string): Promise<ScannerStatusS
 }
 
 export async function findScannerControlRecord(id: string) {
-    const state = await ScannerState.findByPk(id, {
+    const state = await ScannerStateModel.findByPk(id, {
         attributes: ['scannerPaused'],
     });
     if (!state) return null;
@@ -88,14 +88,14 @@ export async function updateScannerControlRecord(
     id: string,
     updates: { scannerPaused: boolean },
 ): Promise<void> {
-    const [updatedRows] = await ScannerState.update(updates, { where: { id } });
+    const [updatedRows] = await ScannerStateModel.update(updates, { where: { id } });
     if (updatedRows !== 1) {
         throw new Error(`Unable to update scanner control state for "${id}"`);
     }
 }
 
 export async function unblockScannerReorgRecovery(id: string): Promise<boolean> {
-    const [updatedRows] = await ScannerState.update(
+    const [updatedRows] = await ScannerStateModel.update(
         {
             reorgRecoveryBlocked: false,
             reorgRecoveryBlockReason: null,
@@ -118,7 +118,7 @@ export interface ScannerRescanState {
 }
 
 export async function findScannerRescanState(id: string): Promise<ScannerRescanState | null> {
-    const state = await ScannerState.findByPk(id, {
+    const state = await ScannerStateModel.findByPk(id, {
         attributes: ['lastProcessedBlock', 'reorgRecoveryActive', 'reorgRecoveryBlocked'],
     });
     if (!state) return null;
