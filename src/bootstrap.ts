@@ -20,12 +20,21 @@ export async function startApplication(): Promise<void> {
         await refreshScannerStatusSnapshot();
 
         const blockMonitorService = getBlockMonitorService();
-        const server = app.listen(HTTP_PORT, HTTP_HOST, () => {
-            console.log(`Server is running on http://${HTTP_HOST}:${HTTP_PORT}`);
+        const server = app.listen(HTTP_PORT, HTTP_HOST);
+
+        // Do not start the scanner until the HTTP server has successfully bound its port.
+        await new Promise<void>((resolve, reject) => {
+            server.once('error', reject);
+            server.once('listening', () => {
+                server.removeListener('error', reject);
+                console.log(`Server is running on http://${HTTP_HOST}:${HTTP_PORT}`);
+                resolve();
+            });
         });
 
+        // Errors after startup are logged locally; they must not become unhandled events.
         server.on('error', (error) => {
-            console.error(`Server error: ${formatError(error)}`);
+            console.error(`[HTTP] Server error after startup: ${formatError(error)}`);
         });
 
         void blockMonitorService.start().catch((error) => {
