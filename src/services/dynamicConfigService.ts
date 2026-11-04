@@ -222,7 +222,9 @@ export function createDynamicConfigService() {
     return {
         init,
         refreshTxFiltersWithRetry,
+        refreshWithRetry: refreshTxFiltersWithRetry,
         stopRefreshTimers,
+        stopRefreshTimer: stopRefreshTimers,
         getTxFilters,
         getDynamicSettings,
         getActiveTxFilterConfig,
