@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import sequelize from '../database';
 import { QueryTypes } from 'sequelize';
-import { RUNTIME_CONFIG_DEFAULTS, type RuntimeConfig, type RuntimeConfigKey } from '../constants/runtime-config.constants';
+import { DYNAMIC_SETTINGS_DEFAULTS, type DynamicSettings, type DynamicSettingKey } from '../constants/dynamic-settings.constants';
 import {
     TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
     TX_FILTER_RELOAD_RETRY_DELAYS_MS,
@@ -22,9 +22,17 @@ export function createDynamicConfigService() {
     let runtimeMetricsSnapshot: unknown = null;
     let scannerStatusSnapshot: unknown = null;
     let scannerControlPausedSnapshot: boolean | null = null;
-    let runtimeConfigSnapshot: RuntimeConfig = { ...RUNTIME_CONFIG_DEFAULTS };
+    let dynamicSettings: DynamicSettings = { scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner }, metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics } };
 
-    function parseRuntimeConfigValue(key: RuntimeConfigKey, rawValue: string): number | null {
+    function getDynamicSetting(settings: DynamicSettings, key: DynamicSettingKey): number {
+        const [section, setting] = key.split('.') as ['scanner' | 'metrics', string];
+        return (settings[section] as Record<string, number>)[setting];
+    }
+    function setDynamicSetting(settings: DynamicSettings, key: DynamicSettingKey, value: number): void {
+        const [section, setting] = key.split('.') as ['scanner' | 'metrics', string];
+        (settings[section] as Record<string, number>)[setting] = value;
+    }
+    function parseDynamicSettingValue(key: DynamicSettingKey, rawValue: string): number | null {
         const value = Number(rawValue);
         if (!Number.isSafeInteger(value) || value <= 0) return null;
         if (key === 'scanner.maxParallelBlocks' && value > 32) return null;
@@ -34,33 +42,33 @@ export function createDynamicConfigService() {
         return value;
     }
 
-    async function loadRuntimeConfigurations(): Promise<void> {
+    async function loadDynamicSettings(): Promise<void> {
         try {
             const rows = await sequelize.query<{ settingKey: string; value: string }>(
                 'SELECT "settingKey", value FROM "Configurations"',
                 { type: QueryTypes.SELECT },
             );
-            const next: RuntimeConfig = { ...RUNTIME_CONFIG_DEFAULTS };
+            const next: DynamicSettings = { scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner }, metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics } };
             for (const row of rows) {
-                const key = row.settingKey as RuntimeConfigKey;
-                if (!(key in RUNTIME_CONFIG_DEFAULTS)) continue;
-                const parsedValue = parseRuntimeConfigValue(key, row.value);
+                const key = row.settingKey as DynamicSettingKey;
+                if (!['scanner.maxParallelBlocks', 'scanner.parallelProcessingLagBlocks', 'scanner.maxBlocksPerCatchup', 'scanner.pollIntervalMs', 'metrics.publishIntervalMs', 'metrics.analyticsRefreshMs'].includes(key)) continue;
+                const parsedValue = parseDynamicSettingValue(key, row.value);
                 if (parsedValue === null) {
                     console.warn(`[DynamicConfig] Invalid value for "${key}"; keeping previous valid value`);
-                    next[key] = runtimeConfigSnapshot[key];
+                    setDynamicSetting(next, key, getDynamicSetting(dynamicSettings, key));
                     continue;
                 }
-                next[key] = parsedValue;
+                setDynamicSetting(next, key, parsedValue);
             }
-            runtimeConfigSnapshot = next;
-            console.log(`[DynamicConfig] Loaded runtime configurations; rows=${rows.length}`);
+            dynamicSettings = next;
+            console.log(`[DynamicConfig] Loaded dynamic settings; rows=${rows.length}`);
         } catch (error) {
-            console.error(`[DynamicConfig] Runtime configuration refresh failed; keeping last valid snapshot: ${formatError(error)}`);
+            console.error(`[DynamicConfig] Dynamic settings refresh failed; keeping last valid settings: ${formatError(error)}`);
         }
     }
 
     async function loadTxFilters(): Promise<void> {
-        await loadRuntimeConfigurations();
+        await loadDynamicSettings();
         const loadedFilters = await txFilterService.loadActiveTxFilters();
         const next = new Map<number, ActiveTxFilter>(
             loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]),
@@ -155,9 +163,7 @@ export function createDynamicConfigService() {
         };
     }
 
-    function getRuntimeConfigSnapshot(): RuntimeConfig {
-        return { ...runtimeConfigSnapshot };
-    }
+    function getDynamicSettings(): DynamicSettings { return { scanner: { ...dynamicSettings.scanner }, metrics: { ...dynamicSettings.metrics } }; }
 
     function getTxFilters(): ActiveTxFilter[] {
         return getTxFilterSnapshot().filters;
@@ -208,7 +214,7 @@ export function createDynamicConfigService() {
         refreshWithRetry,
         stopRefreshTimer,
         getTxFilters,
-        getRuntimeConfigSnapshot,
+        getDynamicSettings,
         getTxFilterSnapshot,
         publishRuntimeMetrics,
         getRuntimeMetricsSnapshot,
