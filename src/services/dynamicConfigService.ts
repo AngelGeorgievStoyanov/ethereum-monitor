@@ -1,8 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
-    DYNAMIC_SETTINGS_DEFAULTS,
-    type DynamicSettings,
-} from '../constants/dynamic-settings.constants';
+import type { DynamicSettings } from '../constants/dynamic-settings.constants';
 import { getConfigurationService } from './configurationService';
 import {
     TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
@@ -15,6 +12,7 @@ import { sleep } from '../utils/sleep';
 
 export function createDynamicConfigService() {
     const txFilterService = getTxFilterService();
+    const configurationService = getConfigurationService();
     let activeTxFilters = new Map<number, ActiveTxFilter>();
     let activeTxFilterVersion = '';
     let reloadQueue: Promise<boolean> = Promise.resolve(true);
@@ -24,19 +22,8 @@ export function createDynamicConfigService() {
     let currentMetrics: Record<string, unknown> | null = null;
     let scannerStatus: unknown = null;
     let scannerPaused: boolean | null = null;
-    let dynamicSettings: DynamicSettings = {
-        scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner },
-        metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics },
-    };
-
-    async function loadDynamicSettings(): Promise<void> {
-        const configurationService = getConfigurationService();
-        await configurationService.refresh();
-        dynamicSettings = configurationService.getDynamicSettings();
-    }
-
     async function loadTxFilters(): Promise<void> {
-        await loadDynamicSettings();
+        await configurationService.refresh();
         const loadedFilters = await txFilterService.loadActiveTxFilters();
         const next = new Map<number, ActiveTxFilter>(
             loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]),
@@ -132,10 +119,7 @@ export function createDynamicConfigService() {
     }
 
     function getDynamicSettings(): DynamicSettings {
-        return {
-            scanner: { ...dynamicSettings.scanner },
-            metrics: { ...dynamicSettings.metrics },
-        };
+        return configurationService.getDynamicSettings();
     }
 
     function getTxFilters(): ActiveTxFilter[] {
