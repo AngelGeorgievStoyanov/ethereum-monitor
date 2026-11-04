@@ -42,8 +42,8 @@ Do not bypass an existing boundary without a clear reason. Equally, do not add a
 - Functions with more than 3–4 parameters should normally accept one options object with named properties.
 - Use clear types for meaningful inputs, outputs, and domain concepts.
 - Avoid unnecessary wrappers, duplicate types, and type assertions that hide uncertainty.
-- Handle optional and nullable values explicitly; do not assume a value exists and then fail at runtime.
-- Keep configuration and runtime constants centralized in the appropriate `src/constants/` modules.
+- Handle optional and nullable values explicitly; do not assume a value exists and then fail during execution.
+- Keep configuration and operational constants centralized in the appropriate `src/constants/` modules.
 - Avoid magic numbers and repeated configuration literals.
 - Use plain numeric literals without numeric separators (for example, `60000`, not `60_000`).
 
@@ -72,7 +72,7 @@ Before changing code:
 1. Inspect the existing implementation and its callers.
 2. Identify the actual problem and the responsible module.
 3. Check whether an existing helper, client, service, or repository already solves it.
-4. Consider effects on API contracts, persisted data, runtime state, and recovery behavior.
+4. Consider effects on API contracts, persisted data, current state, and recovery behavior.
 5. Choose the smallest change that solves the problem without weakening correctness.
 
 During review, check:
