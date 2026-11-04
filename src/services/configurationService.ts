@@ -1,7 +1,4 @@
-import {
-    DYNAMIC_SETTINGS_DEFAULTS,
-    type DynamicSettings,
-} from '../constants/dynamic-settings.constants';
+import type { DynamicSettings } from '../constants/dynamic-settings.constants';
 import Configuration from '../models/configuration';
 import {
     mapConfigurationRowsToDynamicSettings,
@@ -10,10 +7,7 @@ import {
 import { formatError } from '../utils/formatError';
 
 export function createConfigurationService() {
-    let dynamicSettings: DynamicSettings = {
-        scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner },
-        metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics },
-    };
+    let dynamicSettings: DynamicSettings = {};
 
     async function refresh(): Promise<void> {
         try {
@@ -25,7 +19,7 @@ export function createConfigurationService() {
                 value,
             }));
 
-            dynamicSettings = mapConfigurationRowsToDynamicSettings(rows, dynamicSettings);
+            dynamicSettings = mapConfigurationRowsToDynamicSettings(rows);
             console.log(
                 `[Configuration] Loaded dynamic settings; rows=${rows.length}`,
             );
@@ -37,10 +31,7 @@ export function createConfigurationService() {
     }
 
     function getDynamicSettings(): DynamicSettings {
-        return {
-            scanner: { ...dynamicSettings.scanner },
-            metrics: { ...dynamicSettings.metrics },
-        };
+        return { ...dynamicSettings };
     }
 
     return {
