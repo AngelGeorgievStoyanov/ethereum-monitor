@@ -9,7 +9,7 @@ Use these documents together:
 
 - [Development Guidelines](./development-guidelines.md) — coding principles, generic and loosely coupled design, dependencies, simplicity, errors, and code reviews.
 - [Performance Guidelines](./performance-guidelines.md) — evidence-based optimization, avoiding unnecessary DB/RPC work, caching, memory, batching, and correctness.
-- This document — module responsibilities, dependency direction, and approved runtime behavior.
+- This document — module responsibilities, dependency direction, and approved scanner operation.
 
 ## 1. Controllers
 
@@ -268,12 +268,12 @@ These rules document the approved scanner operation. They are intended to preven
 - Scanner analytics are calculated on demand for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms); analytics are not precomputed for every window during the 10-second current metrics publication. Each analytics calculation sorts the retained RPC durations once and reuses that ordering for the requested window. Retained RPC events use a head index for constant-time removal; the backing array is compacted periodically using `METRICS_RPC_EVENT_COMPACTION_THRESHOLD`, rather than shifting the full array for every expired event. Block and lag sample retention also uses head indexes with periodic compaction via `METRICS_SAMPLE_COMPACTION_THRESHOLD`, avoiding repeated array shifts.
 - Dashboard polling is configured separately in `public/dashboard.constants.js`: `STATUS_REFRESH_INTERVAL_MS` (currently 5000 ms), `ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms), and `STALLED_THRESHOLD_MS` (currently 60000 ms). These are independent of backend metrics publication and cache intervals.
 - Dashboard polling and RPC event collection are separate concerns; do not change their cadence merely to change the metrics publishing interval.
-- Dynamic Config stores the latest current metrics snapshot only; the analytics cache is owned by the metrics aggregator.
+- Dynamic Config stores the latest current metrics only; the analytics cache is owned by the metrics aggregator.
 - Database query metrics classify `WITH` statements by the main statement after their CTE definitions, so data-changing CTEs are counted as writes rather than reads.
 
 ### Constants and code style
 
 - Put scanner, Rescan, Recovery, and metrics timing/batch/limit values in their relevant files under `src/constants/`. Dashboard-only timing values belong in `public/dashboard.constants.js`.
 - Use plain numeric literals without numeric separators (for example, `60000`, not `60_000`).
-- When changing a runtime interval or batch size, update the relevant constant and any runtime/status documentation that exposes the value. Avoid duplicating the same value as a separate hardcoded literal.
+- When changing a scanner interval or batch size, update the relevant constant and any scanner/status documentation that exposes the value. Avoid duplicating the same value as a separate hardcoded literal.
 

@@ -1,6 +1,6 @@
 # Performance Guidelines
 
-These guidelines describe how to optimize Ethereum Monitor without making the code unnecessarily complex or compromising correctness. Scanner-operational approved values and workflows are documented in [Code Organization](./code-organization.md#14-runtime-behavior-and-performance-rules).
+These guidelines describe how to optimize Ethereum Monitor without making the code unnecessarily complex or compromising correctness. Scanner-operational approved values and workflows are documented in [Code Organization](./code-organization.md#14-scanner-operation-and-performance-rules).
 
 ## 1. Start with evidence
 

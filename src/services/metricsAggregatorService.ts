@@ -499,7 +499,7 @@ function getCurrentMetrics() {
     return {
         startedAt,
         updatedAt: new Date(now).toISOString(),
-        current: {
+        process: {
             memoryRssMb: Number((memoryUsage.rss / 1048576).toFixed(1)),
             memoryHeapUsedMb: Number((memoryUsage.heapUsed / 1048576).toFixed(1)),
             memoryHeapTotalMb: Number((memoryUsage.heapTotal / 1048576).toFixed(1)),
