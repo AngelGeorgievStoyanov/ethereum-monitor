@@ -307,25 +307,7 @@ function publish(): void {
         try {
             const currentMetrics = calculateCurrentMetrics();
             getDynamicConfigService().publishMetrics(currentMetrics);
-            const current = currentMetrics as {
-                scanner: {
-                    running: boolean;
-                    paused: boolean;
-                    uptimeSeconds: number;
-                    activeFiltersCount: number;
-                };
-                chain: {
-                    latestFinalizedBlock: number | null;
-                    latestFinalizedAt: string | null;
-                    lastProcessedBlock: number | null;
-                    lagBlocks: number | null;
-                    finalizedRegression: boolean;
-                    finalizedRegressionMessage: string | null;
-                    rpcAvailable: boolean | null;
-                };
-                rpc: { endpoints: Array<Record<string, unknown>> };
-                recovery: Record<string, number>;
-            };
+            const current = currentMetrics;
             getDynamicConfigService().updateScannerStatus({
                 scannerRunning: current.scanner.running,
                 paused: current.scanner.paused,
