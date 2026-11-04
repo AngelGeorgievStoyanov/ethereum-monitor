@@ -1,5 +1,5 @@
-import type { ScannerRuntimeState } from '../types/scanner-state.types';
-import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
+import type { ScannerState } from '../types/scanner-state.types';
+import type { ActiveTxFilterConfig } from '../types/tx-filter.types';
 import {
     REORG_RECOVERY_STABLE_BLOCKS,
 } from '../constants/scanner.constants';
@@ -49,9 +49,9 @@ function validateBatchConnectivity(
 }
 
 export async function processFinalizedBlocks(
-    state: ScannerRuntimeState,
+    state: ScannerState,
     finalizedBlockNumber: number,
-    getActiveTxFilters: () => TxFilterConfigSnapshot,
+    getActiveTxFilters: () => ActiveTxFilterConfig,
 ): Promise<void> {
     const catchupStartedAt = Date.now();
     const catchupStartBlock = state.lastProcessedBlock + 1;
@@ -61,7 +61,7 @@ export async function processFinalizedBlocks(
     while (state.lastProcessedBlock < finalizedBlockNumber) {
         currentBatchStart = state.lastProcessedBlock + 1;
         const batchStartedAt = Date.now();
-        if (getDynamicConfigService().getScannerControlSnapshot()) return;
+        if (getDynamicConfigService().getScannerPaused()) return;
         const filterConfig = getActiveTxFilters();
         const activeTxFilters = filterConfig.filters;
         if (activeTxFilters.length === 0) return;
