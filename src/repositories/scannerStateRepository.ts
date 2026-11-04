@@ -1,8 +1,8 @@
 import ScannerState from '../models/scannerState';
-import type { ScannerRuntimeState } from '../types/scanner-state.types';
+import type { ScannerState } from '../types/scanner-state.types';
 import type { ScannerStatusState } from '../types/scanner-status.types';
 
-function toScannerRuntimeState(state: ScannerState): ScannerRuntimeState {
+function toScannerState(state: ScannerState): ScannerState {
     return {
         id: state.id,
         lastProcessedBlock: state.lastProcessedBlock,
@@ -16,7 +16,7 @@ function toScannerRuntimeState(state: ScannerState): ScannerRuntimeState {
     };
 }
 
-const scannerRuntimeAttributes = [
+const scannerStateAttributes = [
     'id',
     'lastProcessedBlock',
     'lastRescanFromBlock',
@@ -28,18 +28,18 @@ const scannerRuntimeAttributes = [
     'reorgRecoveryTargetBlock',
 ] as const;
 
-export async function findScannerState(id: string): Promise<ScannerRuntimeState | null> {
-    const state = await ScannerState.findByPk(id, { attributes: [...scannerRuntimeAttributes] });
-    return state ? toScannerRuntimeState(state) : null;
+export async function findScannerState(id: string): Promise<ScannerState | null> {
+    const state = await ScannerState.findByPk(id, { attributes: [...scannerStateAttributes] });
+    return state ? toScannerState(state) : null;
 }
 
 export async function createScannerState(data: {
     id: string;
     lastProcessedBlock: number;
     lastRescanFromBlock: number | null;
-}): Promise<ScannerRuntimeState> {
+}): Promise<ScannerState> {
     const state = await ScannerState.create(data);
-    return toScannerRuntimeState(state);
+    return toScannerState(state);
 }
 
 export async function updateScannerCheckpoint(id: string, lastProcessedBlock: number) {
