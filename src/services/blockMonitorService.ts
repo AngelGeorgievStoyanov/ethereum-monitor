@@ -3,6 +3,10 @@ import {
     SCANNER_STALL_CHECK_INTERVAL_MS,
     SCANNER_STALL_WARNING_INTERVAL_MS,
     FINALIZED_REGRESSION_WAIT_MS,
+    SCANNER_MAX_PARALLEL_BLOCKS,
+    SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
+    MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+    SCANNER_POLL_INTERVAL_MS,
 } from '../constants/scanner.constants';
 import { evmRpcClient } from './evmBlockDataService';
 import { getDynamicConfigService } from './dynamicConfigService';
@@ -53,6 +57,20 @@ export function createBlockMonitorService() {
     const dynamicConfigService = getDynamicConfigService();
     let scannerStarted = false;
 
+    function getScannerSettings() {
+        const dynamicSettings = dynamicConfigService.getDynamicSettings();
+        return {
+            maxParallelBlocks:
+                Number(dynamicSettings.maxParallelBlocks) || SCANNER_MAX_PARALLEL_BLOCKS,
+            parallelProcessingLagBlocks:
+                Number(dynamicSettings.parallelProcessingLagBlocks) ||
+                SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
+            maxBlocksPerCatchup:
+                Number(dynamicSettings.maxBlocksPerCatchup) || MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+            pollIntervalMs: Number(dynamicSettings.pollIntervalMs) || SCANNER_POLL_INTERVAL_MS,
+        };
+    }
+
     async function start() {
         if (scannerStarted) return;
         scannerStarted = true;
@@ -64,16 +82,14 @@ export function createBlockMonitorService() {
             state = await initializeScannerState();
             registerScannerState(state);
             await refreshScannerStatus();
+            const scannerSettings = getScannerSettings();
             updateScannerContext({
                 running: true,
                 lastProcessedBlock: state.lastProcessedBlock,
                 activeFiltersCount: dynamicConfigService.getTxFilters().length,
-                maxBlocksPerCatchup:
-                    dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
-                maxParallelBlocks:
-                    dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
-                parallelProcessingLagBlocks:
-                    dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks,
+                maxBlocksPerCatchup: scannerSettings.maxBlocksPerCatchup,
+                maxParallelBlocks: scannerSettings.maxParallelBlocks,
+                parallelProcessingLagBlocks: scannerSettings.parallelProcessingLagBlocks,
             });
             dynamicConfigService.updateScannerStatus({ scannerRunning: true });
         } catch (error) {
@@ -120,17 +136,14 @@ export function createBlockMonitorService() {
             try {
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
+                const scannerSettings = getScannerSettings();
                 updateScannerContext({
                     running: true,
                     activeFiltersCount: activeTxFilters.length,
                     lastProcessedBlock: state.lastProcessedBlock,
-                    maxBlocksPerCatchup:
-                        dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
-                    maxParallelBlocks:
-                        dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
-                    parallelProcessingLagBlocks:
-                        dynamicConfigService.getDynamicSettings().scanner
-                            .parallelProcessingLagBlocks,
+                    maxBlocksPerCatchup: scannerSettings.maxBlocksPerCatchup,
+                    maxParallelBlocks: scannerSettings.maxParallelBlocks,
+                    parallelProcessingLagBlocks: scannerSettings.parallelProcessingLagBlocks,
                 });
 
                 if (activeTxFilters.length === 0) {
@@ -151,7 +164,7 @@ export function createBlockMonitorService() {
                         waitingForPause = false;
                         if (manualRescanReserved) {
                             await sleep(
-                                dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs,
+                                getScannerSettings().pollIntervalMs,
                             );
                             continue;
                         }
@@ -195,19 +208,18 @@ export function createBlockMonitorService() {
                         const finalizedCatchupTarget = Math.min(
                             finalized.number,
                             state.lastProcessedBlock +
-                                dynamicConfigService.getDynamicSettings().scanner
-                                    .maxBlocksPerCatchup,
+                                scannerSettings.maxBlocksPerCatchup,
                         );
                         if (finalizedCatchupTarget < finalized.number) {
                             console.log(
-                                `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup}`,
+                                `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${scannerSettings.maxBlocksPerCatchup}`,
                             );
                         }
 
                         // Reserve and block normal processing atomically with respect to the rescan endpoint.
                         if (manualRescanReserved) {
                             await sleep(
-                                dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs,
+                                getScannerSettings().pollIntervalMs,
                             );
                             continue;
                         }
@@ -248,7 +260,7 @@ export function createBlockMonitorService() {
                 );
             }
 
-            await sleep(dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs);
+            await sleep(getScannerSettings().pollIntervalMs);
         }
     }
 
