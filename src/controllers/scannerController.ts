@@ -13,7 +13,10 @@ import { retryBlockedReorgRecovery as retryReorgRecovery } from '../services/reo
 import { requestManualRescan } from '../services/manualRescanRequestService';
 import { validateManualRescanFromBlock } from '../validators/manualRescanValidator';
 import { getManualRescanHttpStatus } from '../mappers/manualRescanMapper';
-import { METRICS_TIME_WINDOWS, DEFAULT_METRICS_WINDOW } from '../constants/scanner-metrics.constants';
+import {
+    METRICS_TIME_WINDOWS,
+    DEFAULT_METRICS_WINDOW,
+} from '../constants/scanner-metrics.constants';
 
 export const getScannerStatus = async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -23,36 +26,41 @@ export const getScannerStatus = async (_req: Request, res: Response): Promise<vo
     }
 };
 
-
 export const getScannerAnalyticsController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const requestedWindow = typeof req.query.window === 'string'
-            ? req.query.window
-            : DEFAULT_METRICS_WINDOW.value;
-        const configuredWindow = METRICS_TIME_WINDOWS.find((window) => window.value === requestedWindow);
-        const analytics = getScannerAnalytics(configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value);
+        const requestedWindow =
+            typeof req.query.window === 'string' ? req.query.window : DEFAULT_METRICS_WINDOW.value;
+        const configuredWindow = METRICS_TIME_WINDOWS.find(
+            (window) => window.value === requestedWindow,
+        );
+        const analytics = getScannerAnalytics(
+            configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value,
+        );
         res.json(analytics);
     } catch (error) {
         sendHttpError(res, 'Unable to retrieve scanner analytics', error);
     }
 };
 
-
 export const getScannerAnalysisController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const requestedWindow = typeof req.query.window === 'string'
-            ? req.query.window
-            : DEFAULT_METRICS_WINDOW.value;
-        const configuredWindow = METRICS_TIME_WINDOWS.find((window) => window.value === requestedWindow);
-        const analytics = getScannerAnalytics(configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value);
+        const requestedWindow =
+            typeof req.query.window === 'string' ? req.query.window : DEFAULT_METRICS_WINDOW.value;
+        const configuredWindow = METRICS_TIME_WINDOWS.find(
+            (window) => window.value === requestedWindow,
+        );
+        const analytics = getScannerAnalytics(
+            configuredWindow?.value ?? DEFAULT_METRICS_WINDOW.value,
+        );
         const current = analytics.current as Record<string, unknown>;
         const chain = (current.chain ?? {}) as Record<string, unknown>;
         const currentProcessing = (current.processing ?? {}) as Record<string, unknown>;
         const rpc = analytics.windowMetrics.rpc;
-        const coreRpcMethods = rpc.methods.filter(({ method }) =>
-            method === 'getBlock(finalized)' ||
-            method === 'eth_getBlockByNumber' ||
-            method === 'eth_getBlockReceipts'
+        const coreRpcMethods = rpc.methods.filter(
+            ({ method }) =>
+                method === 'getBlock(finalized)' ||
+                method === 'eth_getBlockByNumber' ||
+                method === 'eth_getBlockReceipts',
         );
 
         res.json({

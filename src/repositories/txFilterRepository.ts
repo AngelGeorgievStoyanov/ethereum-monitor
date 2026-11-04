@@ -53,7 +53,6 @@ export async function updateTxFilter(
     },
     transaction: SequelizeTransaction,
 ): Promise<TxFilterRecord> {
-
     if (updates.description !== undefined) filter.description = updates.description;
     if (updates.isActive !== undefined) filter.isActive = updates.isActive;
     if (updates.rule !== undefined) filter.rule = updates.rule;

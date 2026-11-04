@@ -73,12 +73,7 @@ export const RPC_ERROR_MESSAGE_PATTERNS = {
         /daily request.*exceeded/i,
         /exceeded.*requests/i,
     ],
-    TIMEOUT: [
-        /timed?\s*out/i,
-        /timeout/i,
-        /deadline exceeded/i,
-        /etimedout/i,
-    ],
+    TIMEOUT: [/timed?\s*out/i, /timeout/i, /deadline exceeded/i, /etimedout/i],
     NETWORK: [
         /econnreset/i,
         /econnrefused/i,

@@ -9,10 +9,7 @@ import {
     RESCAN_PROGRESS_UPDATE_INTERVAL_BLOCKS,
 } from '../constants/rescan.constants';
 import { findScannerRescanState } from '../repositories/scannerStateRepository';
-import {
-    fetchBlockForProcessing,
-    processFetchedBlock,
-} from './blockProcessingService';
+import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
 import { getBlockWithConsensus } from './blockConsensusService';
 import { reconcileBlockCandidates } from './scannerPersistenceService';
 import type { ActiveTxFilter } from '../types/tx-filter.types';
@@ -109,10 +106,7 @@ async function runManualRescanInternal({
             batchSize: RESCAN_BLOCK_IDENTITY_BATCH_SIZE,
             direction: 'forward',
         })) {
-            const batch = await findCanonicalBlockIdentitiesInRange(
-                range.fromBlock,
-                range.toBlock,
-            );
+            const batch = await findCanonicalBlockIdentitiesInRange(range.fromBlock, range.toBlock);
             canonicalIdentities.clear();
             for (const identity of batch) {
                 canonicalIdentities.set(identity.blockNumber, identity);
@@ -123,7 +117,6 @@ async function runManualRescanInternal({
                 blockNumber <= range.toBlock;
                 blockNumber += 1
             ) {
-
                 const storedBlock = canonicalIdentities.get(blockNumber);
                 if (!storedBlock) {
                     throw new Error(
@@ -140,7 +133,10 @@ async function runManualRescanInternal({
                 };
 
                 if (!matchesBlock(storedBlock, fetchedIdentity)) {
-                    const consensusBlock = await getBlockWithConsensus(blockNumber, 'manual rescan');
+                    const consensusBlock = await getBlockWithConsensus(
+                        blockNumber,
+                        'manual rescan',
+                    );
                     if (!matchesBlock(storedBlock, consensusBlock)) {
                         await flushPendingCandidates();
                         recordReorgDetected();

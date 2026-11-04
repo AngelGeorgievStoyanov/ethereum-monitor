@@ -26,15 +26,20 @@ export async function initializeDatabase(): Promise<void> {
     if (Number(countRows[0]?.count ?? 0) === 0) {
         const descriptions: Record<DynamicSettingKey, string> = {
             'scanner.maxParallelBlocks': 'Maximum number of blocks processed in parallel',
-            'scanner.parallelProcessingLagBlocks': 'Lag threshold that enables parallel block processing',
-            'scanner.maxBlocksPerCatchup': 'Maximum finalized blocks included in one catch-up iteration',
+            'scanner.parallelProcessingLagBlocks':
+                'Lag threshold that enables parallel block processing',
+            'scanner.maxBlocksPerCatchup':
+                'Maximum finalized blocks included in one catch-up iteration',
             'scanner.pollIntervalMs': 'Interval between finalized block polling attempts',
             'metrics.publishIntervalMs': 'Minimum delay between metrics updates',
             'metrics.analyticsRefreshMs': 'Cache refresh interval for metrics analytics',
         };
         const entries: Array<[DynamicSettingKey, number]> = [
             ['scanner.maxParallelBlocks', DYNAMIC_SETTINGS_DEFAULTS.scanner.maxParallelBlocks],
-            ['scanner.parallelProcessingLagBlocks', DYNAMIC_SETTINGS_DEFAULTS.scanner.parallelProcessingLagBlocks],
+            [
+                'scanner.parallelProcessingLagBlocks',
+                DYNAMIC_SETTINGS_DEFAULTS.scanner.parallelProcessingLagBlocks,
+            ],
             ['scanner.maxBlocksPerCatchup', DYNAMIC_SETTINGS_DEFAULTS.scanner.maxBlocksPerCatchup],
             ['scanner.pollIntervalMs', DYNAMIC_SETTINGS_DEFAULTS.scanner.pollIntervalMs],
             ['metrics.publishIntervalMs', DYNAMIC_SETTINGS_DEFAULTS.metrics.publishIntervalMs],

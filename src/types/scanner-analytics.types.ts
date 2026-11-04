@@ -28,7 +28,13 @@ export interface ScannerAnalyticsWindowMetrics {
         retryableFailures: number;
         averageLatencyMs: number | null;
         latencyP95Ms: number | null;
-        methods: Array<{ method: string; requests: number; successes: number; failures: number; totalDurationMs: number }>;
+        methods: Array<{
+            method: string;
+            requests: number;
+            successes: number;
+            failures: number;
+            totalDurationMs: number;
+        }>;
         operations: {
             totalOperations: number;
             successfulOperations: number;
@@ -51,14 +57,20 @@ export interface ScannerAnalyticsWindowMetrics {
         totalBatchWriteDurationMs: number;
         averageBatchWriteDurationMs: number | null;
         averageBatchWriteDurationMsPerBlock: number | null;
-        byOperation: Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }>;
+        byOperation: Record<
+            string,
+            { count: number; totalDurationMs: number; maxDurationMs: number }
+        >;
     };
     filters: {
         evaluations: number;
         matches: number;
         failures: number;
         averageDurationMs: number | null;
-        byFilter: Record<string, { evaluations: number; matches: number; failures: number; totalDurationMs: number }>;
+        byFilter: Record<
+            string,
+            { evaluations: number; matches: number; failures: number; totalDurationMs: number }
+        >;
     };
 }
 

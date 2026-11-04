@@ -1,12 +1,38 @@
 import type { ScannerAnalyticsResponse } from '../types/scanner-analytics.types';
 import { performance } from 'node:perf_hooks';
 import { getDynamicConfigService } from './dynamicConfigService';
-import { subscribeToRpcMetricEvents, subscribeToRpcOperationMetricEvents, type RpcMetricEventInput, type RpcOperationMetricEvent } from '../metrics/metricsEventBus';
+import {
+    subscribeToRpcMetricEvents,
+    subscribeToRpcOperationMetricEvents,
+    type RpcMetricEventInput,
+    type RpcOperationMetricEvent,
+} from '../metrics/metricsEventBus';
 import { FINALIZED_REGRESSION_WAIT_MS } from '../constants/scanner.constants';
 import { classifyRpcError } from '../utils/classifyRpcError';
-import { subscribeToDatabaseMetricEvents, type DatabaseMetricEvent } from '../metrics/databaseMetricsEventBus';
-import { subscribeToFilterMetricEvents, type FilterMetricEvent } from '../metrics/filterMetricsEventBus';
-import { METRICS_RETENTION_MS, METRICS_SAMPLE_LIMITS, DEFAULT_METRICS_WINDOW, METRICS_TIME_WINDOWS, METRICS_BUCKET_INTERVAL_MS, METRICS_MAX_BUCKETS, METRICS_RPC_EVENT_COMPACTION_THRESHOLD, METRICS_SAMPLE_COMPACTION_THRESHOLD, METRICS_RECENT_BLOCK_WINDOW_MS, METRICS_RECENT_RATE_WINDOW_MS, METRICS_FINALIZED_SAMPLE_WINDOW_MS, METRICS_CATCH_UP_ETA_MIN_DURATION_MS, METRICS_MIN_ANALYTICS_WINDOW_MS, METRICS_ANALYTICS_RECENT_RPC_ERRORS } from '../constants/scanner-metrics.constants';
+import {
+    subscribeToDatabaseMetricEvents,
+    type DatabaseMetricEvent,
+} from '../metrics/databaseMetricsEventBus';
+import {
+    subscribeToFilterMetricEvents,
+    type FilterMetricEvent,
+} from '../metrics/filterMetricsEventBus';
+import {
+    METRICS_RETENTION_MS,
+    METRICS_SAMPLE_LIMITS,
+    DEFAULT_METRICS_WINDOW,
+    METRICS_TIME_WINDOWS,
+    METRICS_BUCKET_INTERVAL_MS,
+    METRICS_MAX_BUCKETS,
+    METRICS_RPC_EVENT_COMPACTION_THRESHOLD,
+    METRICS_SAMPLE_COMPACTION_THRESHOLD,
+    METRICS_RECENT_BLOCK_WINDOW_MS,
+    METRICS_RECENT_RATE_WINDOW_MS,
+    METRICS_FINALIZED_SAMPLE_WINDOW_MS,
+    METRICS_CATCH_UP_ETA_MIN_DURATION_MS,
+    METRICS_MIN_ANALYTICS_WINDOW_MS,
+    METRICS_ANALYTICS_RECENT_RPC_ERRORS,
+} from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
     blockNumber: number;
@@ -80,15 +106,25 @@ type MinuteMetricBucket = {
     latestLagBlocks: number | null;
     processingBatches: number;
     batchDurationMsTotal: number;
-    rpcMethods: Record<string, { requests: number; successes: number; failures: number; totalDurationMs: number }>;
-    filtersById: Record<string, { evaluations: number; matches: number; failures: number; totalDurationMs: number }>;
-    databaseByOperation: Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }>;
+    rpcMethods: Record<
+        string,
+        { requests: number; successes: number; failures: number; totalDurationMs: number }
+    >;
+    filtersById: Record<
+        string,
+        { evaluations: number; matches: number; failures: number; totalDurationMs: number }
+    >;
+    databaseByOperation: Record<
+        string,
+        { count: number; totalDurationMs: number; maxDurationMs: number }
+    >;
 };
 const minuteBuckets: MinuteMetricBucket[] = [];
 const minuteBucketsByTimestamp = new Map<number, MinuteMetricBucket>();
 
 function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
-    const bucketTimestampMs = Math.floor(timestampMs / METRICS_BUCKET_INTERVAL_MS) * METRICS_BUCKET_INTERVAL_MS;
+    const bucketTimestampMs =
+        Math.floor(timestampMs / METRICS_BUCKET_INTERVAL_MS) * METRICS_BUCKET_INTERVAL_MS;
     const existingBucket = minuteBucketsByTimestamp.get(bucketTimestampMs);
     if (existingBucket) return existingBucket;
     let bucket: MinuteMetricBucket;
@@ -140,10 +176,11 @@ function getMinuteBucket(timestampMs: number): MinuteMetricBucket {
         minuteBuckets.sort((left, right) => left.timestampMs - right.timestampMs);
         minuteBucketsByTimestamp.set(bucketTimestampMs, bucket);
     }
-    while (minuteBuckets.length > 0 && (
-        minuteBuckets.length > METRICS_MAX_BUCKETS ||
-        timestampMs - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS
-    )) {
+    while (
+        minuteBuckets.length > 0 &&
+        (minuteBuckets.length > METRICS_MAX_BUCKETS ||
+            timestampMs - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS)
+    ) {
         const removedBucket = minuteBuckets.shift();
         if (removedBucket) minuteBucketsByTimestamp.delete(removedBucket.timestampMs);
     }
@@ -157,7 +194,17 @@ function recordMinuteLag(timestampMs: number, lagBlocks: number | null): void {
     bucket.lagSamples += 1;
     bucket.latestLagBlocks = lagBlocks;
 }
-const endpointTotals = new Map<number, { attempts: number; successes: number; failures: number; retryableFailures: number; durationMs: number; lastFailureAt: string | null }>();
+const endpointTotals = new Map<
+    number,
+    {
+        attempts: number;
+        successes: number;
+        failures: number;
+        retryableFailures: number;
+        durationMs: number;
+        lastFailureAt: string | null;
+    }
+>();
 const rpcOperationTotals = {
     totalOperations: 0,
     successfulOperations: 0,
@@ -210,14 +257,23 @@ let totalGetBlockReceiptsDurationMs = 0;
 let totalFilterMatchingDurationMs = 0;
 let totalBlockDurationMs = 0;
 let totalDatabaseWriteDurationMs = 0;
-const databaseMetrics = { writes: 0, failures: 0, totalWriteDurationMs: 0, lastErrorAt: null as string | null, lastError: null as string | null };
+const databaseMetrics = {
+    writes: 0,
+    failures: 0,
+    totalWriteDurationMs: 0,
+    lastErrorAt: null as string | null,
+    lastError: null as string | null,
+};
 const filterMetrics = {
     evaluations: 0,
     matches: 0,
     failures: 0,
     totalDurationMs: 0,
     maxDurationMs: 0,
-    byFilter: {} as Record<string, { evaluations: number; matches: number; failures: number; totalDurationMs: number }>,
+    byFilter: {} as Record<
+        string,
+        { evaluations: number; matches: number; failures: number; totalDurationMs: number }
+    >,
 };
 const databaseQueryTotals = {
     queries: 0,
@@ -227,7 +283,10 @@ const databaseQueryTotals = {
     totalDurationMs: 0,
     maxDurationMs: 0,
     lastQueryAt: null as string | null,
-    byOperation: {} as Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }>,
+    byOperation: {} as Record<
+        string,
+        { count: number; totalDurationMs: number; maxDurationMs: number }
+    >,
 };
 let recoveryMetrics: Record<string, number> = {
     reorgCount: 0,
@@ -293,14 +352,17 @@ function publish(): void {
 }
 
 function trimSamples(now: number): void {
-    while (blockSamplesStartIndex < blockSamples.length && (blockSamples.length - blockSamplesStartIndex > METRICS_SAMPLE_LIMITS.blocks || now - blockSamples[blockSamplesStartIndex].timestampMs > METRICS_RETENTION_MS)) blockSamplesStartIndex += 1;
+    while (
+        blockSamplesStartIndex < blockSamples.length &&
+        (blockSamples.length - blockSamplesStartIndex > METRICS_SAMPLE_LIMITS.blocks ||
+            now - blockSamples[blockSamplesStartIndex].timestampMs > METRICS_RETENTION_MS)
+    )
+        blockSamplesStartIndex += 1;
     const previousRpcEventsStartIndex = rpcEventsStartIndex;
     while (
         rpcEventsStartIndex < rpcEvents.length &&
-        (
-            rpcEvents.length - rpcEventsStartIndex > METRICS_SAMPLE_LIMITS.rpcEvents ||
-            now - rpcEvents[rpcEventsStartIndex].timestampMs > METRICS_RETENTION_MS
-        )
+        (rpcEvents.length - rpcEventsStartIndex > METRICS_SAMPLE_LIMITS.rpcEvents ||
+            now - rpcEvents[rpcEventsStartIndex].timestampMs > METRICS_RETENTION_MS)
     ) {
         rpcEventsStartIndex += 1;
     }
@@ -312,19 +374,48 @@ function trimSamples(now: number): void {
         rpcEvents.splice(0, rpcEventsStartIndex);
         rpcEventsStartIndex = 0;
     }
-    while (catchUpSessions.length > 0 && (catchUpSessions.length > METRICS_SAMPLE_LIMITS.catchUpSessions || now - catchUpSessions[0].startedAtMs > METRICS_RETENTION_MS)) catchUpSessions.shift();
-    while (batchSamples.length > 0 && (batchSamples.length > METRICS_SAMPLE_LIMITS.batches || now - batchSamples[0].timestampMs > METRICS_RETENTION_MS)) batchSamples.shift();
-    while (finalizedSamples.length > 0 && now - finalizedSamples[0].timestampMs > METRICS_RETENTION_MS) finalizedSamples.shift();
-    while (lagSamplesStartIndex < lagSamples.length && (lagSamples.length - lagSamplesStartIndex > METRICS_SAMPLE_LIMITS.lag || now - lagSamples[lagSamplesStartIndex].timestampMs > METRICS_RETENTION_MS)) lagSamplesStartIndex += 1;
-    if (blockSamplesStartIndex >= METRICS_SAMPLE_COMPACTION_THRESHOLD && blockSamplesStartIndex * 2 >= blockSamples.length) {
+    while (
+        catchUpSessions.length > 0 &&
+        (catchUpSessions.length > METRICS_SAMPLE_LIMITS.catchUpSessions ||
+            now - catchUpSessions[0].startedAtMs > METRICS_RETENTION_MS)
+    )
+        catchUpSessions.shift();
+    while (
+        batchSamples.length > 0 &&
+        (batchSamples.length > METRICS_SAMPLE_LIMITS.batches ||
+            now - batchSamples[0].timestampMs > METRICS_RETENTION_MS)
+    )
+        batchSamples.shift();
+    while (
+        finalizedSamples.length > 0 &&
+        now - finalizedSamples[0].timestampMs > METRICS_RETENTION_MS
+    )
+        finalizedSamples.shift();
+    while (
+        lagSamplesStartIndex < lagSamples.length &&
+        (lagSamples.length - lagSamplesStartIndex > METRICS_SAMPLE_LIMITS.lag ||
+            now - lagSamples[lagSamplesStartIndex].timestampMs > METRICS_RETENTION_MS)
+    )
+        lagSamplesStartIndex += 1;
+    if (
+        blockSamplesStartIndex >= METRICS_SAMPLE_COMPACTION_THRESHOLD &&
+        blockSamplesStartIndex * 2 >= blockSamples.length
+    ) {
         blockSamples.splice(0, blockSamplesStartIndex);
         blockSamplesStartIndex = 0;
     }
-    if (lagSamplesStartIndex >= METRICS_SAMPLE_COMPACTION_THRESHOLD && lagSamplesStartIndex * 2 >= lagSamples.length) {
+    if (
+        lagSamplesStartIndex >= METRICS_SAMPLE_COMPACTION_THRESHOLD &&
+        lagSamplesStartIndex * 2 >= lagSamples.length
+    ) {
         lagSamples.splice(0, lagSamplesStartIndex);
         lagSamplesStartIndex = 0;
     }
-    while (minuteBuckets.length > 0 && (minuteBuckets.length > METRICS_MAX_BUCKETS || now - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS)) {
+    while (
+        minuteBuckets.length > 0 &&
+        (minuteBuckets.length > METRICS_MAX_BUCKETS ||
+            now - minuteBuckets[0].timestampMs > METRICS_RETENTION_MS)
+    ) {
         const removedBucket = minuteBuckets.shift();
         if (removedBucket) minuteBucketsByTimestamp.delete(removedBucket.timestampMs);
     }
@@ -334,7 +425,13 @@ type RpcSummary = {
     latencyP50Ms: number | null;
     latencyP95Ms: number | null;
     latencyP99Ms: number | null;
-    methods: Array<{ method: string; requests: number; successes: number; failures: number; totalDurationMs: number }>;
+    methods: Array<{
+        method: string;
+        requests: number;
+        successes: number;
+        failures: number;
+        totalDurationMs: number;
+    }>;
     recentErrors: Array<Record<string, unknown>>;
 };
 
@@ -344,7 +441,8 @@ let rpcSummaryCalculatedAt = 0;
 function getRpcSummary(now: number): RpcSummary {
     if (
         rpcSummaryCache &&
-        now - rpcSummaryCalculatedAt < getDynamicConfigService().getDynamicSettings().metrics.analyticsRefreshMs
+        now - rpcSummaryCalculatedAt <
+            getDynamicConfigService().getDynamicSettings().metrics.analyticsRefreshMs
     ) {
         return rpcSummaryCache;
     }
@@ -394,7 +492,10 @@ function getRpcSummary(now: number): RpcSummary {
         latencyP50Ms: percentile(0.5),
         latencyP95Ms: percentile(0.95),
         latencyP99Ms: percentile(0.99),
-        methods: Array.from(methodTotals.entries()).map(([method, value]) => ({ method, ...value })),
+        methods: Array.from(methodTotals.entries()).map(([method, value]) => ({
+            method,
+            ...value,
+        })),
         recentErrors,
     };
     rpcSummaryCalculatedAt = now;
@@ -459,42 +560,77 @@ function getCurrentMetrics() {
     lastCpuUsage = process.cpuUsage();
     const cpuElapsedMs = Math.max(1, now - lastCpuSampleAt);
     lastCpuSampleAt = now;
-    const cpuPercent = Number((((cpuUsage.user + cpuUsage.system) / 1000 / cpuElapsedMs) * 100).toFixed(2));
+    const cpuPercent = Number(
+        (((cpuUsage.user + cpuUsage.system) / 1000 / cpuElapsedMs) * 100).toFixed(2),
+    );
     const eventLoopUtilization = performance.eventLoopUtilization(lastEventLoopUtilization);
     lastEventLoopUtilization = performance.eventLoopUtilization();
     const memoryUsage = process.memoryUsage();
     const recent = getRecentBlockSummary(now);
-    const recentWindowSeconds = Math.max(1, Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000));
+    const recentWindowSeconds = Math.max(
+        1,
+        Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000),
+    );
     const average = (key: keyof RecentBlockSummary['totals']) =>
         recent.count ? Number((recent.totals[key] / recent.count).toFixed(1)) : null;
     const totalTransactions = totalProcessedTransactions;
-    const lagBlocks = !finalizedRegression && latestFinalizedBlock !== null && lastProcessedBlock !== null
-        ? Math.max(0, latestFinalizedBlock - lastProcessedBlock) : null;
+    const lagBlocks =
+        !finalizedRegression && latestFinalizedBlock !== null && lastProcessedBlock !== null
+            ? Math.max(0, latestFinalizedBlock - lastProcessedBlock)
+            : null;
     const recentTransactions = recent.totals.transactionCount;
-    const recentFinalized = finalizedSamples.filter((sample) => now - sample.timestampMs <= METRICS_FINALIZED_SAMPLE_WINDOW_MS);
-    const finalizedElapsedMs = recentFinalized.length > 1
-        ? recentFinalized[recentFinalized.length - 1].timestampMs - recentFinalized[0].timestampMs
-        : 0;
-    const chainBlocksPerSecond = finalizedElapsedMs > 0
-        ? Number(((recentFinalized[recentFinalized.length - 1].blockNumber - recentFinalized[0].blockNumber) * 1000 / finalizedElapsedMs).toFixed(2))
-        : null;
+    const recentFinalized = finalizedSamples.filter(
+        (sample) => now - sample.timestampMs <= METRICS_FINALIZED_SAMPLE_WINDOW_MS,
+    );
+    const finalizedElapsedMs =
+        recentFinalized.length > 1
+            ? recentFinalized[recentFinalized.length - 1].timestampMs -
+              recentFinalized[0].timestampMs
+            : 0;
+    const chainBlocksPerSecond =
+        finalizedElapsedMs > 0
+            ? Number(
+                  (
+                      ((recentFinalized[recentFinalized.length - 1].blockNumber -
+                          recentFinalized[0].blockNumber) *
+                          1000) /
+                      finalizedElapsedMs
+                  ).toFixed(2),
+              )
+            : null;
     const blocksPerSecondLastMinute = Number((recent.count / recentWindowSeconds).toFixed(2));
     const activeCatchUpSession = catchUpSessions[catchUpSessions.length - 1];
-    const activeCatchUpElapsedMs = activeCatchUpSession?.status === 'running'
-        ? now - activeCatchUpSession.startedAtMs
-        : 0;
-    const lagReductionBlocksPerSecond = activeCatchUpSession?.status === 'running' && lagBlocks !== null && activeCatchUpElapsedMs >= METRICS_CATCH_UP_ETA_MIN_DURATION_MS
-        ? Number(((Number(activeCatchUpSession.initialLagBlocks) - lagBlocks) * 1000 / activeCatchUpElapsedMs).toFixed(2))
-        : null;
-    const estimatedCatchUpSeconds = lagBlocks !== null && lagBlocks > 0 && lagReductionBlocksPerSecond !== null && lagReductionBlocksPerSecond > 0
-        ? Number((lagBlocks / lagReductionBlocksPerSecond).toFixed(1))
-        : null;
+    const activeCatchUpElapsedMs =
+        activeCatchUpSession?.status === 'running' ? now - activeCatchUpSession.startedAtMs : 0;
+    const lagReductionBlocksPerSecond =
+        activeCatchUpSession?.status === 'running' &&
+        lagBlocks !== null &&
+        activeCatchUpElapsedMs >= METRICS_CATCH_UP_ETA_MIN_DURATION_MS
+            ? Number(
+                  (
+                      ((Number(activeCatchUpSession.initialLagBlocks) - lagBlocks) * 1000) /
+                      activeCatchUpElapsedMs
+                  ).toFixed(2),
+              )
+            : null;
+    const estimatedCatchUpSeconds =
+        lagBlocks !== null &&
+        lagBlocks > 0 &&
+        lagReductionBlocksPerSecond !== null &&
+        lagReductionBlocksPerSecond > 0
+            ? Number((lagBlocks / lagReductionBlocksPerSecond).toFixed(1))
+            : null;
     const endpoints = Array.from(endpointTotals.entries()).map(([index, value]) => ({
-        index, attempts: value.attempts, successes: value.successes, failures: value.failures,
+        index,
+        attempts: value.attempts,
+        successes: value.successes,
+        failures: value.failures,
         retryableFailures: value.retryableFailures,
         totalDurationMs: value.durationMs,
         lastFailureAt: value.lastFailureAt,
-        averageLatencyMs: value.attempts ? Number((value.durationMs / value.attempts).toFixed(1)) : null,
+        averageLatencyMs: value.attempts
+            ? Number((value.durationMs / value.attempts).toFixed(1))
+            : null,
     }));
     return {
         startedAt,
@@ -505,23 +641,46 @@ function getCurrentMetrics() {
             memoryHeapTotalMb: Number((memoryUsage.heapTotal / 1048576).toFixed(1)),
             memoryExternalMb: Number((memoryUsage.external / 1048576).toFixed(1)),
             cpuPercent,
-            eventLoopUtilizationPercent: Number((eventLoopUtilization.utilization * 100).toFixed(2)),
+            eventLoopUtilizationPercent: Number(
+                (eventLoopUtilization.utilization * 100).toFixed(2),
+            ),
         },
-        scanner: { running: scannerRunning, paused: scannerPaused, uptimeSeconds: Math.floor(process.uptime()), activeFiltersCount, maxBlocksPerCatchup, maxParallelBlocks, parallelProcessingLagBlocks },
+        scanner: {
+            running: scannerRunning,
+            paused: scannerPaused,
+            uptimeSeconds: Math.floor(process.uptime()),
+            activeFiltersCount,
+            maxBlocksPerCatchup,
+            maxParallelBlocks,
+            parallelProcessingLagBlocks,
+        },
         chain: {
             latestFinalizedBlock,
             latestFinalizedAt,
             finalizedCadence: (() => {
-                const samples = finalizedSamples.filter((sample) => now - sample.timestampMs <= METRICS_RETENTION_MS);
-                const intervals = samples.slice(1).map((sample, index) => ({
-                    intervalMs: sample.timestampMs - samples[index].timestampMs,
-                    blocksAdvanced: sample.blockNumber - samples[index].blockNumber,
-                })).filter((sample) => sample.intervalMs > 0 && sample.blocksAdvanced > 0);
-                const summarize = (values: number[]) => values.length ? {
-                    min: Number(Math.min(...values).toFixed(1)),
-                    average: Number((values.reduce((total, value) => total + value, 0) / values.length).toFixed(1)),
-                    max: Number(Math.max(...values).toFixed(1)),
-                } : { min: null, average: null, max: null };
+                const samples = finalizedSamples.filter(
+                    (sample) => now - sample.timestampMs <= METRICS_RETENTION_MS,
+                );
+                const intervals = samples
+                    .slice(1)
+                    .map((sample, index) => ({
+                        intervalMs: sample.timestampMs - samples[index].timestampMs,
+                        blocksAdvanced: sample.blockNumber - samples[index].blockNumber,
+                    }))
+                    .filter((sample) => sample.intervalMs > 0 && sample.blocksAdvanced > 0);
+                const summarize = (values: number[]) =>
+                    values.length
+                        ? {
+                              min: Number(Math.min(...values).toFixed(1)),
+                              average: Number(
+                                  (
+                                      values.reduce((total, value) => total + value, 0) /
+                                      values.length
+                                  ).toFixed(1),
+                              ),
+                              max: Number(Math.max(...values).toFixed(1)),
+                          }
+                        : { min: null, average: null, max: null };
                 const lastInterval = intervals[intervals.length - 1];
                 return {
                     // A detection is recorded only when the observed finalized height advances.
@@ -540,9 +699,10 @@ function getCurrentMetrics() {
             lagBlocks,
             rpcAvailable,
             finalizedRegression,
-            finalizedRegressionMessage: finalizedRegression && latestFinalizedBlock !== null && lastProcessedBlock !== null
-                ? `RPC returned finalized block ${latestFinalizedBlock}, below checkpoint ${lastProcessedBlock}. Scanner processing is paused and will retry in ${FINALIZED_REGRESSION_WAIT_MS / 1000}s. If this persists, manual intervention and investigation may be required.`
-                : null,
+            finalizedRegressionMessage:
+                finalizedRegression && latestFinalizedBlock !== null && lastProcessedBlock !== null
+                    ? `RPC returned finalized block ${latestFinalizedBlock}, below checkpoint ${lastProcessedBlock}. Scanner processing is paused and will retry in ${FINALIZED_REGRESSION_WAIT_MS / 1000}s. If this persists, manual intervention and investigation may be required.`
+                    : null,
         },
         processing: {
             processedBlocks: totalProcessedBlocks,
@@ -560,19 +720,28 @@ function getCurrentMetrics() {
             totalBlockDurationMs,
             totalDatabaseWriteDurationMs,
             blocksPerSecondLastMinute,
-            transactionsPerSecondLastMinute: Number((recentTransactions / recentWindowSeconds).toFixed(2)),
-            averageTransactionsPerBlock: totalProcessedBlocks ? Number((totalTransactions / totalProcessedBlocks).toFixed(1)) : 0,
+            transactionsPerSecondLastMinute: Number(
+                (recentTransactions / recentWindowSeconds).toFixed(2),
+            ),
+            averageTransactionsPerBlock: totalProcessedBlocks
+                ? Number((totalTransactions / totalProcessedBlocks).toFixed(1))
+                : 0,
             averageBlockDurationMs: average('blockDurationMs'),
             averageFetchDurationMs: average('fetchDurationMs'),
             averageGetBlockDurationMs: average('getBlockDurationMs'),
             averageGetBlockReceiptsDurationMs: average('getBlockReceiptsDurationMs'),
             averageFilterMatchingDurationMs: average('filterMatchingDurationMs'),
             averageDatabaseWriteDurationMs: average('databaseWriteDurationMs'),
-            lastBlockTransactionCount: blockSamples.length > blockSamplesStartIndex ? Number(blockSamples[blockSamples.length - 1].transactionCount) : null,
+            lastBlockTransactionCount:
+                blockSamples.length > blockSamplesStartIndex
+                    ? Number(blockSamples[blockSamples.length - 1].transactionCount)
+                    : null,
         },
         rpc: {
             ...rpcTotals,
-            averageLatencyMs: rpcTotals.totalRequests ? Number((rpcTotals.totalDurationMs / rpcTotals.totalRequests).toFixed(1)) : null,
+            averageLatencyMs: rpcTotals.totalRequests
+                ? Number((rpcTotals.totalDurationMs / rpcTotals.totalRequests).toFixed(1))
+                : null,
             latencyP50Ms: rpcSummary.latencyP50Ms,
             latencyP95Ms: rpcSummary.latencyP95Ms,
             latencyP99Ms: rpcSummary.latencyP99Ms,
@@ -581,10 +750,21 @@ function getCurrentMetrics() {
             operations: {
                 ...rpcOperationTotals,
                 averageAttemptsPerSuccessfulOperation: rpcOperationTotals.successfulOperations
-                    ? Number((rpcOperationTotals.totalSuccessfulAttempts / rpcOperationTotals.successfulOperations).toFixed(2))
+                    ? Number(
+                          (
+                              rpcOperationTotals.totalSuccessfulAttempts /
+                              rpcOperationTotals.successfulOperations
+                          ).toFixed(2),
+                      )
                     : null,
                 retryRate: rpcOperationTotals.totalOperations
-                    ? Number((rpcOperationTotals.retriedOperations / rpcOperationTotals.totalOperations * 100).toFixed(2))
+                    ? Number(
+                          (
+                              (rpcOperationTotals.retriedOperations /
+                                  rpcOperationTotals.totalOperations) *
+                              100
+                          ).toFixed(2),
+                      )
                     : 0,
             },
         },
@@ -604,11 +784,20 @@ function getCurrentMetrics() {
                 return {
                     ...session,
                     durationMs,
-                    blocksPerSecond: durationMs > 0 ? Number((processedBlocks * 1000 / durationMs).toFixed(2)) : 0,
-                    transactionsPerSecond: durationMs > 0 ? Number((processedTransactions * 1000 / durationMs).toFixed(2)) : 0,
+                    blocksPerSecond:
+                        durationMs > 0
+                            ? Number(((processedBlocks * 1000) / durationMs).toFixed(2))
+                            : 0,
+                    transactionsPerSecond:
+                        durationMs > 0
+                            ? Number(((processedTransactions * 1000) / durationMs).toFixed(2))
+                            : 0,
                     finalLagBlocks,
                     lagReductionBlocks,
-                    lagReductionPerSecond: durationMs > 0 ? Number((lagReductionBlocks * 1000 / durationMs).toFixed(2)) : 0,
+                    lagReductionPerSecond:
+                        durationMs > 0
+                            ? Number(((lagReductionBlocks * 1000) / durationMs).toFixed(2))
+                            : 0,
                 };
             }),
         },
@@ -620,9 +809,17 @@ function getCurrentMetrics() {
         },
         database: {
             ...databaseMetrics,
-            averageWriteDurationMs: databaseMetrics.writes ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1)) : null,
+            averageWriteDurationMs: databaseMetrics.writes
+                ? Number((databaseMetrics.totalWriteDurationMs / databaseMetrics.writes).toFixed(1))
+                : null,
             ...databaseQueryTotals,
-            averageQueryDurationMs: databaseQueryTotals.queries ? Number((databaseQueryTotals.totalDurationMs / databaseQueryTotals.queries).toFixed(1)) : null,
+            averageQueryDurationMs: databaseQueryTotals.queries
+                ? Number(
+                      (databaseQueryTotals.totalDurationMs / databaseQueryTotals.queries).toFixed(
+                          1,
+                      ),
+                  )
+                : null,
         },
         recovery: { ...recoveryMetrics },
         recentRpcErrors: rpcSummary.recentErrors,
@@ -638,15 +835,23 @@ function completeCatchUp(status: 'completed' | 'interrupted'): void {
     session.completedAt = new Date(now).toISOString();
     session.endBlock = lastProcessedBlock;
     session.durationMs = durationMs;
-    session.blocksPerSecond = durationMs > 0 ? Number((Number(session.processedBlocks) * 1000 / durationMs).toFixed(2)) : 0;
-    const finalLagBlocks = latestFinalizedBlock !== null && lastProcessedBlock !== null
-        ? Math.max(0, latestFinalizedBlock - lastProcessedBlock)
-        : Number(session.initialLagBlocks);
+    session.blocksPerSecond =
+        durationMs > 0
+            ? Number(((Number(session.processedBlocks) * 1000) / durationMs).toFixed(2))
+            : 0;
+    const finalLagBlocks =
+        latestFinalizedBlock !== null && lastProcessedBlock !== null
+            ? Math.max(0, latestFinalizedBlock - lastProcessedBlock)
+            : Number(session.initialLagBlocks);
     const lagReductionBlocks = Number(session.initialLagBlocks) - finalLagBlocks;
     session.finalLagBlocks = finalLagBlocks;
     session.lagReductionBlocks = lagReductionBlocks;
-    session.lagReductionPerSecond = durationMs > 0 ? Number((lagReductionBlocks * 1000 / durationMs).toFixed(2)) : 0;
-    session.transactionsPerSecond = durationMs > 0 ? Number((Number(session.processedTransactions) * 1000 / durationMs).toFixed(2)) : 0;
+    session.lagReductionPerSecond =
+        durationMs > 0 ? Number(((lagReductionBlocks * 1000) / durationMs).toFixed(2)) : 0;
+    session.transactionsPerSecond =
+        durationMs > 0
+            ? Number(((Number(session.processedTransactions) * 1000) / durationMs).toFixed(2))
+            : 0;
     session.status = status;
     catchUpActive = false;
 }
@@ -657,7 +862,10 @@ export function recordFinalizedBlock(blockNumber: number): void {
     const previousFinalizedSample = finalizedSamples[finalizedSamples.length - 1];
     const headChanged = latestFinalizedBlock === null || blockNumber !== latestFinalizedBlock;
     latestFinalizedBlock = blockNumber;
-    if (finalizedRegression || (previousFinalizedSample && blockNumber < previousFinalizedSample.blockNumber)) {
+    if (
+        finalizedRegression ||
+        (previousFinalizedSample && blockNumber < previousFinalizedSample.blockNumber)
+    ) {
         finalizedSamples.length = 0;
         finalizedSamples.push({ timestampMs: observedAtMs, blockNumber });
     } else if (!previousFinalizedSample || blockNumber > previousFinalizedSample.blockNumber) {
@@ -670,19 +878,38 @@ export function recordFinalizedBlock(blockNumber: number): void {
     if (headChanged) latestFinalizedAt = new Date(observedAtMs).toISOString();
     trimSamples(observedAtMs);
     rpcAvailable = true;
-    const lag = finalizedRegression || lastProcessedBlock === null
-        ? null
-        : Math.max(0, blockNumber - lastProcessedBlock);
+    const lag =
+        finalizedRegression || lastProcessedBlock === null
+            ? null
+            : Math.max(0, blockNumber - lastProcessedBlock);
     const finalizedTimestampMs = Date.now();
-    lagSamples.push({ timestamp: latestFinalizedAt, timestampMs: finalizedTimestampMs, latestFinalizedBlock: blockNumber, lastProcessedBlock, lagBlocks: lag });
+    lagSamples.push({
+        timestamp: latestFinalizedAt,
+        timestampMs: finalizedTimestampMs,
+        latestFinalizedBlock: blockNumber,
+        lastProcessedBlock,
+        lagBlocks: lag,
+    });
     recordMinuteLag(finalizedTimestampMs, lag);
-    if (lag !== null && lag > getDynamicConfigService().getDynamicSettings().scanner.parallelProcessingLagBlocks && !catchUpActive) {
+    if (
+        lag !== null &&
+        lag > getDynamicConfigService().getDynamicSettings().scanner.parallelProcessingLagBlocks &&
+        !catchUpActive
+    ) {
         const now = Date.now();
         catchUpSessions.push({
-            startedAt: new Date(now).toISOString(), startedAtMs: now, completedAt: null,
-            startBlock: (lastProcessedBlock ?? blockNumber) + 1, endBlock: null,
-            initialLagBlocks: lag, processedBlocks: 0, processedTransactions: 0,
-            durationMs: null, blocksPerSecond: null, transactionsPerSecond: null, status: 'running',
+            startedAt: new Date(now).toISOString(),
+            startedAtMs: now,
+            completedAt: null,
+            startBlock: (lastProcessedBlock ?? blockNumber) + 1,
+            endBlock: null,
+            initialLagBlocks: lag,
+            processedBlocks: 0,
+            processedTransactions: 0,
+            durationMs: null,
+            blocksPerSecond: null,
+            transactionsPerSecond: null,
+            status: 'running',
         });
         catchUpActive = true;
     } else if (lag === 0 && catchUpActive) completeCatchUp('completed');
@@ -714,11 +941,19 @@ export function recordProcessedBlock(input: BlockInput): void {
     totalDatabaseWriteDurationMs += input.databaseWriteDurationMs;
     lastProcessedBlock = input.blockNumber;
     lastProcessedAt = timestamp;
-    finalizedRegression = latestFinalizedBlock !== null && latestFinalizedBlock < lastProcessedBlock;
-    const currentLag = finalizedRegression || latestFinalizedBlock === null
-        ? null
-        : Math.max(0, latestFinalizedBlock - lastProcessedBlock);
-    lagSamples.push({ timestamp, timestampMs: now, latestFinalizedBlock, lastProcessedBlock, lagBlocks: currentLag });
+    finalizedRegression =
+        latestFinalizedBlock !== null && latestFinalizedBlock < lastProcessedBlock;
+    const currentLag =
+        finalizedRegression || latestFinalizedBlock === null
+            ? null
+            : Math.max(0, latestFinalizedBlock - lastProcessedBlock);
+    lagSamples.push({
+        timestamp,
+        timestampMs: now,
+        latestFinalizedBlock,
+        lastProcessedBlock,
+        lagBlocks: currentLag,
+    });
     const minuteBucket = getMinuteBucket(now);
     minuteBucket.processedBlocks += 1;
     minuteBucket.processedTransactions += input.transactionCount;
@@ -729,9 +964,11 @@ export function recordProcessedBlock(input: BlockInput): void {
     const session = catchUpSessions[catchUpSessions.length - 1];
     if (session?.status === 'running') {
         session.processedBlocks = Number(session.processedBlocks) + 1;
-        session.processedTransactions = Number(session.processedTransactions) + input.transactionCount;
+        session.processedTransactions =
+            Number(session.processedTransactions) + input.transactionCount;
     }
-    if (latestFinalizedBlock !== null && input.blockNumber >= latestFinalizedBlock && catchUpActive) completeCatchUp('completed');
+    if (latestFinalizedBlock !== null && input.blockNumber >= latestFinalizedBlock && catchUpActive)
+        completeCatchUp('completed');
     trimSamples(now);
     publish();
 }
@@ -751,8 +988,7 @@ export function recordRpcRequest(input: RpcInput): void {
         else if (failureKind === 'provider') {
             rpcTotals.serverErrors += 1;
             rpcTotals.providerErrors += 1;
-        }
-        else if (failureKind === 'rpc') rpcTotals.jsonRpcErrors += 1;
+        } else if (failureKind === 'rpc') rpcTotals.jsonRpcErrors += 1;
         else rpcTotals.otherErrors += 1;
     } else rpcTotals.successes += 1;
     rpcTotals.totalRequests += 1;
@@ -781,7 +1017,14 @@ export function recordRpcRequest(input: RpcInput): void {
         else rpcBucket.rpcOtherErrors += 1;
         if (input.retryable ?? classification.retryable) rpcBucket.rpcRetryableFailures += 1;
     }
-    const endpoint = endpointTotals.get(input.endpointIndex) ?? { attempts: 0, successes: 0, failures: 0, retryableFailures: 0, durationMs: 0, lastFailureAt: null as string | null };
+    const endpoint = endpointTotals.get(input.endpointIndex) ?? {
+        attempts: 0,
+        successes: 0,
+        failures: 0,
+        retryableFailures: 0,
+        durationMs: 0,
+        lastFailureAt: null as string | null,
+    };
     endpoint.attempts += 1;
     endpoint.durationMs += input.durationMs;
     if (input.outcome === 'success') endpoint.successes += 1;
@@ -792,8 +1035,12 @@ export function recordRpcRequest(input: RpcInput): void {
     }
     endpointTotals.set(input.endpointIndex, endpoint);
     rpcEvents.push({
-        timestamp: new Date(now).toISOString(), timestampMs: now, method: input.method,
-        endpointIndex: input.endpointIndex, durationMs: input.durationMs, outcome: input.outcome,
+        timestamp: new Date(now).toISOString(),
+        timestampMs: now,
+        method: input.method,
+        endpointIndex: input.endpointIndex,
+        durationMs: input.durationMs,
+        outcome: input.outcome,
         failureKind,
         httpStatus: input.httpStatus ?? classification.httpStatus,
         rpcCode: input.rpcCode ?? classification.rpcCode,
@@ -804,9 +1051,14 @@ export function recordRpcRequest(input: RpcInput): void {
 }
 
 export function updateScannerContext(input: {
-    running?: boolean; paused?: boolean; activeFiltersCount?: number;
-    lastProcessedBlock?: number | null; recovery?: Record<string, number>;
-    maxBlocksPerCatchup?: number; maxParallelBlocks?: number; parallelProcessingLagBlocks?: number;
+    running?: boolean;
+    paused?: boolean;
+    activeFiltersCount?: number;
+    lastProcessedBlock?: number | null;
+    recovery?: Record<string, number>;
+    maxBlocksPerCatchup?: number;
+    maxParallelBlocks?: number;
+    parallelProcessingLagBlocks?: number;
 }): void {
     if (input.running !== undefined) scannerRunning = input.running;
     if (input.paused !== undefined) scannerPaused = input.paused;
@@ -814,19 +1066,25 @@ export function updateScannerContext(input: {
     if (input.lastProcessedBlock !== undefined) lastProcessedBlock = input.lastProcessedBlock;
     if (input.maxBlocksPerCatchup !== undefined) maxBlocksPerCatchup = input.maxBlocksPerCatchup;
     if (input.maxParallelBlocks !== undefined) maxParallelBlocks = input.maxParallelBlocks;
-    if (input.parallelProcessingLagBlocks !== undefined) parallelProcessingLagBlocks = input.parallelProcessingLagBlocks;
+    if (input.parallelProcessingLagBlocks !== undefined)
+        parallelProcessingLagBlocks = input.parallelProcessingLagBlocks;
     if (input.recovery) recoveryMetrics = { ...input.recovery };
     publish();
 }
 
-
 export function getBlockProcessingMetrics() {
     const now = Date.now();
     const recent = getRecentBlockSummary(now);
-    const recentWindowSeconds = Math.max(1, Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000));
+    const recentWindowSeconds = Math.max(
+        1,
+        Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000),
+    );
     const average = (key: keyof RecentBlockSummary['totals']) =>
         recent.count ? Number((recent.totals[key] / recent.count).toFixed(1)) : null;
-    const last = blockSamples.length > blockSamplesStartIndex ? blockSamples[blockSamples.length - 1] : undefined;
+    const last =
+        blockSamples.length > blockSamplesStartIndex
+            ? blockSamples[blockSamples.length - 1]
+            : undefined;
     return {
         processedBlocks: totalProcessedBlocks,
         totalTransactions: totalProcessedTransactions,
@@ -869,7 +1127,6 @@ export function getCurrentMetrics() {
     return getDynamicConfigService().getCurrentMetrics();
 }
 
-
 export function recordProcessingBatch(input: {
     startBlock: number;
     endBlock: number;
@@ -883,8 +1140,14 @@ export function recordProcessingBatch(input: {
         ...input,
         timestamp: new Date(now).toISOString(),
         timestampMs: now,
-        blocksPerSecond: input.durationMs > 0 ? Number((input.blocks * 1000 / input.durationMs).toFixed(2)) : 0,
-        transactionsPerSecond: input.durationMs > 0 ? Number((input.transactions * 1000 / input.durationMs).toFixed(2)) : 0,
+        blocksPerSecond:
+            input.durationMs > 0
+                ? Number(((input.blocks * 1000) / input.durationMs).toFixed(2))
+                : 0,
+        transactionsPerSecond:
+            input.durationMs > 0
+                ? Number(((input.transactions * 1000) / input.durationMs).toFixed(2))
+                : 0,
     });
     databaseMetrics.writes += 1;
     databaseMetrics.totalWriteDurationMs += input.databaseWriteDurationMs;
@@ -894,7 +1157,6 @@ export function recordProcessingBatch(input: {
     trimSamples(now);
     publish();
 }
-
 
 export function recordDatabaseFailure(operation: string, message: string): void {
     databaseMetrics.failures += 1;
@@ -911,7 +1173,10 @@ function buildScannerAnalytics(
     sortedRpcDurations: Array<{ timestampMs: number; durationMs: number }>,
 ): ScannerAnalyticsResponse {
     const now = Date.now();
-    const requestedWindowMs = Math.max(METRICS_MIN_ANALYTICS_WINDOW_MS, Math.min(windowMs, METRICS_RETENTION_MS));
+    const requestedWindowMs = Math.max(
+        METRICS_MIN_ANALYTICS_WINDOW_MS,
+        Math.min(windowMs, METRICS_RETENTION_MS),
+    );
     const availableWindowMs = Math.max(0, Math.min(requestedWindowMs, now - startedAtMs));
     const since = now - availableWindowMs;
     const recentRpcErrors: Array<Record<string, unknown>> = [];
@@ -924,10 +1189,11 @@ function buildScannerAnalytics(
         if (recentRpcErrors.length >= METRICS_ANALYTICS_RECENT_RPC_ERRORS) break;
     }
     recentRpcErrors.reverse();
-    const selectedSessions = catchUpSessions.filter((session) =>
-        session.status === 'running' ||
-        session.startedAtMs >= since ||
-        (session.completedAt !== null && Date.parse(String(session.completedAt)) >= since),
+    const selectedSessions = catchUpSessions.filter(
+        (session) =>
+            session.status === 'running' ||
+            session.startedAtMs >= since ||
+            (session.completedAt !== null && Date.parse(String(session.completedAt)) >= since),
     );
     const latestBatch: Array<Record<string, unknown>> = [];
     for (let index = batchSamples.length - 1; index >= 0; index -= 1) {
@@ -937,7 +1203,9 @@ function buildScannerAnalytics(
         latestBatch.push(batch);
         break;
     }
-    const selectedMinuteBuckets = minuteBuckets.filter((bucket) => bucket.timestampMs + METRICS_BUCKET_INTERVAL_MS > since);
+    const selectedMinuteBuckets = minuteBuckets.filter(
+        (bucket) => bucket.timestampMs + METRICS_BUCKET_INTERVAL_MS > since,
+    );
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
     const batchTotals = selectedBatches.reduce(
         (totals, sample) => {
@@ -965,7 +1233,10 @@ function buildScannerAnalytics(
     );
     const windowPercentile = (ratio: number): number | null => {
         if (!selectedRpcDurationCount) return null;
-        const targetIndex = Math.min(selectedRpcDurationCount - 1, Math.ceil(selectedRpcDurationCount * ratio) - 1);
+        const targetIndex = Math.min(
+            selectedRpcDurationCount - 1,
+            Math.ceil(selectedRpcDurationCount * ratio) - 1,
+        );
         let selectedIndex = 0;
         for (const sample of sortedRpcDurations) {
             if (sample.timestampMs < since) continue;
@@ -974,12 +1245,26 @@ function buildScannerAnalytics(
         }
         return null;
     };
-    const windowRpcMethods: Record<string, { requests: number; successes: number; failures: number; totalDurationMs: number }> = {};
-    const windowFiltersById: Record<string, { evaluations: number; matches: number; failures: number; totalDurationMs: number }> = {};
-    const windowDatabaseByOperation: Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }> = {};
+    const windowRpcMethods: Record<
+        string,
+        { requests: number; successes: number; failures: number; totalDurationMs: number }
+    > = {};
+    const windowFiltersById: Record<
+        string,
+        { evaluations: number; matches: number; failures: number; totalDurationMs: number }
+    > = {};
+    const windowDatabaseByOperation: Record<
+        string,
+        { count: number; totalDurationMs: number; maxDurationMs: number }
+    > = {};
     for (const bucket of selectedMinuteBuckets) {
         for (const [method, metric] of Object.entries(bucket.rpcMethods)) {
-            const total = windowRpcMethods[method] ?? { requests: 0, successes: 0, failures: 0, totalDurationMs: 0 };
+            const total = windowRpcMethods[method] ?? {
+                requests: 0,
+                successes: 0,
+                failures: 0,
+                totalDurationMs: 0,
+            };
             total.requests += metric.requests;
             total.successes += metric.successes;
             total.failures += metric.failures;
@@ -987,7 +1272,12 @@ function buildScannerAnalytics(
             windowRpcMethods[method] = total;
         }
         for (const [filterId, metric] of Object.entries(bucket.filtersById)) {
-            const total = windowFiltersById[filterId] ?? { evaluations: 0, matches: 0, failures: 0, totalDurationMs: 0 };
+            const total = windowFiltersById[filterId] ?? {
+                evaluations: 0,
+                matches: 0,
+                failures: 0,
+                totalDurationMs: 0,
+            };
             total.evaluations += metric.evaluations;
             total.matches += metric.matches;
             total.failures += metric.failures;
@@ -995,7 +1285,11 @@ function buildScannerAnalytics(
             windowFiltersById[filterId] = total;
         }
         for (const [operation, metric] of Object.entries(bucket.databaseByOperation)) {
-            const total = windowDatabaseByOperation[operation] ?? { count: 0, totalDurationMs: 0, maxDurationMs: 0 };
+            const total = windowDatabaseByOperation[operation] ?? {
+                count: 0,
+                totalDurationMs: 0,
+                maxDurationMs: 0,
+            };
             total.count += metric.count;
             total.totalDurationMs += metric.totalDurationMs;
             total.maxDurationMs = Math.max(total.maxDurationMs, metric.maxDurationMs);
@@ -1012,12 +1306,21 @@ function buildScannerAnalytics(
                 ? Number((batchTotals.transactions / batchTotals.blocks).toFixed(2))
                 : null,
             activeProcessingDurationMs: Number(batchTotals.activeDurationMs.toFixed(1)),
-            activeBlocksPerSecond: batchTotals.activeDurationMs > 0
-                ? Number((batchTotals.blocks * 1000 / batchTotals.activeDurationMs).toFixed(2))
-                : 0,
-            activeTransactionsPerSecond: batchTotals.activeDurationMs > 0
-                ? Number((batchTotals.transactions * 1000 / batchTotals.activeDurationMs).toFixed(2))
-                : 0,
+            activeBlocksPerSecond:
+                batchTotals.activeDurationMs > 0
+                    ? Number(
+                          ((batchTotals.blocks * 1000) / batchTotals.activeDurationMs).toFixed(2),
+                      )
+                    : 0,
+            activeTransactionsPerSecond:
+                batchTotals.activeDurationMs > 0
+                    ? Number(
+                          (
+                              (batchTotals.transactions * 1000) /
+                              batchTotals.activeDurationMs
+                          ).toFixed(2),
+                      )
+                    : 0,
             averageActiveProcessingMsPerBlock: batchTotals.blocks
                 ? Number((batchTotals.activeDurationMs / batchTotals.blocks).toFixed(1))
                 : null,
@@ -1029,10 +1332,19 @@ function buildScannerAnalytics(
                 ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
                 : null,
             averageFilterDurationMs: sumBucketMetric('filterEvaluations')
-                ? Number((sumBucketMetric('predicateDurationMsTotal') / sumBucketMetric('filterEvaluations')).toFixed(2))
+                ? Number(
+                      (
+                          sumBucketMetric('predicateDurationMsTotal') /
+                          sumBucketMetric('filterEvaluations')
+                      ).toFixed(2),
+                  )
                 : null,
             averageDatabaseBatchWriteDurationMs: processedBlocks
-                ? Number((sumBucketMetric('databaseBatchWriteDurationMsTotal') / processedBlocks).toFixed(1))
+                ? Number(
+                      (
+                          sumBucketMetric('databaseBatchWriteDurationMsTotal') / processedBlocks
+                      ).toFixed(1),
+                  )
                 : null,
         },
         rpc: {
@@ -1049,7 +1361,10 @@ function buildScannerAnalytics(
                 ? Number((sumBucketMetric('rpcDurationMsTotal') / rpcRequests).toFixed(1))
                 : null,
             latencyP95Ms: windowPercentile(0.95),
-            methods: Object.entries(windowRpcMethods).map(([method, metric]) => ({ method, ...metric })),
+            methods: Object.entries(windowRpcMethods).map(([method, metric]) => ({
+                method,
+                ...metric,
+            })),
             operations: {
                 totalOperations: logicalRpcOperations,
                 successfulOperations: successfulRpcOperations,
@@ -1058,7 +1373,12 @@ function buildScannerAnalytics(
                 totalRetryAttempts: sumBucketMetric('rpcRetryAttempts'),
                 endpointFailovers: sumBucketMetric('rpcEndpointFailovers'),
                 averageAttemptsPerSuccessfulOperation: successfulRpcOperations
-                    ? Number((sumBucketMetric('successfulOperationAttempts') / successfulRpcOperations).toFixed(2))
+                    ? Number(
+                          (
+                              sumBucketMetric('successfulOperationAttempts') /
+                              successfulRpcOperations
+                          ).toFixed(2),
+                      )
                     : null,
             },
         },
@@ -1069,7 +1389,12 @@ function buildScannerAnalytics(
             other: sumBucketMetric('databaseOther'),
             failures: sumBucketMetric('databaseFailures'),
             averageQueryDurationMs: sumBucketMetric('databaseQueries')
-                ? Number((sumBucketMetric('databaseDurationMsTotal') / sumBucketMetric('databaseQueries')).toFixed(1))
+                ? Number(
+                      (
+                          sumBucketMetric('databaseDurationMsTotal') /
+                          sumBucketMetric('databaseQueries')
+                      ).toFixed(1),
+                  )
                 : null,
             batchWrites: selectedBatches.length,
             totalBatchWriteDurationMs: Number(batchTotals.databaseWriteDurationMs.toFixed(1)),
@@ -1086,7 +1411,12 @@ function buildScannerAnalytics(
             matches: sumBucketMetric('filterMatches'),
             failures: sumBucketMetric('filterFailures'),
             averageDurationMs: sumBucketMetric('filterEvaluations')
-                ? Number((sumBucketMetric('predicateDurationMsTotal') / sumBucketMetric('filterEvaluations')).toFixed(2))
+                ? Number(
+                      (
+                          sumBucketMetric('predicateDurationMsTotal') /
+                          sumBucketMetric('filterEvaluations')
+                      ).toFixed(2),
+                  )
                 : null,
             byFilter: windowFiltersById,
         },
@@ -1103,12 +1433,18 @@ function buildScannerAnalytics(
         current,
         windowMetrics,
         rpcEvents: recentRpcErrors,
-        catchUpSessions: selectedSessions.map(({ startedAtMs: _startedAtMs, ...session }) => session),
+        catchUpSessions: selectedSessions.map(
+            ({ startedAtMs: _startedAtMs, ...session }) => session,
+        ),
         batches: latestBatch,
-        minuteBuckets: selectedMinuteBuckets.map(({ timestampMs: _timestampMs, ...bucket }) => bucket),
+        minuteBuckets: selectedMinuteBuckets.map(
+            ({ timestampMs: _timestampMs, ...bucket }) => bucket,
+        ),
         retention: {
-            oldestBlockSampleAt: (blockSamples[blockSamplesStartIndex]?.timestamp as string | undefined) ?? null,
-            oldestRpcEventAt: (rpcEvents[rpcEventsStartIndex]?.timestamp as string | undefined) ?? null,
+            oldestBlockSampleAt:
+                (blockSamples[blockSamplesStartIndex]?.timestamp as string | undefined) ?? null,
+            oldestRpcEventAt:
+                (rpcEvents[rpcEventsStartIndex]?.timestamp as string | undefined) ?? null,
             blockSamples: blockSamples.length - blockSamplesStartIndex,
             lagSamples: lagSamples.length - lagSamplesStartIndex,
             rpcEvents: rpcEvents.length - rpcEventsStartIndex,
@@ -1125,7 +1461,9 @@ let scannerAnalyticsCache: {
     result: ScannerAnalyticsResponse;
 } | null = null;
 
-export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
+export function getScannerAnalytics(
+    windowLabel: string = DEFAULT_METRICS_WINDOW.value,
+): ScannerAnalyticsResponse {
     const selectedWindow = METRICS_TIME_WINDOWS.find((window) => window.value === windowLabel);
     if (!selectedWindow) {
         throw new Error(`Analytics window "${windowLabel}" is not configured`);
@@ -1134,7 +1472,8 @@ export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW
     const now = Date.now();
     if (
         scannerAnalyticsCache?.windowLabel === windowLabel &&
-        now - scannerAnalyticsCache.generatedAtMs < getDynamicConfigService().getDynamicSettings().metrics.analyticsRefreshMs
+        now - scannerAnalyticsCache.generatedAtMs <
+            getDynamicConfigService().getDynamicSettings().metrics.analyticsRefreshMs
     ) {
         return scannerAnalyticsCache.result;
     }
@@ -1196,9 +1535,14 @@ function recordFilterEvaluation(input: FilterMetricEvent): void {
 
 function recordDatabaseQuery(input: DatabaseMetricEvent): void {
     databaseQueryTotals.queries += 1;
-    databaseQueryTotals[input.operation === 'read' ? 'reads' : input.operation === 'write' ? 'writes' : 'other'] += 1;
+    databaseQueryTotals[
+        input.operation === 'read' ? 'reads' : input.operation === 'write' ? 'writes' : 'other'
+    ] += 1;
     databaseQueryTotals.totalDurationMs += input.durationMs;
-    databaseQueryTotals.maxDurationMs = Math.max(databaseQueryTotals.maxDurationMs, input.durationMs);
+    databaseQueryTotals.maxDurationMs = Math.max(
+        databaseQueryTotals.maxDurationMs,
+        input.durationMs,
+    );
     databaseQueryTotals.lastQueryAt = new Date().toISOString();
     const operation = databaseQueryTotals.byOperation[input.queryType] ?? {
         count: 0,
@@ -1252,4 +1596,3 @@ subscribeToRpcMetricEvents(recordRpcRequest);
 subscribeToRpcOperationMetricEvents(recordRpcOperation);
 subscribeToDatabaseMetricEvents(recordDatabaseQuery);
 subscribeToFilterMetricEvents(recordFilterEvaluation);
-

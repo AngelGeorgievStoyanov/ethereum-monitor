@@ -1,23 +1,14 @@
 import { BlockVerificationUnavailableError } from '../errors/blockVerificationUnavailableError';
-import {
-    getBlockWithConsensus,
-    getBlockWithConsensusAndData,
-} from './blockConsensusService';
+import { getBlockWithConsensus, getBlockWithConsensusAndData } from './blockConsensusService';
 import type { ConsensusBlock } from './blockConsensusService';
-import {
-    fetchBlockForProcessing,
-    type FetchedBlockForProcessing,
-} from './blockProcessingService';
+import { fetchBlockForProcessing, type FetchedBlockForProcessing } from './blockProcessingService';
 
 import {
     CONSENSUS_LOG_INTERVAL_MS,
     CONSENSUS_MAX_RETRIES,
     CONSENSUS_RETRY_INTERVAL_MS,
 } from '../constants/scanner.constants';
-import {
-    evmRpcClient,
-    fetchBlockDataFromVerifiedBlock,
-} from './evmBlockDataService';
+import { evmRpcClient, fetchBlockDataFromVerifiedBlock } from './evmBlockDataService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
 
@@ -84,7 +75,6 @@ export async function getReorgVerifiedBlock(
     console.error(`[ReorgVerification] CRITICAL ${message}`);
     throw new BlockVerificationUnavailableError(blockNumber, operation, message);
 }
-
 
 export async function getReorgVerifiedBlockForProcessing(
     blockNumber: number,

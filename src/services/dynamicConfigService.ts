@@ -36,7 +36,11 @@ export function createDynamicConfigService() {
         return (settings[section] as Record<string, number>)[setting];
     }
 
-    function setDynamicSetting(settings: DynamicSettings, key: DynamicSettingKey, value: number): void {
+    function setDynamicSetting(
+        settings: DynamicSettings,
+        key: DynamicSettingKey,
+        value: number,
+    ): void {
         const [section, setting] = key.split('.') as ['scanner' | 'metrics', string];
         (settings[section] as Record<string, number>)[setting] = value;
     }
@@ -72,10 +76,13 @@ export function createDynamicConfigService() {
                         'metrics.publishIntervalMs',
                         'metrics.analyticsRefreshMs',
                     ].includes(key)
-                ) continue;
+                )
+                    continue;
                 const parsedValue = parseDynamicSettingValue(key, row.value);
                 if (parsedValue === null) {
-                    console.warn(`[DynamicConfig] Invalid value for "${key}"; keeping previous valid value`);
+                    console.warn(
+                        `[DynamicConfig] Invalid value for "${key}"; keeping previous valid value`,
+                    );
                     setDynamicSetting(next, key, getDynamicSetting(dynamicSettings, key));
                     continue;
                 }
@@ -84,7 +91,9 @@ export function createDynamicConfigService() {
             dynamicSettings = next;
             console.log(`[DynamicConfig] Loaded dynamic settings; rows=${rows.length}`);
         } catch (error) {
-            console.error(`[DynamicConfig] Dynamic settings refresh failed; keeping last valid settings: ${formatError(error)}`);
+            console.error(
+                `[DynamicConfig] Dynamic settings refresh failed; keeping last valid settings: ${formatError(error)}`,
+            );
         }
     }
 

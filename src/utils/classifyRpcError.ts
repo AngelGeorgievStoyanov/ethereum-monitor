@@ -12,8 +12,7 @@ import {
     RPC_ERROR_STATUS_KEYS,
 } from '../constants/rpc-error.constants';
 
-export type RpcErrorCategory =
-    (typeof RPC_ERROR_CATEGORIES)[keyof typeof RPC_ERROR_CATEGORIES];
+export type RpcErrorCategory = (typeof RPC_ERROR_CATEGORIES)[keyof typeof RPC_ERROR_CATEGORIES];
 
 export interface RpcErrorClassification {
     category: RpcErrorCategory;
@@ -147,9 +146,7 @@ export function classifyRpcError(error: unknown): RpcErrorClassification {
         details.httpStatuses.some((status) =>
             RPC_ERROR_HTTP_STATUS.RATE_LIMIT.includes(status as 429),
         ) ||
-        details.rpcCodes.some((code) =>
-            RPC_ERROR_JSON_CODES.RATE_LIMIT.includes(code as -32005),
-        ) ||
+        details.rpcCodes.some((code) => RPC_ERROR_JSON_CODES.RATE_LIMIT.includes(code as -32005)) ||
         hasPattern(RPC_ERROR_MESSAGE_PATTERNS.RATE_LIMIT)
     ) {
         category = RPC_ERROR_CATEGORIES.RATE_LIMIT;
@@ -169,10 +166,7 @@ export function classifyRpcError(error: unknown): RpcErrorClassification {
         hasPattern(RPC_ERROR_MESSAGE_PATTERNS.PROVIDER)
     ) {
         category = RPC_ERROR_CATEGORIES.PROVIDER;
-    } else if (
-        details.rpcCodes.length > 0 ||
-        hasPattern(RPC_ERROR_MESSAGE_PATTERNS.RPC)
-    ) {
+    } else if (details.rpcCodes.length > 0 || hasPattern(RPC_ERROR_MESSAGE_PATTERNS.RPC)) {
         category = RPC_ERROR_CATEGORIES.RPC;
     }
 

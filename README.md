@@ -99,7 +99,7 @@ A rescan checks existing canonical history from fromBlock through the saved chec
 
         POST /api/scanner/pause
 
-   The pause is applied on the next 30-second control refresh. The scanner finishes its current processing batch first.
+    The pause is applied on the next 30-second control refresh. The scanner finishes its current processing batch first.
 
 2. Start the rescan:
 
@@ -116,21 +116,21 @@ The scanner must be idle and canonical history must exist for the full range. A 
 
 All routes use the /api prefix.
 
-| Method              | Route                         | Purpose                                                        |
-| ------------------- | ----------------------------- | -------------------------------------------------------------- |
-| GET                 | /health/live                  | Process liveness.                                              |
-| GET                 | /health/ready                 | Database and RPC availability.                                 |
-| GET                 | /scanner/status               | Checkpoint, lag, pause, recovery, RPC, and processing metrics. |
-| GET                 | /scanner/analytics?window=1h   | Full analytics result for the selected 1h or 3h window.      |
-| GET                 | /scanner/analysis?window=1h    | Compact diagnostic report for sharing and performance analysis. |
-| POST                | /scanner/pause                | Request a manual pause.                                        |
-| POST                | /scanner/resume               | Resume scanning.                                               |
-| POST                | /scanner/rescan               | Start a manual rescan.                                         |
-| GET                 | /scanner/rescan/:id           | Check rescan progress.                                         |
-| POST                | /scanner/reorg-retry          | Retry blocked recovery.                                        |
-| GET/POST/PUT/DELETE | /tx-filters                   | Manage filters.                                                |
-| GET                 | /transactions?page=1&limit=20 | List stored transfers.                                         |
-| DELETE              | /transactions/:id             | Delete a stored transfer.                                      |
+| Method              | Route                         | Purpose                                                         |
+| ------------------- | ----------------------------- | --------------------------------------------------------------- |
+| GET                 | /health/live                  | Process liveness.                                               |
+| GET                 | /health/ready                 | Database and RPC availability.                                  |
+| GET                 | /scanner/status               | Checkpoint, lag, pause, recovery, RPC, and processing metrics.  |
+| GET                 | /scanner/analytics?window=1h  | Full analytics result for the selected 1h or 3h window.         |
+| GET                 | /scanner/analysis?window=1h   | Compact diagnostic report for sharing and performance analysis. |
+| POST                | /scanner/pause                | Request a manual pause.                                         |
+| POST                | /scanner/resume               | Resume scanning.                                                |
+| POST                | /scanner/rescan               | Start a manual rescan.                                          |
+| GET                 | /scanner/rescan/:id           | Check rescan progress.                                          |
+| POST                | /scanner/reorg-retry          | Retry blocked recovery.                                         |
+| GET/POST/PUT/DELETE | /tx-filters                   | Manage filters.                                                 |
+| GET                 | /transactions?page=1&limit=20 | List stored transfers.                                          |
+| DELETE              | /transactions/:id             | Delete a stored transfer.                                       |
 
 The dashboard is served separately at GET /dashboard.
 

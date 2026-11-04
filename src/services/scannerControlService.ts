@@ -1,9 +1,15 @@
-import { SCANNER_CONTROL_FAST_REFRESH_INTERVAL_MS, SCANNER_ID } from '../constants/scanner.constants';
+import {
+    SCANNER_CONTROL_FAST_REFRESH_INTERVAL_MS,
+    SCANNER_ID,
+} from '../constants/scanner.constants';
 import {
     findScannerControlRecord,
     updateScannerControlRecord,
 } from '../repositories/scannerStateRepository';
-import { mapScannerControlResponse, mapScannerResumeResponse } from '../mappers/scannerControlMapper';
+import {
+    mapScannerControlResponse,
+    mapScannerResumeResponse,
+} from '../mappers/scannerControlMapper';
 import { updateScannerContext } from './metricsAggregatorService';
 import { getDynamicConfigService } from './dynamicConfigService';
 import type { ScannerControlState } from '../types/scanner-status.types';

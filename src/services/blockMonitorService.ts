@@ -15,7 +15,11 @@ import { processFinalizedBlocks } from './blockProcessor';
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
 import { refreshScannerStatus } from './scannerStatusService';
 import { processReorgRecovery } from './reorgRecoveryService';
-import { recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerContext } from './metricsAggregatorService';
+import {
+    recordFinalizedBlock,
+    recordFinalizedBlockFailure,
+    updateScannerContext,
+} from './metricsAggregatorService';
 
 let processingFinalizedBlocks = false;
 let manualRescanReserved = false;
@@ -64,9 +68,12 @@ export function createBlockMonitorService() {
                 running: true,
                 lastProcessedBlock: state.lastProcessedBlock,
                 activeFiltersCount: dynamicConfigService.getTxFilters().length,
-                maxBlocksPerCatchup: dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
-                maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
-                parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks,
+                maxBlocksPerCatchup:
+                    dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
+                maxParallelBlocks:
+                    dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
+                parallelProcessingLagBlocks:
+                    dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks,
             });
             dynamicConfigService.updateScannerStatus({ scannerRunning: true });
         } catch (error) {
@@ -117,9 +124,13 @@ export function createBlockMonitorService() {
                     running: true,
                     activeFiltersCount: activeTxFilters.length,
                     lastProcessedBlock: state.lastProcessedBlock,
-                    maxBlocksPerCatchup: dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
-                    maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
-                    parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks,
+                    maxBlocksPerCatchup:
+                        dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
+                    maxParallelBlocks:
+                        dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
+                    parallelProcessingLagBlocks:
+                        dynamicConfigService.getDynamicSettings().scanner
+                            .parallelProcessingLagBlocks,
                 });
 
                 if (activeTxFilters.length === 0) {
@@ -139,13 +150,16 @@ export function createBlockMonitorService() {
                     } else {
                         waitingForPause = false;
                         if (manualRescanReserved) {
-                            await sleep(dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs);
+                            await sleep(
+                                dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs,
+                            );
                             continue;
                         }
                         let finalized: Awaited<ReturnType<typeof evmRpcClient.getBlock>>;
                         try {
                             finalized = await evmRpcClient.getBlock('finalized');
-                            if (!finalized) throw new Error('Unable to resolve the latest finalized block');
+                            if (!finalized)
+                                throw new Error('Unable to resolve the latest finalized block');
                             recordFinalizedBlock(finalized.number);
                         } catch (error) {
                             recordFinalizedBlockFailure();
@@ -180,7 +194,9 @@ export function createBlockMonitorService() {
 
                         const finalizedCatchupTarget = Math.min(
                             finalized.number,
-                            state.lastProcessedBlock + dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
+                            state.lastProcessedBlock +
+                                dynamicConfigService.getDynamicSettings().scanner
+                                    .maxBlocksPerCatchup,
                         );
                         if (finalizedCatchupTarget < finalized.number) {
                             console.log(
@@ -190,7 +206,9 @@ export function createBlockMonitorService() {
 
                         // Reserve and block normal processing atomically with respect to the rescan endpoint.
                         if (manualRescanReserved) {
-                            await sleep(dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs);
+                            await sleep(
+                                dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs,
+                            );
                             continue;
                         }
                         processingFinalizedBlocks = true;

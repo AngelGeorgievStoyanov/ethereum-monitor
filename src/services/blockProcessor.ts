@@ -1,8 +1,6 @@
 import type { ScannerState } from '../types/scanner-state.types';
 import type { ActiveTxFilterConfig } from '../types/tx-filter.types';
-import {
-    REORG_RECOVERY_STABLE_BLOCKS,
-} from '../constants/scanner.constants';
+import { REORG_RECOVERY_STABLE_BLOCKS } from '../constants/scanner.constants';
 import { getDynamicConfigService } from './dynamicConfigService';
 import { formatError } from '../utils/formatError';
 import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
@@ -168,7 +166,10 @@ export async function processFinalizedBlocks(
                 startBlock: blockNumbers[0],
                 endBlock: blockNumbers[blockNumbers.length - 1],
                 blocks: preparedBlocks.length,
-                transactions: preparedBlocks.reduce((total, item) => total + item.result.transactionCount, 0),
+                transactions: preparedBlocks.reduce(
+                    (total, item) => total + item.result.transactionCount,
+                    0,
+                ),
                 durationMs: Date.now() - batchStartedAt,
                 databaseWriteDurationMs,
             });

@@ -366,10 +366,7 @@ interface LocalBlockedRecoveryUpdate {
     stableBlocks: number;
 }
 
-function updateLocalBlockedState(
-    state: ScannerState,
-    input: LocalBlockedRecoveryUpdate,
-): void {
+function updateLocalBlockedState(state: ScannerState, input: LocalBlockedRecoveryUpdate): void {
     const updates: Partial<ScannerState> = {};
 
     if (input.initializeRecovery) {
@@ -426,7 +423,6 @@ async function markReceiptConsistencyRecoveryBlocked(
     state: ScannerState,
     error: BlockReceiptConsistencyError,
 ): Promise<void> {
-
     await markReorgRecoveryBlocked({
         scannerStateId: state.id,
         reason: `RECEIPT_CONSISTENCY:block=${error.blockNumber}:${error.message}`,

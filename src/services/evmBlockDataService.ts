@@ -152,7 +152,9 @@ export async function fetchBlockDataFromVerifiedBlock(
         } catch (error) {
             const message = formatError(error);
             if (error instanceof BlockReceiptConsistencyError) {
-                console.error(`[RPC] Verified block ${blockNumber} receipt consistency failure: ${message}`);
+                console.error(
+                    `[RPC] Verified block ${blockNumber} receipt consistency failure: ${message}`,
+                );
                 throw error;
             }
             if (attempt === MAX_BLOCK_FETCH_ATTEMPTS) {

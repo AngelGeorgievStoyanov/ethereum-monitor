@@ -5,7 +5,10 @@ import { initializeDatabase } from './database/initializeDatabase';
 import { getBlockMonitorService } from './services/blockMonitorServiceFactory';
 import { getDynamicConfigService } from './services/dynamicConfigService';
 import { refreshScannerStatus } from './services/scannerStatusService';
-import { initScannerControlRefresh, stopScannerControlRefresh } from './services/scannerControlService';
+import {
+    initScannerControlRefresh,
+    stopScannerControlRefresh,
+} from './services/scannerControlService';
 import { formatError } from './utils/formatError';
 
 export async function startApplication(): Promise<void> {

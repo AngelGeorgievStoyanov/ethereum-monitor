@@ -40,7 +40,9 @@ export function publishRpcOperationMetricEvent(event: RpcOperationMetricEvent): 
     for (const listener of rpcOperationMetricListeners) listener(event);
 }
 
-export function subscribeToRpcOperationMetricEvents(listener: RpcOperationMetricListener): () => void {
+export function subscribeToRpcOperationMetricEvents(
+    listener: RpcOperationMetricListener,
+): () => void {
     rpcOperationMetricListeners.add(listener);
     return () => rpcOperationMetricListeners.delete(listener);
 }

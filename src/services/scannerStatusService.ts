@@ -75,7 +75,8 @@ export async function refreshScannerStatus(): Promise<ScannerStatusResponse> {
         activeFiltersCount:
             currentMetrics?.scanner?.activeFiltersCount ??
             getDynamicConfigService().getTxFilters().length,
-        processUptimeSeconds: currentMetrics?.scanner?.uptimeSeconds ?? Math.floor(process.uptime()),
+        processUptimeSeconds:
+            currentMetrics?.scanner?.uptimeSeconds ?? Math.floor(process.uptime()),
         latestFinalizedBlock,
         latestFinalizedAt,
         lagBlocks,
