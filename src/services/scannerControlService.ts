@@ -4,7 +4,7 @@ import {
     updateScannerControlRecord,
 } from '../repositories/scannerStateRepository';
 import { mapScannerControlResponse, mapScannerResumeResponse } from '../mappers/scannerControlMapper';
-import { updateScannerRuntimeContext } from './metricsAggregatorService';
+import { updateScannerContext } from './metricsAggregatorService';
 import { getDynamicConfigService } from './dynamicConfigService';
 import type { ScannerControlState } from '../types/scanner-status.types';
 import { formatError } from '../utils/formatError';
@@ -12,24 +12,24 @@ import { formatError } from '../utils/formatError';
 let controlRefreshTimer: ReturnType<typeof setInterval> | undefined;
 let controlRefreshInProgress = false;
 
-function publishControlSnapshot(control: ScannerControlState): void {
-    getDynamicConfigService().publishScannerControlSnapshot(control.paused);
-    updateScannerRuntimeContext({ paused: control.paused });
+function publishControlState(control: ScannerControlState): void {
+    getDynamicConfigService().publishScannerControlState(control.paused);
+    updateScannerContext({ paused: control.paused });
 }
 
-async function loadControlSnapshot(): Promise<ScannerControlState> {
+async function loadControlState(): Promise<ScannerControlState> {
     const record = await findScannerControlRecord(SCANNER_ID);
     const control = { paused: record?.paused ?? false };
-    publishControlSnapshot(control);
+    publishControlState(control);
     return control;
 }
 
-async function refreshControlSnapshot(): Promise<void> {
+async function refreshControlState(): Promise<void> {
     if (controlRefreshInProgress) return;
     controlRefreshInProgress = true;
 
     try {
-        await loadControlSnapshot();
+        await loadControlState();
     } catch (error) {
         console.error(
             `[ScannerControl] Fast refresh failed; keeping the last successful pause state: ${formatError(error)}`,
@@ -43,10 +43,10 @@ export async function initScannerControlRefresh(): Promise<void> {
     if (controlRefreshTimer) return;
 
     // Load the initial state before scheduling refreshes or starting the scanner.
-    await loadControlSnapshot();
+    await loadControlState();
 
     controlRefreshTimer = setInterval(() => {
-        void refreshControlSnapshot();
+        void refreshControlState();
     }, SCANNER_CONTROL_FAST_REFRESH_INTERVAL_MS);
     controlRefreshTimer.unref?.();
 
@@ -62,7 +62,7 @@ export function stopScannerControlRefresh(): void {
 }
 
 export function getScannerControlState(): ScannerControlState {
-    return { paused: getDynamicConfigService().getScannerControlSnapshot() };
+    return { paused: getDynamicConfigService().getScannerPaused() };
 }
 
 export async function requestScannerPause(): Promise<void> {

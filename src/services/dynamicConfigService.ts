@@ -10,7 +10,7 @@ import {
     TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
     TX_FILTER_RELOAD_RETRY_DELAYS_MS,
 } from '../constants/tx-filter.constants';
-import type { ActiveTxFilter, TxFilterConfigSnapshot } from '../types/tx-filter.types';
+import type { ActiveTxFilter, ActiveTxFilterConfig } from '../types/tx-filter.types';
 import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
@@ -23,9 +23,9 @@ export function createDynamicConfigService() {
     let refreshTimer: ReturnType<typeof setInterval> | undefined;
     let pendingReloadCount = 0;
     let initialized = false;
-    let runtimeMetricsSnapshot: unknown = null;
-    let scannerStatusSnapshot: unknown = null;
-    let scannerControlPausedSnapshot: boolean | null = null;
+    let currentMetrics: unknown = null;
+    let scannerStatus: unknown = null;
+    let scannerPaused: boolean | null = null;
     let dynamicSettings: DynamicSettings = {
         scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner },
         metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics },
@@ -176,7 +176,7 @@ export function createDynamicConfigService() {
         refreshTimer = undefined;
     }
 
-    function getTxFilterSnapshot(): TxFilterConfigSnapshot {
+    function getActiveTxFilterConfig(): ActiveTxFilterConfig {
         if (!initialized) throw new Error('Dynamic configuration has not been initialized');
         return {
             version: activeTxFilterVersion,
@@ -192,43 +192,43 @@ export function createDynamicConfigService() {
     }
 
     function getTxFilters(): ActiveTxFilter[] {
-        return getTxFilterSnapshot().filters;
+        return getActiveTxFilterConfig().filters;
     }
 
-    // Runtime metrics are passively stored and returned; calculations belong to the aggregator.
-    function publishRuntimeMetrics(snapshot: unknown): void {
-        runtimeMetricsSnapshot = snapshot;
+    // Current metrics are passively stored and returned; calculations belong to the aggregator.
+    function publishMetrics(metrics: unknown): void {
+        currentMetrics = metrics;
     }
 
-    function getRuntimeMetricsSnapshot(): unknown {
-        return runtimeMetricsSnapshot;
+    function getCurrentMetrics(): unknown {
+        return currentMetrics;
     }
 
-    function publishScannerControlSnapshot(paused: boolean): void {
-        scannerControlPausedSnapshot = paused;
-        updateScannerStatusSnapshot({ paused });
+    function publishScannerControlState(paused: boolean): void {
+        scannerPaused = paused;
+        updateScannerStatus({ paused });
     }
 
-    function getScannerControlSnapshot(): boolean {
-        if (scannerControlPausedSnapshot === null) {
+    function getScannerPaused(): boolean {
+        if (scannerPaused === null) {
             throw new Error('Scanner control configuration has not been initialized');
         }
-        return scannerControlPausedSnapshot;
+        return scannerPaused;
     }
 
-    function publishScannerStatus(snapshot: unknown): void {
-        scannerStatusSnapshot = snapshot;
+    function publishScannerStatus(status: unknown): void {
+        scannerStatus = status;
     }
 
-    function getScannerStatusSnapshot(): unknown {
-        return scannerStatusSnapshot;
+    function getScannerStatus(): unknown {
+        return scannerStatus;
     }
 
-    // Dynamic Config remains a passive in-memory snapshot store; callers own all state calculations.
-    function updateScannerStatusSnapshot(patch: Record<string, unknown>): void {
-        if (!scannerStatusSnapshot || typeof scannerStatusSnapshot !== 'object') return;
-        scannerStatusSnapshot = {
-            ...scannerStatusSnapshot,
+    // Dynamic Config remains a passive in-memory state store; callers own all state calculations.
+    function updateScannerStatus(patch: Record<string, unknown>): void {
+        if (!scannerStatus || typeof scannerStatus !== 'object') return;
+        scannerStatus = {
+            ...scannerStatus,
             ...patch,
             checkedAt: new Date().toISOString(),
         };
@@ -241,14 +241,14 @@ export function createDynamicConfigService() {
         stopRefreshTimer,
         getTxFilters,
         getDynamicSettings,
-        getTxFilterSnapshot,
-        publishRuntimeMetrics,
-        getRuntimeMetricsSnapshot,
-        publishScannerControlSnapshot,
-        getScannerControlSnapshot,
+        getActiveTxFilterConfig,
+        publishMetrics,
+        getCurrentMetrics,
+        publishScannerControlState,
+        getScannerPaused,
         publishScannerStatus,
-        getScannerStatusSnapshot,
-        updateScannerStatusSnapshot,
+        getScannerStatus,
+        updateScannerStatus,
     };
 }
 

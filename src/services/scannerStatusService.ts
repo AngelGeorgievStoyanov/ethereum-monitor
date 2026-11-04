@@ -1,7 +1,7 @@
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { findScannerStatusState } from '../repositories/scannerStateRepository';
 import { findLatestScannerRescanJob } from '../repositories/scannerRescanJobRepository';
-import { getScannerRuntimeMetrics } from './metricsAggregatorService';
+import { getCurrentMetrics } from './metricsAggregatorService';
 import { getScannerControlState } from './scannerControlService';
 import { getRecoveryMetrics } from './recoveryMetrics';
 import { getBlockProcessingMetrics } from './scannerMetrics';
@@ -9,7 +9,7 @@ import { getDynamicConfigService } from './dynamicConfigService';
 import { mapScannerStatusResponse } from '../mappers/scannerStatusMapper';
 import type { ScannerStatusResponse } from '../types/scanner-status.types';
 
-type RuntimeStatusMetrics = {
+type CurrentMetrics = {
     scanner?: { running?: boolean; uptimeSeconds?: number; activeFiltersCount?: number };
     recovery?: Record<string, number>;
     chain?: {
@@ -35,25 +35,25 @@ type RuntimeStatusMetrics = {
 };
 
 /**
- * Loads persistent scanner state and publishes a ready-to-read runtime snapshot.
+ * Loads persistent scanner state and publishes a ready-to-read current status.
  * This function is called during scanner initialization and after scanner lock
  * reacquisition, never by the Dashboard request path. Routine checkpoint,
- * control, and rescan changes publish smaller snapshot updates directly.
+ * control, and rescan changes publish smaller status updates directly.
  */
-export async function refreshScannerStatusSnapshot(): Promise<ScannerStatusResponse> {
+export async function refreshScannerStatus(): Promise<ScannerStatusResponse> {
     const [control, state, rescanJob] = await Promise.all([
         getScannerControlState(),
         findScannerStatusState(SCANNER_ID),
         findLatestScannerRescanJob(),
     ]);
 
-    const runtimeMetrics = getScannerRuntimeMetrics() as RuntimeStatusMetrics | null;
-    const latestFinalizedBlock = runtimeMetrics?.chain?.latestFinalizedBlock ?? null;
-    const latestFinalizedAt = runtimeMetrics?.chain?.latestFinalizedAt ?? null;
-    const rpcAvailable = runtimeMetrics?.chain?.rpcAvailable ?? false;
-    const lagBlocks = runtimeMetrics?.chain?.lagBlocks ?? null;
-    const finalizedRegression = runtimeMetrics?.chain?.finalizedRegression ?? false;
-    const rpcMetrics = (runtimeMetrics?.rpc?.endpoints ?? []).map((endpoint) => ({
+    const currentMetrics = getCurrentMetrics() as CurrentMetrics | null;
+    const latestFinalizedBlock = currentMetrics?.chain?.latestFinalizedBlock ?? null;
+    const latestFinalizedAt = currentMetrics?.chain?.latestFinalizedAt ?? null;
+    const rpcAvailable = currentMetrics?.chain?.rpcAvailable ?? false;
+    const lagBlocks = currentMetrics?.chain?.lagBlocks ?? null;
+    const finalizedRegression = currentMetrics?.chain?.finalizedRegression ?? false;
+    const rpcMetrics = (currentMetrics?.rpc?.endpoints ?? []).map((endpoint) => ({
         index: endpoint.index,
         attempts: endpoint.attempts,
         successes: endpoint.successes,
@@ -65,22 +65,22 @@ export async function refreshScannerStatusSnapshot(): Promise<ScannerStatusRespo
 
     const response = mapScannerStatusResponse({
         control,
-        scannerRunning: runtimeMetrics?.scanner?.running ?? false,
+        scannerRunning: currentMetrics?.scanner?.running ?? false,
         state,
         rescanJob,
         recoveryMetrics:
-            (runtimeMetrics?.recovery as ReturnType<typeof getRecoveryMetrics> | undefined) ??
+            (currentMetrics?.recovery as ReturnType<typeof getRecoveryMetrics> | undefined) ??
             getRecoveryMetrics(),
         processingMetrics: getBlockProcessingMetrics(),
         activeFiltersCount:
-            runtimeMetrics?.scanner?.activeFiltersCount ??
+            currentMetrics?.scanner?.activeFiltersCount ??
             getDynamicConfigService().getTxFilters().length,
-        processUptimeSeconds: runtimeMetrics?.scanner?.uptimeSeconds ?? Math.floor(process.uptime()),
+        processUptimeSeconds: currentMetrics?.scanner?.uptimeSeconds ?? Math.floor(process.uptime()),
         latestFinalizedBlock,
         latestFinalizedAt,
         lagBlocks,
         finalizedRegression,
-        finalizedRegressionMessage: runtimeMetrics?.chain?.finalizedRegressionMessage ?? null,
+        finalizedRegressionMessage: currentMetrics?.chain?.finalizedRegressionMessage ?? null,
         rpcAvailable,
         rpcMetrics,
         checkedAt: new Date().toISOString(),
@@ -91,12 +91,12 @@ export async function refreshScannerStatusSnapshot(): Promise<ScannerStatusRespo
 }
 
 /**
- * Dashboard reads only this in-memory snapshot. It performs no database or RPC calls.
+ * Dashboard reads only this in-memory status. It performs no database or RPC calls.
  */
 export function getScannerStatusResponse(): ScannerStatusResponse {
-    const snapshot = getDynamicConfigService().getScannerStatusSnapshot();
-    if (!snapshot) {
+    const status = getDynamicConfigService().getScannerStatus();
+    if (!status) {
         throw new Error('Scanner status is still initializing');
     }
-    return snapshot as ScannerStatusResponse;
+    return status as ScannerStatusResponse;
 }

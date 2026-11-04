@@ -16,7 +16,7 @@ async function updateAndPublishRescanJob(
     updates: Parameters<typeof updateScannerRescanJob>[1],
 ): Promise<ScannerRescanJobSummary | null> {
     const updatedJob = await updateScannerRescanJob(jobId, updates);
-    if (updatedJob) getDynamicConfigService().updateScannerStatusSnapshot({ rescanJob: updatedJob });
+    if (updatedJob) getDynamicConfigService().updateScannerStatus({ rescanJob: updatedJob });
     return updatedJob;
 }
 

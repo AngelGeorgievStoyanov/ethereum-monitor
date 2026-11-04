@@ -4,7 +4,7 @@ import { HTTP_HOST, HTTP_PORT } from './constants/http.constants';
 import { initializeDatabase } from './database/initializeDatabase';
 import { getBlockMonitorService } from './services/blockMonitorServiceFactory';
 import { getDynamicConfigService } from './services/dynamicConfigService';
-import { refreshScannerStatusSnapshot } from './services/scannerStatusService';
+import { refreshScannerStatus } from './services/scannerStatusService';
 import { initScannerControlRefresh, stopScannerControlRefresh } from './services/scannerControlService';
 import { formatError } from './utils/formatError';
 
@@ -17,7 +17,7 @@ export async function startApplication(): Promise<void> {
         dynamicConfigService = getDynamicConfigService();
         await dynamicConfigService.init();
         await initScannerControlRefresh();
-        await refreshScannerStatusSnapshot();
+        await refreshScannerStatus();
 
         const blockMonitorService = getBlockMonitorService();
         const server = app.listen(HTTP_PORT, HTTP_HOST);

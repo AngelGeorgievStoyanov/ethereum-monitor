@@ -5,8 +5,8 @@ import {
     REORG_RECOVERY_STABLE_BLOCKS,
     SCANNER_ID,
 } from '../constants/scanner.constants';
-import type { ScannerRuntimeState } from '../types/scanner-state.types';
-import { refreshScannerState, updateScannerRuntimeState } from './scannerStateService';
+import type { ScannerState } from '../types/scanner-state.types';
+import { refreshScannerState, updateScannerState } from './scannerStateService';
 import {
     markReorgRecoveryBlocked,
     markReorgRecoveryPending as persistReorgRecoveryPending,
@@ -21,7 +21,7 @@ import {
 } from './reorgBlockVerificationService';
 import { BlockReceiptConsistencyError, evmRpcClient } from './evmBlockDataService';
 import { persistProcessedBlockBatch } from './scannerPersistenceService';
-import type { TxFilterConfigSnapshot } from '../types/tx-filter.types';
+import type { ActiveTxFilterConfig } from '../types/tx-filter.types';
 import {
     findCanonicalBlockIdentitiesInRange,
     type CanonicalBlockIdentity,
@@ -60,7 +60,7 @@ export async function retryBlockedReorgRecovery(): Promise<RetryBlockedReorgReco
     const unblocked = await unblockScannerReorgRecovery(SCANNER_ID);
     if (!unblocked) return { kind: 'state-changed' };
 
-    updateScannerRuntimeState({
+    updateScannerState({
         reorgRecoveryBlocked: false,
         reorgRecoveryBlockReason: null,
     });
@@ -103,7 +103,7 @@ export async function markReorgRecoveryPending(
 ): Promise<void> {
     await persistReorgRecoveryPending(scannerStateId, checkpoint, targetBlock);
     lastVerifiedFinalizedHead = '';
-    updateScannerRuntimeState({
+    updateScannerState({
         reorgRecoveryActive: true,
         reorgRecoveryBlocked: false,
         reorgRecoveryBlockReason: null,
@@ -113,7 +113,7 @@ export async function markReorgRecoveryPending(
     });
 }
 
-async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void> {
+async function findAncestorAndRollback(state: ScannerState): Promise<void> {
     const originalCheckpoint = state.reorgRecoveryStartBlock;
     if (originalCheckpoint === null)
         throw new Error('Reorg recovery has no checkpoint to reconcile');
@@ -187,7 +187,7 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
         reorgRecoveryTargetBlock:
             state.reorgRecoveryTargetBlock ?? originalCheckpoint + REORG_RECOVERY_STABLE_BLOCKS,
     });
-    updateScannerRuntimeState(state);
+    updateScannerState(state);
     cacheConfirmedCheckpointBlock(ancestor, rollback.checkpoint);
     recordReorgAncestorFound(ancestorDepth);
     console.warn(
@@ -196,10 +196,10 @@ async function findAncestorAndRollback(state: ScannerRuntimeState): Promise<void
 }
 
 async function processReorgRecoveryInternal(
-    state: ScannerRuntimeState,
+    state: ScannerState,
     finalizedBlockNumber: number,
     finalizedBlockHash: string,
-    getActiveTxFilters: () => TxFilterConfigSnapshot,
+    getActiveTxFilters: () => ActiveTxFilterConfig,
 ): Promise<boolean> {
     if (state.reorgRecoveryBlocked) return true;
     if (state.reorgRecoveryActive) logSingleProviderReorgMode();
@@ -267,7 +267,7 @@ async function processReorgRecoveryInternal(
     }
 
     while (state.reorgRecoveryActive && state.lastProcessedBlock < finalizedBlockNumber) {
-        if (getDynamicConfigService().getScannerControlSnapshot()) return true;
+        if (getDynamicConfigService().getScannerPaused()) return true;
 
         const blockNumber = state.lastProcessedBlock + 1;
         const fetched = await getReorgVerifiedBlockForProcessing(blockNumber, 'reorg recovery');
@@ -367,10 +367,10 @@ interface LocalBlockedRecoveryUpdate {
 }
 
 function updateLocalBlockedState(
-    state: ScannerRuntimeState,
+    state: ScannerState,
     input: LocalBlockedRecoveryUpdate,
 ): void {
-    const updates: Partial<ScannerRuntimeState> = {};
+    const updates: Partial<ScannerState> = {};
 
     if (input.initializeRecovery) {
         if (!state.reorgRecoveryActive) {
@@ -392,11 +392,11 @@ function updateLocalBlockedState(
     updates.reorgRecoveryBlocked = true;
     updates.reorgRecoveryBlockReason = input.reason.slice(0, 500);
     Object.assign(state, updates);
-    updateScannerRuntimeState(updates);
+    updateScannerState(updates);
 }
 
 async function markVerificationRecoveryBlocked(
-    state: ScannerRuntimeState,
+    state: ScannerState,
     error: BlockVerificationUnavailableError,
 ): Promise<void> {
     if (error instanceof ConsensusUnavailableError) recordReorgConsensusFailure();
@@ -423,7 +423,7 @@ async function markVerificationRecoveryBlocked(
 }
 
 async function markReceiptConsistencyRecoveryBlocked(
-    state: ScannerRuntimeState,
+    state: ScannerState,
     error: BlockReceiptConsistencyError,
 ): Promise<void> {
 
@@ -443,10 +443,10 @@ async function markReceiptConsistencyRecoveryBlocked(
 }
 
 export async function processReorgRecovery(
-    state: ScannerRuntimeState,
+    state: ScannerState,
     finalizedBlockNumber: number,
     finalizedBlockHash: string,
-    getActiveTxFilters: () => TxFilterConfigSnapshot,
+    getActiveTxFilters: () => ActiveTxFilterConfig,
 ): Promise<boolean> {
     try {
         return await processReorgRecoveryInternal(
@@ -473,7 +473,7 @@ export async function processReorgRecovery(
 }
 
 async function markRecoverySafetyBlocked(
-    state: ScannerRuntimeState,
+    state: ScannerState,
     error: ReorgRecoverySafetyError,
 ): Promise<void> {
     await markReorgRecoveryBlocked({

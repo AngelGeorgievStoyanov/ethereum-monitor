@@ -1,4 +1,4 @@
-import type { ScannerRuntimeState } from '../types/scanner-state.types';
+import type { ScannerState } from '../types/scanner-state.types';
 import {
     SCANNER_STALL_CHECK_INTERVAL_MS,
     SCANNER_STALL_WARNING_INTERVAL_MS,
@@ -13,9 +13,9 @@ import { registerScannerState } from './scannerStateService';
 import { processFinalizedBlocks } from './blockProcessor';
 
 import { markActiveScannerRescanJobsInterrupted } from '../repositories/scannerRescanJobRepository';
-import { refreshScannerStatusSnapshot } from './scannerStatusService';
+import { refreshScannerStatus } from './scannerStatusService';
 import { processReorgRecovery } from './reorgRecoveryService';
-import { recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerRuntimeContext } from './metricsAggregatorService';
+import { recordFinalizedBlock, recordFinalizedBlockFailure, updateScannerContext } from './metricsAggregatorService';
 
 let processingFinalizedBlocks = false;
 let manualRescanReserved = false;
@@ -53,14 +53,14 @@ export function createBlockMonitorService() {
         if (scannerStarted) return;
         scannerStarted = true;
 
-        let state: ScannerRuntimeState;
+        let state: ScannerState;
 
         try {
             await markInterruptedRescanJobs();
             state = await initializeScannerState();
             registerScannerState(state);
-            await refreshScannerStatusSnapshot();
-            updateScannerRuntimeContext({
+            await refreshScannerStatus();
+            updateScannerContext({
                 running: true,
                 lastProcessedBlock: state.lastProcessedBlock,
                 activeFiltersCount: dynamicConfigService.getTxFilters().length,
@@ -68,7 +68,7 @@ export function createBlockMonitorService() {
                 maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
                 parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks,
             });
-            dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
+            dynamicConfigService.updateScannerStatus({ scannerRunning: true });
         } catch (error) {
             scannerStarted = false;
             throw error;
@@ -113,7 +113,7 @@ export function createBlockMonitorService() {
             try {
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
-                updateScannerRuntimeContext({
+                updateScannerContext({
                     running: true,
                     activeFiltersCount: activeTxFilters.length,
                     lastProcessedBlock: state.lastProcessedBlock,
@@ -131,7 +131,7 @@ export function createBlockMonitorService() {
                     waitingForFilters = true;
                     waitingForPause = false;
                 } else {
-                    if (dynamicConfigService.getScannerControlSnapshot()) {
+                    if (dynamicConfigService.getScannerPaused()) {
                         if (!waitingForPause) {
                             console.log('[Scanner] Paused; skipping finalized-block RPC polling');
                         }
@@ -202,15 +202,15 @@ export function createBlockMonitorService() {
                                 state,
                                 finalizedCatchupTarget,
                                 finalized.hash ?? '',
-                                () => dynamicConfigService.getTxFilterSnapshot(),
+                                () => dynamicConfigService.getActiveTxFilterConfig(),
                             );
                             if (!recoveryHandled) {
                                 await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
-                                    dynamicConfigService.getTxFilterSnapshot(),
+                                    dynamicConfigService.getActiveTxFilterConfig(),
                                 );
                             }
-                            updateScannerRuntimeContext({ lastProcessedBlock: state.lastProcessedBlock });
-                            dynamicConfigService.updateScannerStatusSnapshot({
+                            updateScannerContext({ lastProcessedBlock: state.lastProcessedBlock });
+                            dynamicConfigService.updateScannerStatus({
                                 lastProcessedBlock: state.lastProcessedBlock,
                                 reorgRecoveryActive: state.reorgRecoveryActive,
                                 reorgRecoveryBlocked: state.reorgRecoveryBlocked,

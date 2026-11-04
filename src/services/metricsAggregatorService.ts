@@ -246,9 +246,9 @@ function publish(): void {
     publishTimer = setTimeout(() => {
         publishTimer = undefined;
         try {
-            const currentSnapshot = getSnapshot();
-            getDynamicConfigService().publishRuntimeMetrics(currentSnapshot);
-            const runtime = currentSnapshot as {
+            const currentMetrics = getCurrentMetrics();
+            getDynamicConfigService().publishMetrics(currentMetrics);
+            const current = currentMetrics as {
                 scanner: {
                     running: boolean;
                     paused: boolean;
@@ -267,25 +267,25 @@ function publish(): void {
                 rpc: { endpoints: Array<Record<string, unknown>> };
                 recovery: Record<string, number>;
             };
-            getDynamicConfigService().updateScannerStatusSnapshot({
-                scannerRunning: runtime.scanner.running,
-                paused: runtime.scanner.paused,
-                processUptimeSeconds: runtime.scanner.uptimeSeconds,
-                activeFiltersCount: runtime.scanner.activeFiltersCount,
-                latestFinalizedBlock: runtime.chain.latestFinalizedBlock,
-                latestFinalizedAt: runtime.chain.latestFinalizedAt,
-                lastProcessedBlock: runtime.chain.lastProcessedBlock,
-                lagBlocks: runtime.chain.lagBlocks,
-                finalizedRegression: runtime.chain.finalizedRegression,
-                finalizedRegressionMessage: runtime.chain.finalizedRegressionMessage,
-                rpcAvailable: runtime.chain.rpcAvailable ?? false,
-                rpcMetrics: runtime.rpc.endpoints,
-                recoveryMetrics: runtime.recovery,
+            getDynamicConfigService().updateScannerStatus({
+                scannerRunning: current.scanner.running,
+                paused: current.scanner.paused,
+                processUptimeSeconds: current.scanner.uptimeSeconds,
+                activeFiltersCount: current.scanner.activeFiltersCount,
+                latestFinalizedBlock: current.chain.latestFinalizedBlock,
+                latestFinalizedAt: current.chain.latestFinalizedAt,
+                lastProcessedBlock: current.chain.lastProcessedBlock,
+                lagBlocks: current.chain.lagBlocks,
+                finalizedRegression: current.chain.finalizedRegression,
+                finalizedRegressionMessage: current.chain.finalizedRegressionMessage,
+                rpcAvailable: current.chain.rpcAvailable ?? false,
+                rpcMetrics: current.rpc.endpoints,
+                recoveryMetrics: current.recovery,
                 processingMetrics: getBlockProcessingMetrics(),
             });
         } catch (error) {
             console.error(
-                `[Metrics] Failed to publish runtime metrics; scanner processing will continue: ${String(error)}`,
+                `[Metrics] Failed to publish current metrics; scanner processing will continue: ${String(error)}`,
             );
         }
     }, getDynamicConfigService().getDynamicSettings().metrics.publishIntervalMs);
@@ -451,7 +451,7 @@ function getRecentBlockSummary(now: number): RecentBlockSummary {
     return summary;
 }
 
-function getSnapshot() {
+function getCurrentMetrics() {
     const now = Date.now();
     trimSamples(now);
     const rpcSummary = getRpcSummary(now);
@@ -499,7 +499,7 @@ function getSnapshot() {
     return {
         startedAt,
         updatedAt: new Date(now).toISOString(),
-        runtime: {
+        current: {
             memoryRssMb: Number((memoryUsage.rss / 1048576).toFixed(1)),
             memoryHeapUsedMb: Number((memoryUsage.heapUsed / 1048576).toFixed(1)),
             memoryHeapTotalMb: Number((memoryUsage.heapTotal / 1048576).toFixed(1)),
@@ -803,7 +803,7 @@ export function recordRpcRequest(input: RpcInput): void {
     publish();
 }
 
-export function updateScannerRuntimeContext(input: {
+export function updateScannerContext(input: {
     running?: boolean; paused?: boolean; activeFiltersCount?: number;
     lastProcessedBlock?: number | null; recovery?: Record<string, number>;
     maxBlocksPerCatchup?: number; maxParallelBlocks?: number; parallelProcessingLagBlocks?: number;
@@ -865,8 +865,8 @@ export function getBlockProcessingMetrics() {
     };
 }
 
-export function getScannerRuntimeMetrics() {
-    return getDynamicConfigService().getRuntimeMetricsSnapshot();
+export function getCurrentMetrics() {
+    return getDynamicConfigService().getCurrentMetrics();
 }
 
 
@@ -907,7 +907,7 @@ export function recordDatabaseFailure(operation: string, message: string): void 
 function buildScannerAnalytics(
     windowMs: number,
     windowLabel: string,
-    current: ReturnType<typeof getSnapshot>,
+    current: ReturnType<typeof getCurrentMetrics>,
     sortedRpcDurations: Array<{ timestampMs: number; durationMs: number }>,
 ): ScannerAnalyticsResponse {
     const now = Date.now();
@@ -1122,7 +1122,7 @@ function buildScannerAnalytics(
 let scannerAnalyticsCache: {
     windowLabel: string;
     generatedAtMs: number;
-    snapshot: ScannerAnalyticsResponse;
+    result: ScannerAnalyticsResponse;
 } | null = null;
 
 export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW.value): ScannerAnalyticsResponse {
@@ -1136,16 +1136,16 @@ export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW
         scannerAnalyticsCache?.windowLabel === windowLabel &&
         now - scannerAnalyticsCache.generatedAtMs < getDynamicConfigService().getDynamicSettings().metrics.analyticsRefreshMs
     ) {
-        return scannerAnalyticsCache.snapshot;
+        return scannerAnalyticsCache.result;
     }
 
-    const current = getSnapshot();
+    const current = getCurrentMetrics();
     const sortedRpcDurations = rpcEvents
         .slice(rpcEventsStartIndex)
         .map((event) => ({ timestampMs: event.timestampMs, durationMs: Number(event.durationMs) }))
         .filter((sample) => Number.isFinite(sample.durationMs))
         .sort((left, right) => left.durationMs - right.durationMs);
-    const snapshot = buildScannerAnalytics(
+    const result = buildScannerAnalytics(
         selectedWindow.durationMs,
         windowLabel,
         current,
@@ -1153,8 +1153,8 @@ export function getScannerAnalytics(windowLabel: string = DEFAULT_METRICS_WINDOW
     );
 
     // Keep only the most recently requested window; analytics payloads can contain large sample arrays.
-    scannerAnalyticsCache = { windowLabel, generatedAtMs: now, snapshot };
-    return snapshot;
+    scannerAnalyticsCache = { windowLabel, generatedAtMs: now, result };
+    return result;
 }
 
 function recordFilterEvaluation(input: FilterMetricEvent): void {

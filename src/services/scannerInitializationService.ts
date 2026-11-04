@@ -1,4 +1,4 @@
-import type { ScannerRuntimeState } from '../types/scanner-state.types';
+import type { ScannerState } from '../types/scanner-state.types';
 import { createScannerState, findScannerState } from '../repositories/scannerStateRepository';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
@@ -11,7 +11,7 @@ export class UnsafeScannerStartError extends Error {
     }
 }
 
-export async function initializeScannerState(): Promise<ScannerRuntimeState> {
+export async function initializeScannerState(): Promise<ScannerState> {
     let state = await findScannerState(SCANNER_ID);
 
     if (!state) {

@@ -20,7 +20,7 @@ export interface ActiveTxFilter {
     predicate: CompiledTxFilter;
 }
 
-export interface TxFilterConfigSnapshot {
+export interface ActiveTxFilterConfig {
     version: string;
     filters: ActiveTxFilter[];
 }
