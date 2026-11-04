@@ -18,35 +18,52 @@ export async function initializeDatabase(): Promise<void> {
     await sequelize.authenticate();
     await sequelize.sync();
 
-    await Configuration.bulkCreate(
-        [
+    const defaultConfigurations = [
+        {
+            settingKey: 'maxParallelBlocks',
+            value: String(SCANNER_MAX_PARALLEL_BLOCKS),
+            description: 'Maximum number of blocks processed concurrently by the scanner.',
+        },
+        {
+            settingKey: 'parallelProcessingLagBlocks',
+            value: String(SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS),
+            description: 'Number of blocks the scanner stays behind the chain head during processing.',
+        },
+        {
+            settingKey: 'maxBlocksPerCatchup',
+            value: String(MAX_BLOCKS_PER_FINALIZED_CATCHUP),
+            description: 'Maximum number of finalized blocks processed in a single catch-up batch.',
+        },
+        {
+            settingKey: 'pollIntervalMs',
+            value: String(SCANNER_POLL_INTERVAL_MS),
+            description: 'Interval between scanner checks for newly available blocks, in milliseconds.',
+        },
+        {
+            settingKey: 'publishIntervalMs',
+            value: String(METRICS_PUBLISH_INTERVAL_MS),
+            description: 'Interval at which collected scanner metrics are published, in milliseconds.',
+        },
+        {
+            settingKey: 'analyticsRefreshMs',
+            value: String(METRICS_ANALYTICS_REFRESH_INTERVAL_MS),
+            description: 'Interval at which metrics analytics are recalculated, in milliseconds.',
+        },
+    ];
+
+    await Configuration.bulkCreate(defaultConfigurations, { ignoreDuplicates: true });
+
+    for (const configuration of defaultConfigurations) {
+        await Configuration.update(
+            { description: configuration.description },
             {
-                settingKey: 'maxParallelBlocks',
-                value: String(SCANNER_MAX_PARALLEL_BLOCKS),
+                where: {
+                    settingKey: configuration.settingKey,
+                    description: null,
+                },
             },
-            {
-                settingKey: 'parallelProcessingLagBlocks',
-                value: String(SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS),
-            },
-            {
-                settingKey: 'maxBlocksPerCatchup',
-                value: String(MAX_BLOCKS_PER_FINALIZED_CATCHUP),
-            },
-            {
-                settingKey: 'pollIntervalMs',
-                value: String(SCANNER_POLL_INTERVAL_MS),
-            },
-            {
-                settingKey: 'publishIntervalMs',
-                value: String(METRICS_PUBLISH_INTERVAL_MS),
-            },
-            {
-                settingKey: 'analyticsRefreshMs',
-                value: String(METRICS_ANALYTICS_REFRESH_INTERVAL_MS),
-            },
-        ],
-        { ignoreDuplicates: true },
-    );
+        );
+    }
 
     console.log('[Database] Connection established, missing tables synchronized, and default configuration seeded');
 }
