@@ -66,11 +66,11 @@ export async function processFinalizedBlocks(
         const activeTxFilters = filterConfig.filters;
         if (activeTxFilters.length === 0) return;
 
-        const runtimeConfig = getDynamicConfigService().getRuntimeConfigSnapshot();
+        const dynamicSettings = getDynamicConfigService().getDynamicSettings();
         const lag = finalizedBlockNumber - state.lastProcessedBlock;
         const batchSize =
-            lag > runtimeConfig['scanner.parallelProcessingLagBlocks']
-                ? runtimeConfig['scanner.maxParallelBlocks']
+            lag > dynamicSettings.scanner.parallelProcessingLagBlocks
+                ? dynamicSettings.scanner.maxParallelBlocks
                 : 1;
         const blockNumbers = Array.from(
             { length: Math.min(batchSize, finalizedBlockNumber - state.lastProcessedBlock) },
