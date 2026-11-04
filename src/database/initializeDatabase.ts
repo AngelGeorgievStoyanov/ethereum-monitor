@@ -29,7 +29,7 @@ export async function initializeDatabase(): Promise<void> {
             'scanner.parallelProcessingLagBlocks': 'Lag threshold that enables parallel block processing',
             'scanner.maxBlocksPerCatchup': 'Maximum finalized blocks included in one catch-up iteration',
             'scanner.pollIntervalMs': 'Interval between finalized block polling attempts',
-            'metrics.publishIntervalMs': 'Minimum delay between metrics snapshot publications',
+            'metrics.publishIntervalMs': 'Minimum delay between metrics updates',
             'metrics.analyticsRefreshMs': 'Cache refresh interval for metrics analytics',
         };
         const entries: Array<[DynamicSettingKey, number]> = [
