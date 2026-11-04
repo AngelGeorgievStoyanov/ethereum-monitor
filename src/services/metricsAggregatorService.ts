@@ -245,43 +245,49 @@ function publish(): void {
     if (publishTimer) return;
     publishTimer = setTimeout(() => {
         publishTimer = undefined;
-        const currentSnapshot = getSnapshot();
-        getDynamicConfigService().publishRuntimeMetrics(currentSnapshot);
-        const runtime = currentSnapshot as {
-            scanner: {
-                running: boolean;
-                paused: boolean;
-                uptimeSeconds: number;
-                activeFiltersCount: number;
+        try {
+            const currentSnapshot = getSnapshot();
+            getDynamicConfigService().publishRuntimeMetrics(currentSnapshot);
+            const runtime = currentSnapshot as {
+                scanner: {
+                    running: boolean;
+                    paused: boolean;
+                    uptimeSeconds: number;
+                    activeFiltersCount: number;
+                };
+                chain: {
+                    latestFinalizedBlock: number | null;
+                    latestFinalizedAt: string | null;
+                    lastProcessedBlock: number | null;
+                    lagBlocks: number | null;
+                    finalizedRegression: boolean;
+                    finalizedRegressionMessage: string | null;
+                    rpcAvailable: boolean | null;
+                };
+                rpc: { endpoints: Array<Record<string, unknown>> };
+                recovery: Record<string, number>;
             };
-            chain: {
-                latestFinalizedBlock: number | null;
-                latestFinalizedAt: string | null;
-                lastProcessedBlock: number | null;
-                lagBlocks: number | null;
-                finalizedRegression: boolean;
-                finalizedRegressionMessage: string | null;
-                rpcAvailable: boolean | null;
-            };
-            rpc: { endpoints: Array<Record<string, unknown>> };
-            recovery: Record<string, number>;
-        };
-        getDynamicConfigService().updateScannerStatusSnapshot({
-            scannerRunning: runtime.scanner.running,
-            paused: runtime.scanner.paused,
-            processUptimeSeconds: runtime.scanner.uptimeSeconds,
-            activeFiltersCount: runtime.scanner.activeFiltersCount,
-            latestFinalizedBlock: runtime.chain.latestFinalizedBlock,
-            latestFinalizedAt: runtime.chain.latestFinalizedAt,
-            lastProcessedBlock: runtime.chain.lastProcessedBlock,
-            lagBlocks: runtime.chain.lagBlocks,
-            finalizedRegression: runtime.chain.finalizedRegression,
-            finalizedRegressionMessage: runtime.chain.finalizedRegressionMessage,
-            rpcAvailable: runtime.chain.rpcAvailable ?? false,
-            rpcMetrics: runtime.rpc.endpoints,
-            recoveryMetrics: runtime.recovery,
-            processingMetrics: getBlockProcessingMetrics(),
-        });
+            getDynamicConfigService().updateScannerStatusSnapshot({
+                scannerRunning: runtime.scanner.running,
+                paused: runtime.scanner.paused,
+                processUptimeSeconds: runtime.scanner.uptimeSeconds,
+                activeFiltersCount: runtime.scanner.activeFiltersCount,
+                latestFinalizedBlock: runtime.chain.latestFinalizedBlock,
+                latestFinalizedAt: runtime.chain.latestFinalizedAt,
+                lastProcessedBlock: runtime.chain.lastProcessedBlock,
+                lagBlocks: runtime.chain.lagBlocks,
+                finalizedRegression: runtime.chain.finalizedRegression,
+                finalizedRegressionMessage: runtime.chain.finalizedRegressionMessage,
+                rpcAvailable: runtime.chain.rpcAvailable ?? false,
+                rpcMetrics: runtime.rpc.endpoints,
+                recoveryMetrics: runtime.recovery,
+                processingMetrics: getBlockProcessingMetrics(),
+            });
+        } catch (error) {
+            console.error(
+                `[Metrics] Failed to publish runtime metrics; scanner processing will continue: ${String(error)}`,
+            );
+        }
     }, getDynamicConfigService().getDynamicSettings().metrics.publishIntervalMs);
     publishTimer.unref?.();
 }
