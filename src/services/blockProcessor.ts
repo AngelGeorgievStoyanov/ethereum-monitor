@@ -1,6 +1,10 @@
 import type { ScannerState } from '../types/scanner-state.types';
 import type { ActiveTxFilterConfig } from '../types/tx-filter.types';
-import { REORG_RECOVERY_STABLE_BLOCKS } from '../constants/scanner.constants';
+import {
+    REORG_RECOVERY_STABLE_BLOCKS,
+    SCANNER_MAX_PARALLEL_BLOCKS,
+    SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
+} from '../constants/scanner.constants';
 import { getDynamicConfigService } from './dynamicConfigService';
 import { formatError } from '../utils/formatError';
 import { fetchBlockForProcessing, processFetchedBlock } from './blockProcessingService';
@@ -65,11 +69,13 @@ export async function processFinalizedBlocks(
         if (activeTxFilters.length === 0) return;
 
         const dynamicSettings = getDynamicConfigService().getDynamicSettings();
+        const parallelProcessingLagBlocks =
+            Number(dynamicSettings.parallelProcessingLagBlocks) ||
+            SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS;
+        const maxParallelBlocks =
+            Number(dynamicSettings.maxParallelBlocks) || SCANNER_MAX_PARALLEL_BLOCKS;
         const lag = finalizedBlockNumber - state.lastProcessedBlock;
-        const batchSize =
-            lag > dynamicSettings.scanner.parallelProcessingLagBlocks
-                ? dynamicSettings.scanner.maxParallelBlocks
-                : 1;
+        const batchSize = lag > parallelProcessingLagBlocks ? maxParallelBlocks : 1;
         const blockNumbers = Array.from(
             { length: Math.min(batchSize, finalizedBlockNumber - state.lastProcessedBlock) },
             (_, index) => currentBatchStart! + index,
