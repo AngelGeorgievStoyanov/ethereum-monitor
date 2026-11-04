@@ -48,6 +48,7 @@ export async function startApplication(): Promise<void> {
         });
     } catch (error) {
         dynamicConfigService?.stopRefreshTimer();
+        stopScannerControlRefresh();
         await sequelize.close().catch(() => undefined);
         console.error(`[Startup] Application failed to start: ${formatError(error)}`);
         process.exitCode = 1;
