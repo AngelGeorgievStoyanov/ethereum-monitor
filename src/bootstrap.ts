@@ -46,11 +46,11 @@ export async function startApplication(): Promise<void> {
         });
 
         process.once('beforeExit', () => {
-            dynamicConfigService?.stopRefreshTimer();
+            dynamicConfigService?.stopRefreshTimers();
             stopScannerControlRefresh();
         });
     } catch (error) {
-        dynamicConfigService?.stopRefreshTimer();
+        dynamicConfigService?.stopRefreshTimers();
         stopScannerControlRefresh();
         await sequelize.close().catch(() => undefined);
         console.error(`[Startup] Application failed to start: ${formatError(error)}`);
