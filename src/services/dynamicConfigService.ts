@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto';
+import sequelize from '../database';
+import { QueryTypes } from 'sequelize';
+import { RUNTIME_CONFIG_DEFAULTS, type RuntimeConfig, type RuntimeConfigKey } from '../constants/runtime-config.constants';
 import {
     TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
     TX_FILTER_RELOAD_RETRY_DELAYS_MS,
@@ -19,8 +22,45 @@ export function createDynamicConfigService() {
     let runtimeMetricsSnapshot: unknown = null;
     let scannerStatusSnapshot: unknown = null;
     let scannerControlPausedSnapshot: boolean | null = null;
+    let runtimeConfigSnapshot: RuntimeConfig = { ...RUNTIME_CONFIG_DEFAULTS };
+
+    function parseRuntimeConfigValue(key: RuntimeConfigKey, rawValue: string): number | null {
+        const value = Number(rawValue);
+        if (!Number.isSafeInteger(value) || value <= 0) return null;
+        if (key === 'scanner.maxParallelBlocks' && value > 32) return null;
+        if (key === 'scanner.parallelProcessingLagBlocks' && value > 1000000) return null;
+        if (key === 'scanner.maxBlocksPerCatchup' && value > 100000) return null;
+        if ((key.endsWith('IntervalMs') || key.endsWith('RefreshMs')) && value < 100) return null;
+        return value;
+    }
+
+    async function loadRuntimeConfigurations(): Promise<void> {
+        try {
+            const rows = await sequelize.query<{ settingKey: string; value: string }>(
+                'SELECT "settingKey", value FROM "Configurations"',
+                { type: QueryTypes.SELECT },
+            );
+            const next: RuntimeConfig = { ...RUNTIME_CONFIG_DEFAULTS };
+            for (const row of rows) {
+                const key = row.settingKey as RuntimeConfigKey;
+                if (!(key in RUNTIME_CONFIG_DEFAULTS)) continue;
+                const parsedValue = parseRuntimeConfigValue(key, row.value);
+                if (parsedValue === null) {
+                    console.warn(`[DynamicConfig] Invalid value for "${key}"; keeping previous valid value`);
+                    next[key] = runtimeConfigSnapshot[key];
+                    continue;
+                }
+                next[key] = parsedValue;
+            }
+            runtimeConfigSnapshot = next;
+            console.log(`[DynamicConfig] Loaded runtime configurations; rows=${rows.length}`);
+        } catch (error) {
+            console.error(`[DynamicConfig] Runtime configuration refresh failed; keeping last valid snapshot: ${formatError(error)}`);
+        }
+    }
 
     async function loadTxFilters(): Promise<void> {
+        await loadRuntimeConfigurations();
         const loadedFilters = await txFilterService.loadActiveTxFilters();
         const next = new Map<number, ActiveTxFilter>(
             loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]),
@@ -115,6 +155,10 @@ export function createDynamicConfigService() {
         };
     }
 
+    function getRuntimeConfigSnapshot(): RuntimeConfig {
+        return { ...runtimeConfigSnapshot };
+    }
+
     function getTxFilters(): ActiveTxFilter[] {
         return getTxFilterSnapshot().filters;
     }
@@ -164,6 +208,7 @@ export function createDynamicConfigService() {
         refreshWithRetry,
         stopRefreshTimer,
         getTxFilters,
+        getRuntimeConfigSnapshot,
         getTxFilterSnapshot,
         publishRuntimeMetrics,
         getRuntimeMetricsSnapshot,
