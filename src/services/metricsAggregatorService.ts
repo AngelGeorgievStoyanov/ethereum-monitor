@@ -7,7 +7,10 @@ import {
     type RpcMetricEventInput,
     type RpcOperationMetricEvent,
 } from '../metrics/metricsEventBus';
-import { FINALIZED_REGRESSION_WAIT_MS } from '../constants/scanner.constants';
+import {
+    FINALIZED_REGRESSION_WAIT_MS,
+    SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
+} from '../constants/scanner.constants';
 import { classifyRpcError } from '../utils/classifyRpcError';
 import {
     subscribeToDatabaseMetricEvents,
@@ -32,6 +35,8 @@ import {
     METRICS_CATCH_UP_ETA_MIN_DURATION_MS,
     METRICS_MIN_ANALYTICS_WINDOW_MS,
     METRICS_ANALYTICS_RECENT_RPC_ERRORS,
+    METRICS_PUBLISH_INTERVAL_MS,
+    METRICS_ANALYTICS_REFRESH_INTERVAL_MS,
 } from '../constants/scanner-metrics.constants';
 
 type BlockInput = {
@@ -329,7 +334,7 @@ function publish(): void {
                 `[Metrics] Failed to publish current metrics; scanner processing will continue: ${String(error)}`,
             );
         }
-    }, getDynamicConfigService().getDynamicSettings().metrics.publishIntervalMs);
+    }, Number(getDynamicConfigService().getDynamicSettings().publishIntervalMs) || METRICS_PUBLISH_INTERVAL_MS);
     publishTimer.unref?.();
 }
 
@@ -424,7 +429,7 @@ function getRpcSummary(now: number): RpcSummary {
     if (
         rpcSummaryCache &&
         now - rpcSummaryCalculatedAt <
-            getDynamicConfigService().getDynamicSettings().metrics.analyticsRefreshMs
+            (Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) || METRICS_ANALYTICS_REFRESH_INTERVAL_MS)
     ) {
         return rpcSummaryCache;
     }
@@ -875,7 +880,7 @@ export function recordFinalizedBlock(blockNumber: number): void {
     recordMinuteLag(finalizedTimestampMs, lag);
     if (
         lag !== null &&
-        lag > getDynamicConfigService().getDynamicSettings().scanner.parallelProcessingLagBlocks &&
+        lag > (Number(getDynamicConfigService().getDynamicSettings().parallelProcessingLagBlocks) || SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS) &&
         !catchUpActive
     ) {
         const now = Date.now();
@@ -1460,7 +1465,7 @@ export function getScannerAnalytics(
     if (
         scannerAnalyticsCache?.windowLabel === windowLabel &&
         now - scannerAnalyticsCache.generatedAtMs <
-            getDynamicConfigService().getDynamicSettings().metrics.analyticsRefreshMs
+            (Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) || METRICS_ANALYTICS_REFRESH_INTERVAL_MS)
     ) {
         return scannerAnalyticsCache.result;
     }
