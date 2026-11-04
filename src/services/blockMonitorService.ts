@@ -60,7 +60,14 @@ export function createBlockMonitorService() {
             state = await initializeScannerState();
             registerScannerState(state);
             await refreshScannerStatusSnapshot();
-            updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length, maxBlocksPerCatchup: dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup, maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks, parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks });
+            updateScannerRuntimeContext({
+                running: true,
+                lastProcessedBlock: state.lastProcessedBlock,
+                activeFiltersCount: dynamicConfigService.getTxFilters().length,
+                maxBlocksPerCatchup: dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
+                maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
+                parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks,
+            });
             dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
         } catch (error) {
             scannerStarted = false;
@@ -106,7 +113,14 @@ export function createBlockMonitorService() {
             try {
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
-                updateScannerRuntimeContext({ running: true, activeFiltersCount: activeTxFilters.length, lastProcessedBlock: state.lastProcessedBlock, maxBlocksPerCatchup: dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup, maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks, parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks });
+                updateScannerRuntimeContext({
+                    running: true,
+                    activeFiltersCount: activeTxFilters.length,
+                    lastProcessedBlock: state.lastProcessedBlock,
+                    maxBlocksPerCatchup: dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
+                    maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks,
+                    parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks,
+                });
 
                 if (activeTxFilters.length === 0) {
                     if (!waitingForFilters) {
