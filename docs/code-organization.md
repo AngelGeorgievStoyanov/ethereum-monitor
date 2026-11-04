@@ -234,8 +234,11 @@ These rules document the approved scanner operation. They are intended to preven
 - The Scanner reads the in-memory pause state; it must not query PostgreSQL on every block or polling cycle for Pause/Resume.
 - If a periodic pause-state refresh fails, retain the last successfully loaded state. Do not replace it with a guessed default or stop the scanner solely because a later refresh failed.
 - A Pause/Resume request is not an immediate in-memory switch. It is applied by the next successful refresh.
-- Active transaction filters are loaded into an in-memory cache and refreshed according to `TX_FILTER_CACHE_REFRESH_INTERVAL_MS` (currently 60000 ms), as well as after successful local filter mutations. A failed refresh must not discard the last successfully loaded filter configuration.
-- Keep refresh intervals and processing limits in the appropriate files under `src/constants/`; do not scatter hardcoded timing or batch values through services.
+- Dynamic Config initialization loads Configuration Settings and active Transaction Filters before starting either periodic refresh. It then starts two independent intervals: `DYNAMIC_CONFIG_FAST_REFRESH_INTERVAL_MS` (currently 30000 ms) reloads Transaction Filters only; `DYNAMIC_CONFIG_SLOW_REFRESH_INTERVAL_MS` (currently 60000 ms) reloads Configuration Settings and Transaction Filters.
+- `loadTxFilters()` is responsible only for loading Transaction Filters. Configuration loading belongs to `configurationService`; neither operation calls the other.
+- Successful local Transaction Filter mutations trigger an immediate Transaction Filter refresh without reloading Configuration Settings.
+- Fast and slow refreshes must not overlap their Transaction Filter loads. A failed refresh must retain the last successfully loaded filter configuration; a failed Configuration Settings refresh must retain the last successfully loaded settings.
+- Keep the two Dynamic Config refresh intervals in `src/constants/dynamic-config.constants.ts` and filter-specific retry/validation intervals in `src/constants/tx-filter.constants.ts`. Do not scatter hardcoded timing or batch values through services.
 
 ### Manual Rescan
 
