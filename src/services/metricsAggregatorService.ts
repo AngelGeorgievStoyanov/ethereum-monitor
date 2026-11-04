@@ -305,7 +305,7 @@ function publish(): void {
     publishTimer = setTimeout(() => {
         publishTimer = undefined;
         try {
-            const currentMetrics = getCurrentMetrics();
+            const currentMetrics = calculateCurrentMetrics();
             getDynamicConfigService().publishMetrics(currentMetrics);
             const current = currentMetrics as {
                 scanner: {
@@ -552,7 +552,7 @@ function getRecentBlockSummary(now: number): RecentBlockSummary {
     return summary;
 }
 
-function getCurrentMetrics() {
+function calculateCurrentMetrics() {
     const now = Date.now();
     trimSamples(now);
     const rpcSummary = getRpcSummary(now);
@@ -1123,8 +1123,13 @@ export function getBlockProcessingMetrics() {
     };
 }
 
-export function getCurrentMetrics() {
-    return getDynamicConfigService().getCurrentMetrics();
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function getCurrentMetrics(): Record<string, unknown> {
+    const current = getDynamicConfigService().getCurrentMetrics();
+    return isRecord(current) ? current : calculateCurrentMetrics();
 }
 
 export function recordProcessingBatch(input: {
