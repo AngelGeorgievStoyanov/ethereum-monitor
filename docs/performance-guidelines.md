@@ -1,6 +1,6 @@
 # Performance Guidelines
 
-These guidelines describe how to optimize Ethereum Monitor without making the code unnecessarily complex or compromising correctness. Runtime-specific approved values and workflows are documented in [Code Organization](./code-organization.md#14-runtime-behavior-and-performance-rules).
+These guidelines describe how to optimize Ethereum Monitor without making the code unnecessarily complex or compromising correctness. Scanner-operational approved values and workflows are documented in [Code Organization](./code-organization.md#14-runtime-behavior-and-performance-rules).
 
 ## 1. Start with evidence
 
@@ -63,7 +63,7 @@ These guidelines describe how to optimize Ethereum Monitor without making the co
 - Do not implement the same query, RPC request construction, retry policy, or business rule independently in multiple services.
 - Keep shared logic in the module that owns it.
 - Avoid broad abstractions that combine workflows with different correctness requirements.
-- Keep Dynamic Config as a passive snapshot store; calculations and decisions belong to the responsible services.
+- Keep Dynamic Config as a passive in-memory state store; calculations and decisions belong to the responsible services.
 
 ## 8. Configuration and observability
 
@@ -71,7 +71,7 @@ These guidelines describe how to optimize Ethereum Monitor without making the co
 - Avoid scattering hardcoded values across services.
 - Keep logging cadence separate from database progress-persistence cadence.
 - Measure the effect of a change using the relevant metrics; do not infer success from code shape alone.
-- Update runtime documentation when an approved interval, limit, or processing behavior changes.
+- Update operational documentation when an approved interval, limit, or processing behavior changes.
 
 ## Optimization review checklist
 

@@ -1,27 +1,27 @@
-# Scanner Runtime Metrics and Analytics
+# Scanner Metrics and Analytics
 
 ## Data flow
 
 - Scanner, RPC, processing, persistence, filters, and recovery components publish measurements from operations they already perform.
 - The RPC client emits request events and logical-operation events through the metrics event bus. It does not depend on the metrics aggregator.
 - The metrics aggregator calculates rates, rolling statistics, catch-up sessions, RPC error categories, logical-operation retry statistics, and processing batch statistics.
-- Dynamic Config passively stores and returns runtime metrics and scanner status snapshots. It does not calculate metrics, analytics, or query other services.
-- The status endpoint reads the prepared Dynamic Config snapshot. The analytics endpoint asks the metrics aggregator for the requested window; the aggregator calculates the result on demand and caches it for the configured cache duration. Dashboard polling does not issue PostgreSQL or RPC requests.
-- Runtime metrics and history are held in process memory only. They reset when the process restarts and are not written to PostgreSQL.
+- Dynamic Config passively stores and returns current metrics and scanner status. It does not calculate metrics, analytics, or query other services.
+- The status endpoint reads the prepared Dynamic Config current data. The analytics endpoint asks the metrics aggregator for the requested window; the aggregator calculates the result on demand and caches it for the configured cache duration. Dashboard polling does not issue PostgreSQL or RPC requests.
+- Current metrics and history are held in process memory only. They reset when the process restarts and are not written to PostgreSQL.
 
-## Scanner status snapshots
+## Scanner scanner statuss
 
-- During application startup, after database and Dynamic Config initialization, the application loads the initial pause/control state, checkpoint/recovery state, and latest rescan job from PostgreSQL and publishes a status snapshot before the HTTP server starts. After scanner state is initialized, the snapshot is refreshed with the scanner runtime state.
+- During application startup, after database and Dynamic Config initialization, the application loads the initial pause/control state, checkpoint/recovery state, and latest rescan job from PostgreSQL and publishes a scanner status before the HTTP server starts. After scanner state is initialized, the current data is refreshed with the scanner scanner state.
 - The initial pause state is loaded from PostgreSQL during startup and published to Dynamic Config before the scanner starts.
-- A dedicated Fast Refresh reads only the persisted `scannerPaused` flag every 30 seconds and updates the in-memory Dynamic Config snapshot. Pause/resume API requests only write PostgreSQL; the scanner observes them on the next refresh.
-- If a Fast Refresh read fails, the last successfully loaded pause state remains active. The scanner reads the in-memory snapshot at its safe processing boundaries and performs no database reads for pause checks.
+- A dedicated Fast Refresh reads only the persisted `scannerPaused` flag every 30 seconds and updates the in-memory Dynamic Config current data. Pause/resume API requests only write PostgreSQL; the scanner observes them on the next refresh.
+- If a Fast Refresh read fails, the last successfully loaded pause state remains active. The scanner reads the in-memory state at its safe processing boundaries and performs no database reads for pause checks.
 - The existing scanner main loop republishes its runtime context during normal polling. Checkpoint and recovery state are published from the scanner's in-memory state after processing and recovery work; the stall check continues to expose stale progress through the last-processed timestamp.
 - Rescan job creation, progress, completion, failure, and recovery handoff publish the updated job summary.
-- If startup has not yet produced the first complete snapshot, the status endpoint reports that status is initializing rather than returning a fabricated empty state.
+- If startup has not yet produced the first complete current data, the status endpoint reports that status is initializing rather than returning a fabricated empty state.
 
-## Runtime metrics
+## Current metrics
 
-The current runtime snapshot includes:
+The current current metrics includes:
 
 - Scanner running/paused state, active filter count, configured catch-up cap, parallel block count, and parallel-processing lag threshold.
 - Latest finalized block and its update time, last processed block, current lag, bounded lag history, and RPC availability based on the scanner's own finalized-block request.
@@ -52,7 +52,7 @@ History is bounded in memory using generic retention settings in `src/constants/
 - Network-independent one-minute buckets retain throughput, lag, RPC failure/latency, database query, filter evaluation, and batch timing aggregates. Throughput, RPC, component-latency, and lag charts use the selected window's buckets rather than relying on a fixed number of block samples.
 - Each analytics response reports requested duration, available duration, history start time, and whether the requested window is complete or partial.
 - A process that has been running for 40 minutes can return 40 minutes of partial data for a 1-hour window. It does not need to run for 3 hours.
-- Analytics are calculated on demand by the metrics aggregator for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms). Dynamic Config does not own or periodically publish analytics snapshots.
+- Analytics are calculated on demand by the metrics aggregator for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms). Dynamic Config does not own or periodically publish analytics current data.
 - Summary counters and breakdown tables are calculated for the selected window from minute buckets, including processing throughput, RPC request/error/retry/failover counts, database query counts/failures, filter evaluations, RPC methods, database query types, and per-filter performance. Percentile latency uses the retained raw RPC request samples for the selected window.
 
 ## Dashboard polling
@@ -63,19 +63,19 @@ Dashboard polling intervals and the stale-progress display threshold are configu
 - `ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms) controls requests to `GET /api/scanner/analytics`.
 - `STALLED_THRESHOLD_MS` (currently 60000 ms) controls when the Dashboard displays `POSSIBLY STALLED`. This is a display threshold, not a scanner polling interval.
 
-These Dashboard requests read in-memory snapshots and do not issue PostgreSQL or RPC requests.
+These Dashboard requests read in-memory states and do not issue PostgreSQL or RPC requests.
 
 ## Endpoints
 
 ### GET /api/scanner/status
 
-Returns the prepared scanner status snapshot from Dynamic Config. It does not query PostgreSQL or RPC. The dedicated 30-second Fast Refresh checks the persisted pause state independently of Dashboard requests. The scanner and Dashboard read only the in-memory Dynamic Config snapshot.
+Returns the prepared scanner scanner status from Dynamic Config. It does not query PostgreSQL or RPC. The dedicated 30-second Fast Refresh checks the persisted pause state independently of Dashboard requests. The scanner and Dashboard read only the in-memory Dynamic Config current data.
 
 ### GET /api/scanner/analytics?window=1h
 
 Returns the calculated and cached runtime analytics result for the requested window. Supported values are `1h` and `3h`, configured in `src/constants/scanner-metrics.constants.ts`.
 
-The response includes the current metrics snapshot, block samples, lag samples, RPC events, catch-up sessions, processing batches, minute-level aggregates, retention metadata, and window coverage.
+The response includes the current metrics current data, block samples, lag samples, RPC events, catch-up sessions, processing batches, minute-level aggregates, retention metadata, and window coverage.
 
 ## Measurement semantics
 

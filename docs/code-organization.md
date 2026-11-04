@@ -214,24 +214,24 @@ Organize the application into clear layers with explicit responsibilities. Servi
 
 The goal is not to maximize the number of files or abstractions. The goal is predictable, readable, maintainable code that can evolve without unnecessary coupling or mixed responsibilities.
 
-## 14. Runtime behavior and performance rules
+## 14. Scanner operation and performance rules
 
-These rules document the approved runtime design. They are intended to prevent future changes from reintroducing unnecessary database or RPC work, weakening reorganization safety, or moving calculations into Dynamic Config.
+These rules document the approved scanner operation. They are intended to prevent future changes from reintroducing unnecessary database or RPC work, weakening reorganization safety, or moving calculations into Dynamic Config.
 
 ### Scanner
 
 - The application is designed to run as a single scanner instance. Do not add a Scanner advisory lock or multi-instance coordination mechanism unless the deployment architecture explicitly changes.
-- Keep the normal Scanner polling interval at the configured `SCANNER_POLL_INTERVAL_MS` (currently 4000 ms). Do not reduce or increase it based on guesswork; use runtime metrics first.
+- Keep the normal Scanner polling interval at the configured `SCANNER_POLL_INTERVAL_MS` (currently 4000 ms). Do not reduce or increase it based on guesswork; use current metrics first.
 - Keep each finalized catch-up segment bounded by `MAX_BLOCKS_PER_FINALIZED_CATCHUP` (currently 30 blocks). After processing a segment, return to the Scanner polling loop and fetch the latest finalized block again before starting another segment. If the finalized head has advanced, the next segment uses the updated target; it must not continue toward a stale target without rechecking.
 - When the scanner lag is at or below `SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS` (currently 100 blocks), process one block at a time. When the lag is greater than this threshold, process batches of up to `SCANNER_MAX_PARALLEL_BLOCKS` blocks in parallel (currently 3). Keep the threshold and parallel batch size as separate constants.
 - Keep checkpoint and other frequently needed scanner state in memory where safe. The database transaction must remain the final integrity guard: verify the expected checkpoint and parent-hash continuity before committing processed data.
-- Do not add a database read on every polling cycle merely to reload a checkpoint already held in the active runtime state.
+- Do not add a database read on every polling cycle merely to reload a checkpoint already held in the active scanner state.
 
 ### Dynamic configuration and scanner controls
 
-- Dynamic Config is a passive in-memory snapshot store. It must not calculate business state, derive metrics, or own scanner/recovery decisions. The responsible service calculates state and publishes the resulting snapshot.
+- Dynamic Config is a passive in-memory state store. It must not calculate business state, derive metrics, or own scanner/recovery decisions. The responsible service calculates state and publishes the resulting state.
 - Scanner Pause/Resume is persisted to PostgreSQL and read into Dynamic Config at startup and every `SCANNER_CONTROL_FAST_REFRESH_INTERVAL_MS` (currently 30000 ms).
-- The Scanner reads the in-memory pause snapshot; it must not query PostgreSQL on every block or polling cycle for Pause/Resume.
+- The Scanner reads the in-memory pause state; it must not query PostgreSQL on every block or polling cycle for Pause/Resume.
 - If a periodic pause-state refresh fails, retain the last successfully loaded state. Do not replace it with a guessed default or stop the scanner solely because a later refresh failed.
 - A Pause/Resume request is not an immediate in-memory switch. It is applied by the next successful refresh.
 - Active transaction filters are loaded into an in-memory cache and refreshed according to `TX_FILTER_CACHE_REFRESH_INTERVAL_MS` (currently 60000 ms), as well as after successful local filter mutations. A failed refresh must not discard the last successfully loaded filter configuration.
@@ -264,11 +264,11 @@ These rules document the approved runtime design. They are intended to prevent f
 - Finalized-chain rate calculations use `METRICS_FINALIZED_SAMPLE_WINDOW_MS` (currently 900000 ms).
 - Catch-up ETA calculation starts only after `METRICS_CATCH_UP_ETA_MIN_DURATION_MS` (currently 10000 ms).
 - Analytics requests enforce a minimum window of `METRICS_MIN_ANALYTICS_WINDOW_MS` (currently 60000 ms).
-- `GET /api/scanner/analytics?window=1h|3h` returns the full analytics payload. `GET /api/scanner/analysis?window=1h|3h` reuses the same analytics calculation and cache but returns a compact diagnostic projection: window coverage, current scanner/chain state and finalized cadence, runtime resources, window processing/RPC/database/filter summaries, core block/receipt/finalized RPC methods, catch-up, and recovery state. Finalized cadence includes the observed time between head updates and an estimated per-block interval (`elapsed observation time / blocks advanced`); its min/max are batch-level estimates and its average is weighted by blocks. Repeated polling of an unchanged head is excluded. Keep both endpoints; use the compact endpoint for routine snapshots shared for analysis and the full endpoint when detailed histories or per-provider/per-method diagnostics are needed. The endpoint does not create a separate metrics collection path.
-- Scanner analytics are calculated on demand for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms); analytics are not precomputed for every window during the 10-second runtime metrics publication. Each analytics calculation sorts the retained RPC durations once and reuses that ordering for the requested window. Retained RPC events use a head index for constant-time removal; the backing array is compacted periodically using `METRICS_RPC_EVENT_COMPACTION_THRESHOLD`, rather than shifting the full array for every expired event. Block and lag sample retention also uses head indexes with periodic compaction via `METRICS_SAMPLE_COMPACTION_THRESHOLD`, avoiding repeated array shifts.
+- `GET /api/scanner/analytics?window=1h|3h` returns the full analytics payload. `GET /api/scanner/analysis?window=1h|3h` reuses the same analytics calculation and cache but returns a compact diagnostic projection: window coverage, current scanner/chain state and finalized cadence, process resources, window processing/RPC/database/filter summaries, core block/receipt/finalized RPC methods, catch-up, and recovery state. Finalized cadence includes the observed time between head updates and an estimated per-block interval (`elapsed observation time / blocks advanced`); its min/max are batch-level estimates and its average is weighted by blocks. Repeated polling of an unchanged head is excluded. Keep both endpoints; use the compact endpoint for routine diagnostic reports shared for analysis and the full endpoint when detailed histories or per-provider/per-method diagnostics are needed. The endpoint does not create a separate metrics collection path.
+- Scanner analytics are calculated on demand for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms); analytics are not precomputed for every window during the 10-second current metrics publication. Each analytics calculation sorts the retained RPC durations once and reuses that ordering for the requested window. Retained RPC events use a head index for constant-time removal; the backing array is compacted periodically using `METRICS_RPC_EVENT_COMPACTION_THRESHOLD`, rather than shifting the full array for every expired event. Block and lag sample retention also uses head indexes with periodic compaction via `METRICS_SAMPLE_COMPACTION_THRESHOLD`, avoiding repeated array shifts.
 - Dashboard polling is configured separately in `public/dashboard.constants.js`: `STATUS_REFRESH_INTERVAL_MS` (currently 5000 ms), `ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms), and `STALLED_THRESHOLD_MS` (currently 60000 ms). These are independent of backend metrics publication and cache intervals.
-- Dashboard polling and RPC event collection are separate concerns; do not change their cadence merely to change the metrics snapshot publishing interval.
-- Dynamic Config stores the latest runtime metrics snapshot only; the analytics cache is owned by the metrics aggregator.
+- Dashboard polling and RPC event collection are separate concerns; do not change their cadence merely to change the metrics publishing interval.
+- Dynamic Config stores the latest current metrics snapshot only; the analytics cache is owned by the metrics aggregator.
 - Database query metrics classify `WITH` statements by the main statement after their CTE definitions, so data-changing CTEs are counted as writes rather than reads.
 
 ### Constants and code style

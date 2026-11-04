@@ -69,7 +69,7 @@ export const getScannerAnalysisController = async (req: Request, res: Response):
                 finalizedRegression: chain.finalizedRegression,
                 finalizedCadence: chain.finalizedCadence,
             },
-            runtime: current.runtime,
+            process: current.process,
             processing: {
                 ...analytics.windowMetrics.processing,
                 totalBlocksSinceStart: currentProcessing.processedBlocks,
