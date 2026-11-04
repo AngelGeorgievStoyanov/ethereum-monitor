@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import type { DynamicSettings } from '../constants/dynamic-settings.constants';
-import { getConfigurationService } from './configurationService';
 import {
-    TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
-    TX_FILTER_RELOAD_RETRY_DELAYS_MS,
-} from '../constants/tx-filter.constants';
+    DYNAMIC_CONFIG_FAST_REFRESH_INTERVAL_MS,
+    DYNAMIC_CONFIG_SLOW_REFRESH_INTERVAL_MS,
+} from '../constants/dynamic-config.constants';
+import { TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../constants/tx-filter.constants';
 import type { ActiveTxFilter, ActiveTxFilterConfig } from '../types/tx-filter.types';
+import { getConfigurationService } from './configurationService';
 import { getTxFilterService } from './txFilterService';
 import { formatError } from '../utils/formatError';
 import { sleep } from '../utils/sleep';
@@ -16,14 +17,16 @@ export function createDynamicConfigService() {
     let activeTxFilters = new Map<number, ActiveTxFilter>();
     let activeTxFilterVersion = '';
     let reloadQueue: Promise<boolean> = Promise.resolve(true);
-    let refreshTimer: ReturnType<typeof setInterval> | undefined;
+    let fastRefreshTimer: ReturnType<typeof setInterval> | undefined;
+    let slowRefreshTimer: ReturnType<typeof setInterval> | undefined;
     let pendingReloadCount = 0;
+    let slowRefreshInProgress = false;
     let initialized = false;
     let currentMetrics: Record<string, unknown> | null = null;
     let scannerStatus: unknown = null;
     let scannerPaused: boolean | null = null;
+
     async function loadTxFilters(): Promise<void> {
-        await configurationService.refresh();
         const loadedFilters = await txFilterService.loadActiveTxFilters();
         const next = new Map<number, ActiveTxFilter>(
             loadedFilters.map((filter): [number, ActiveTxFilter] => [filter.id, filter]),
@@ -53,7 +56,7 @@ export function createDynamicConfigService() {
         );
     }
 
-    async function refreshWithRetry(): Promise<boolean> {
+    async function refreshTxFiltersWithRetry(): Promise<boolean> {
         pendingReloadCount += 1;
         const task = reloadQueue
             .catch(() => false)
@@ -88,26 +91,76 @@ export function createDynamicConfigService() {
         return settled;
     }
 
+    async function refreshSlowData(): Promise<void> {
+        if (slowRefreshInProgress) return;
+        slowRefreshInProgress = true;
+
+        try {
+            await configurationService.refresh();
+            if (!(await refreshTxFiltersWithRetry())) {
+                console.error(
+                    '[DynamicConfig] Slow refresh could not reload transaction filters; keeping the last valid filter configuration',
+                );
+            }
+        } finally {
+            slowRefreshInProgress = false;
+        }
+    }
+
+    function startFastRefresh(): void {
+        if (fastRefreshTimer) return;
+
+        fastRefreshTimer = setInterval(() => {
+            if (pendingReloadCount === 0 && !slowRefreshInProgress) {
+                void refreshTxFiltersWithRetry();
+            }
+        }, DYNAMIC_CONFIG_FAST_REFRESH_INTERVAL_MS);
+        fastRefreshTimer.unref?.();
+
+        console.log(
+            `[DynamicConfig] Fast refresh scheduled every ${DYNAMIC_CONFIG_FAST_REFRESH_INTERVAL_MS}ms`,
+        );
+    }
+
+    function startSlowRefresh(): void {
+        if (slowRefreshTimer) return;
+
+        slowRefreshTimer = setInterval(() => {
+            if (pendingReloadCount === 0 && !slowRefreshInProgress) {
+                void refreshSlowData();
+            }
+        }, DYNAMIC_CONFIG_SLOW_REFRESH_INTERVAL_MS);
+        slowRefreshTimer.unref?.();
+
+        console.log(
+            `[DynamicConfig] Slow refresh scheduled every ${DYNAMIC_CONFIG_SLOW_REFRESH_INTERVAL_MS}ms`,
+        );
+    }
+
     async function init(): Promise<void> {
-        if (!(await refreshWithRetry())) {
+        if (fastRefreshTimer || slowRefreshTimer) return;
+
+        // Load all dynamic configuration before scheduling either refresh interval.
+        await configurationService.refresh();
+        if (!(await refreshTxFiltersWithRetry())) {
             throw new Error(
                 'Unable to load required dynamic configuration; scanner startup is blocked',
             );
         }
-        if (refreshTimer) return;
-        refreshTimer = setInterval(() => {
-            if (pendingReloadCount === 0) void refreshWithRetry();
-        }, TX_FILTER_CACHE_REFRESH_INTERVAL_MS);
-        refreshTimer.unref?.();
-        console.log(
-            `[DynamicConfig] Refresh scheduled every ${TX_FILTER_CACHE_REFRESH_INTERVAL_MS}ms`,
-        );
+
+        startFastRefresh();
+        startSlowRefresh();
     }
 
-    function stopRefreshTimer(): void {
-        if (!refreshTimer) return;
-        clearInterval(refreshTimer);
-        refreshTimer = undefined;
+    function stopRefreshTimers(): void {
+        if (fastRefreshTimer) {
+            clearInterval(fastRefreshTimer);
+            fastRefreshTimer = undefined;
+        }
+        if (slowRefreshTimer) {
+            clearInterval(slowRefreshTimer);
+            slowRefreshTimer = undefined;
+        }
     }
 
     function getActiveTxFilterConfig(): ActiveTxFilterConfig {
@@ -165,11 +218,11 @@ export function createDynamicConfigService() {
         };
     }
 
-    txFilterService.setDynamicConfigRefreshHandler(refreshWithRetry);
+    txFilterService.setDynamicConfigRefreshHandler(refreshTxFiltersWithRetry);
     return {
         init,
-        refreshWithRetry,
-        stopRefreshTimer,
+        refreshTxFiltersWithRetry,
+        stopRefreshTimers,
         getTxFilters,
         getDynamicSettings,
         getActiveTxFilterConfig,
