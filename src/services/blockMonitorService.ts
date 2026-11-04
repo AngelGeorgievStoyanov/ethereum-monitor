@@ -1,9 +1,5 @@
 import type { ScannerRuntimeState } from '../types/scanner-state.types';
 import {
-    MAX_BLOCKS_PER_FINALIZED_CATCHUP,
-    SCANNER_MAX_PARALLEL_BLOCKS,
-    SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
-    SCANNER_POLL_INTERVAL_MS,
     SCANNER_STALL_CHECK_INTERVAL_MS,
     SCANNER_STALL_WARNING_INTERVAL_MS,
     FINALIZED_REGRESSION_WAIT_MS,
@@ -64,7 +60,7 @@ export function createBlockMonitorService() {
             state = await initializeScannerState();
             registerScannerState(state);
             await refreshScannerStatusSnapshot();
-            updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });
+            updateScannerRuntimeContext({ running: true, lastProcessedBlock: state.lastProcessedBlock, activeFiltersCount: dynamicConfigService.getTxFilters().length, maxBlocksPerCatchup: dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup, maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks, parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks });
             dynamicConfigService.updateScannerStatusSnapshot({ scannerRunning: true });
         } catch (error) {
             scannerStarted = false;
@@ -110,7 +106,7 @@ export function createBlockMonitorService() {
             try {
                 // The filter cache is refreshed on startup, after local mutations, and periodically.
                 const activeTxFilters = dynamicConfigService.getTxFilters();
-                updateScannerRuntimeContext({ running: true, activeFiltersCount: activeTxFilters.length, lastProcessedBlock: state.lastProcessedBlock, maxBlocksPerCatchup: MAX_BLOCKS_PER_FINALIZED_CATCHUP, maxParallelBlocks: SCANNER_MAX_PARALLEL_BLOCKS, parallelProcessingLagBlocks: SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS });
+                updateScannerRuntimeContext({ running: true, activeFiltersCount: activeTxFilters.length, lastProcessedBlock: state.lastProcessedBlock, maxBlocksPerCatchup: dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup, maxParallelBlocks: dynamicConfigService.getDynamicSettings().scanner.maxParallelBlocks, parallelProcessingLagBlocks: dynamicConfigService.getDynamicSettings().scanner.parallelProcessingLagBlocks });
 
                 if (activeTxFilters.length === 0) {
                     if (!waitingForFilters) {
@@ -129,7 +125,7 @@ export function createBlockMonitorService() {
                     } else {
                         waitingForPause = false;
                         if (manualRescanReserved) {
-                            await sleep(SCANNER_POLL_INTERVAL_MS);
+                            await sleep(dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs);
                             continue;
                         }
                         let finalized: Awaited<ReturnType<typeof evmRpcClient.getBlock>>;
@@ -170,17 +166,17 @@ export function createBlockMonitorService() {
 
                         const finalizedCatchupTarget = Math.min(
                             finalized.number,
-                            state.lastProcessedBlock + MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+                            state.lastProcessedBlock + dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup,
                         );
                         if (finalizedCatchupTarget < finalized.number) {
                             console.log(
-                                `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${MAX_BLOCKS_PER_FINALIZED_CATCHUP}`,
+                                `[Scanner] Finalized catch-up capped at ${finalizedCatchupTarget}; reportedFinalized=${finalized.number}; checkpoint=${state.lastProcessedBlock}; maxStep=${dynamicConfigService.getDynamicSettings().scanner.maxBlocksPerCatchup}`,
                             );
                         }
 
                         // Reserve and block normal processing atomically with respect to the rescan endpoint.
                         if (manualRescanReserved) {
-                            await sleep(SCANNER_POLL_INTERVAL_MS);
+                            await sleep(dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs);
                             continue;
                         }
                         processingFinalizedBlocks = true;
@@ -220,7 +216,7 @@ export function createBlockMonitorService() {
                 );
             }
 
-            await sleep(SCANNER_POLL_INTERVAL_MS);
+            await sleep(dynamicConfigService.getDynamicSettings().scanner.pollIntervalMs);
         }
     }
 
