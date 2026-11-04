@@ -23,7 +23,7 @@ export function createDynamicConfigService() {
     let refreshTimer: ReturnType<typeof setInterval> | undefined;
     let pendingReloadCount = 0;
     let initialized = false;
-    let currentMetrics: unknown = null;
+    let currentMetrics: Record<string, unknown> | null = null;
     let scannerStatus: unknown = null;
     let scannerPaused: boolean | null = null;
     let dynamicSettings: DynamicSettings = {
@@ -205,11 +205,11 @@ export function createDynamicConfigService() {
     }
 
     // Current metrics are passively stored and returned; calculations belong to the aggregator.
-    function publishMetrics(metrics: unknown): void {
+    function publishMetrics(metrics: Record<string, unknown>): void {
         currentMetrics = metrics;
     }
 
-    function getCurrentMetrics(): unknown {
+    function getCurrentMetrics(): Record<string, unknown> | null {
         return currentMetrics;
     }
 
