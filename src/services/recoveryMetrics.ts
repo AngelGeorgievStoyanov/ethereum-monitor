@@ -1,5 +1,5 @@
 import type { RecoveryMetrics } from '../types/scanner-status.types';
-import { updateScannerRuntimeContext } from './metricsAggregatorService';
+import { updateScannerContext } from './metricsAggregatorService';
 
 const metrics: RecoveryMetrics = {
     reorgCount: 0,
@@ -16,7 +16,7 @@ const metrics: RecoveryMetrics = {
 let recoveryStartedAt: number | null = null;
 
 function publishRecoveryMetrics(): void {
-    updateScannerRuntimeContext({ recovery: { ...metrics } });
+    updateScannerContext({ recovery: { ...metrics } });
 }
 
 export function recordReorgDetected(): void {
