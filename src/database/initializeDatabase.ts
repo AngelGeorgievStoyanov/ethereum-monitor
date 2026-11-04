@@ -1,7 +1,10 @@
 import '../models/registerModels';
 import sequelize from '../database';
 import { QueryTypes } from 'sequelize';
-import { DYNAMIC_SETTINGS_DEFAULTS, type DynamicSettingKey } from '../constants/dynamic-settings.constants';
+import {
+    DYNAMIC_SETTINGS_DEFAULTS,
+    type DynamicSettingKey,
+} from '../constants/dynamic-settings.constants';
 import { createDatabaseIfNotExists } from './createDatabaseIfNotExists';
 
 export async function initializeDatabase(): Promise<void> {
