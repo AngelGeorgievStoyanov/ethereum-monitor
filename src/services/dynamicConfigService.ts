@@ -1,11 +1,9 @@
 import { createHash } from 'node:crypto';
-import sequelize from '../database';
-import { QueryTypes } from 'sequelize';
 import {
     DYNAMIC_SETTINGS_DEFAULTS,
     type DynamicSettings,
-    type DynamicSettingKey,
 } from '../constants/dynamic-settings.constants';
+import { getConfigurationService } from './configurationService';
 import {
     TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
     TX_FILTER_RELOAD_RETRY_DELAYS_MS,
@@ -31,70 +29,10 @@ export function createDynamicConfigService() {
         metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics },
     };
 
-    function getDynamicSetting(settings: DynamicSettings, key: DynamicSettingKey): number {
-        const [section, setting] = key.split('.') as ['scanner' | 'metrics', string];
-        return (settings[section] as Record<string, number>)[setting];
-    }
-
-    function setDynamicSetting(
-        settings: DynamicSettings,
-        key: DynamicSettingKey,
-        value: number,
-    ): void {
-        const [section, setting] = key.split('.') as ['scanner' | 'metrics', string];
-        (settings[section] as Record<string, number>)[setting] = value;
-    }
-
-    function parseDynamicSettingValue(key: DynamicSettingKey, rawValue: string): number | null {
-        const value = Number(rawValue);
-        if (!Number.isSafeInteger(value) || value <= 0) return null;
-        if (key === 'scanner.maxParallelBlocks' && value > 32) return null;
-        if (key === 'scanner.parallelProcessingLagBlocks' && value > 1000000) return null;
-        if (key === 'scanner.maxBlocksPerCatchup' && value > 100000) return null;
-        if ((key.endsWith('IntervalMs') || key.endsWith('RefreshMs')) && value < 100) return null;
-        return value;
-    }
-
     async function loadDynamicSettings(): Promise<void> {
-        try {
-            const rows = await sequelize.query<{ settingKey: string; value: string }>(
-                'SELECT "settingKey", value FROM "Configurations"',
-                { type: QueryTypes.SELECT },
-            );
-            const next: DynamicSettings = {
-                scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner },
-                metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics },
-            };
-            for (const row of rows) {
-                const key = row.settingKey as DynamicSettingKey;
-                if (
-                    ![
-                        'scanner.maxParallelBlocks',
-                        'scanner.parallelProcessingLagBlocks',
-                        'scanner.maxBlocksPerCatchup',
-                        'scanner.pollIntervalMs',
-                        'metrics.publishIntervalMs',
-                        'metrics.analyticsRefreshMs',
-                    ].includes(key)
-                )
-                    continue;
-                const parsedValue = parseDynamicSettingValue(key, row.value);
-                if (parsedValue === null) {
-                    console.warn(
-                        `[DynamicConfig] Invalid value for "${key}"; keeping previous valid value`,
-                    );
-                    setDynamicSetting(next, key, getDynamicSetting(dynamicSettings, key));
-                    continue;
-                }
-                setDynamicSetting(next, key, parsedValue);
-            }
-            dynamicSettings = next;
-            console.log(`[DynamicConfig] Loaded dynamic settings; rows=${rows.length}`);
-        } catch (error) {
-            console.error(
-                `[DynamicConfig] Dynamic settings refresh failed; keeping last valid settings: ${formatError(error)}`,
-            );
-        }
+        const configurationService = getConfigurationService();
+        await configurationService.refresh();
+        dynamicSettings = configurationService.getDynamicSettings();
     }
 
     async function loadTxFilters(): Promise<void> {
