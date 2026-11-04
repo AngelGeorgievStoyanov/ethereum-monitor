@@ -307,34 +307,38 @@ let recoveryMetrics: Record<string, number> = {
 
 function publish(): void {
     if (publishTimer) return;
-    publishTimer = setTimeout(() => {
-        publishTimer = undefined;
-        try {
-            const currentMetrics = calculateCurrentMetrics();
-            getDynamicConfigService().publishMetrics(currentMetrics);
-            const current = currentMetrics;
-            getDynamicConfigService().updateScannerStatus({
-                scannerRunning: current.scanner.running,
-                paused: current.scanner.paused,
-                processUptimeSeconds: current.scanner.uptimeSeconds,
-                activeFiltersCount: current.scanner.activeFiltersCount,
-                latestFinalizedBlock: current.chain.latestFinalizedBlock,
-                latestFinalizedAt: current.chain.latestFinalizedAt,
-                lastProcessedBlock: current.chain.lastProcessedBlock,
-                lagBlocks: current.chain.lagBlocks,
-                finalizedRegression: current.chain.finalizedRegression,
-                finalizedRegressionMessage: current.chain.finalizedRegressionMessage,
-                rpcAvailable: current.chain.rpcAvailable ?? false,
-                rpcMetrics: current.rpc.endpoints,
-                recoveryMetrics: current.recovery,
-                processingMetrics: getBlockProcessingMetrics(),
-            });
-        } catch (error) {
-            console.error(
-                `[Metrics] Failed to publish current metrics; scanner processing will continue: ${String(error)}`,
-            );
-        }
-    }, Number(getDynamicConfigService().getDynamicSettings().publishIntervalMs) || METRICS_PUBLISH_INTERVAL_MS);
+    publishTimer = setTimeout(
+        () => {
+            publishTimer = undefined;
+            try {
+                const currentMetrics = calculateCurrentMetrics();
+                getDynamicConfigService().publishMetrics(currentMetrics);
+                const current = currentMetrics;
+                getDynamicConfigService().updateScannerStatus({
+                    scannerRunning: current.scanner.running,
+                    paused: current.scanner.paused,
+                    processUptimeSeconds: current.scanner.uptimeSeconds,
+                    activeFiltersCount: current.scanner.activeFiltersCount,
+                    latestFinalizedBlock: current.chain.latestFinalizedBlock,
+                    latestFinalizedAt: current.chain.latestFinalizedAt,
+                    lastProcessedBlock: current.chain.lastProcessedBlock,
+                    lagBlocks: current.chain.lagBlocks,
+                    finalizedRegression: current.chain.finalizedRegression,
+                    finalizedRegressionMessage: current.chain.finalizedRegressionMessage,
+                    rpcAvailable: current.chain.rpcAvailable ?? false,
+                    rpcMetrics: current.rpc.endpoints,
+                    recoveryMetrics: current.recovery,
+                    processingMetrics: getBlockProcessingMetrics(),
+                });
+            } catch (error) {
+                console.error(
+                    `[Metrics] Failed to publish current metrics; scanner processing will continue: ${String(error)}`,
+                );
+            }
+        },
+        Number(getDynamicConfigService().getDynamicSettings().publishIntervalMs) ||
+            METRICS_PUBLISH_INTERVAL_MS,
+    );
     publishTimer.unref?.();
 }
 
@@ -429,7 +433,8 @@ function getRpcSummary(now: number): RpcSummary {
     if (
         rpcSummaryCache &&
         now - rpcSummaryCalculatedAt <
-            (Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) || METRICS_ANALYTICS_REFRESH_INTERVAL_MS)
+            (Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) ||
+                METRICS_ANALYTICS_REFRESH_INTERVAL_MS)
     ) {
         return rpcSummaryCache;
     }
@@ -880,7 +885,9 @@ export function recordFinalizedBlock(blockNumber: number): void {
     recordMinuteLag(finalizedTimestampMs, lag);
     if (
         lag !== null &&
-        lag > (Number(getDynamicConfigService().getDynamicSettings().parallelProcessingLagBlocks) || SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS) &&
+        lag >
+            (Number(getDynamicConfigService().getDynamicSettings().parallelProcessingLagBlocks) ||
+                SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS) &&
         !catchUpActive
     ) {
         const now = Date.now();
@@ -1465,7 +1472,8 @@ export function getScannerAnalytics(
     if (
         scannerAnalyticsCache?.windowLabel === windowLabel &&
         now - scannerAnalyticsCache.generatedAtMs <
-            (Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) || METRICS_ANALYTICS_REFRESH_INTERVAL_MS)
+            (Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) ||
+                METRICS_ANALYTICS_REFRESH_INTERVAL_MS)
     ) {
         return scannerAnalyticsCache.result;
     }

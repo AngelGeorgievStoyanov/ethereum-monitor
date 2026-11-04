@@ -163,9 +163,7 @@ export function createBlockMonitorService() {
                     } else {
                         waitingForPause = false;
                         if (manualRescanReserved) {
-                            await sleep(
-                                getScannerSettings().pollIntervalMs,
-                            );
+                            await sleep(getScannerSettings().pollIntervalMs);
                             continue;
                         }
                         let finalized: Awaited<ReturnType<typeof evmRpcClient.getBlock>>;
@@ -207,8 +205,7 @@ export function createBlockMonitorService() {
 
                         const finalizedCatchupTarget = Math.min(
                             finalized.number,
-                            state.lastProcessedBlock +
-                                scannerSettings.maxBlocksPerCatchup,
+                            state.lastProcessedBlock + scannerSettings.maxBlocksPerCatchup,
                         );
                         if (finalizedCatchupTarget < finalized.number) {
                             console.log(
@@ -218,9 +215,7 @@ export function createBlockMonitorService() {
 
                         // Reserve and block normal processing atomically with respect to the rescan endpoint.
                         if (manualRescanReserved) {
-                            await sleep(
-                                getScannerSettings().pollIntervalMs,
-                            );
+                            await sleep(getScannerSettings().pollIntervalMs);
                             continue;
                         }
                         processingFinalizedBlocks = true;

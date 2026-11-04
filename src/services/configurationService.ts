@@ -20,9 +20,7 @@ export function createConfigurationService() {
             }));
 
             dynamicSettings = mapConfigurationRowsToDynamicSettings(rows);
-            console.log(
-                `[Configuration] Loaded dynamic settings; rows=${rows.length}`,
-            );
+            console.log(`[Configuration] Loaded dynamic settings; rows=${rows.length}`);
         } catch (error) {
             console.error(
                 `[Configuration] Refresh failed; keeping last valid settings: ${formatError(error)}`,
