@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 import sequelize from '../database';
 import { QueryTypes } from 'sequelize';
-import { DYNAMIC_SETTINGS_DEFAULTS, type DynamicSettings, type DynamicSettingKey } from '../constants/dynamic-settings.constants';
+import {
+    DYNAMIC_SETTINGS_DEFAULTS,
+    type DynamicSettings,
+    type DynamicSettingKey,
+} from '../constants/dynamic-settings.constants';
 import {
     TX_FILTER_CACHE_REFRESH_INTERVAL_MS,
     TX_FILTER_RELOAD_RETRY_DELAYS_MS,
@@ -22,16 +26,21 @@ export function createDynamicConfigService() {
     let runtimeMetricsSnapshot: unknown = null;
     let scannerStatusSnapshot: unknown = null;
     let scannerControlPausedSnapshot: boolean | null = null;
-    let dynamicSettings: DynamicSettings = { scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner }, metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics } };
+    let dynamicSettings: DynamicSettings = {
+        scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner },
+        metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics },
+    };
 
     function getDynamicSetting(settings: DynamicSettings, key: DynamicSettingKey): number {
         const [section, setting] = key.split('.') as ['scanner' | 'metrics', string];
         return (settings[section] as Record<string, number>)[setting];
     }
+
     function setDynamicSetting(settings: DynamicSettings, key: DynamicSettingKey, value: number): void {
         const [section, setting] = key.split('.') as ['scanner' | 'metrics', string];
         (settings[section] as Record<string, number>)[setting] = value;
     }
+
     function parseDynamicSettingValue(key: DynamicSettingKey, rawValue: string): number | null {
         const value = Number(rawValue);
         if (!Number.isSafeInteger(value) || value <= 0) return null;
@@ -48,10 +57,22 @@ export function createDynamicConfigService() {
                 'SELECT "settingKey", value FROM "Configurations"',
                 { type: QueryTypes.SELECT },
             );
-            const next: DynamicSettings = { scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner }, metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics } };
+            const next: DynamicSettings = {
+                scanner: { ...DYNAMIC_SETTINGS_DEFAULTS.scanner },
+                metrics: { ...DYNAMIC_SETTINGS_DEFAULTS.metrics },
+            };
             for (const row of rows) {
                 const key = row.settingKey as DynamicSettingKey;
-                if (!['scanner.maxParallelBlocks', 'scanner.parallelProcessingLagBlocks', 'scanner.maxBlocksPerCatchup', 'scanner.pollIntervalMs', 'metrics.publishIntervalMs', 'metrics.analyticsRefreshMs'].includes(key)) continue;
+                if (
+                    ![
+                        'scanner.maxParallelBlocks',
+                        'scanner.parallelProcessingLagBlocks',
+                        'scanner.maxBlocksPerCatchup',
+                        'scanner.pollIntervalMs',
+                        'metrics.publishIntervalMs',
+                        'metrics.analyticsRefreshMs',
+                    ].includes(key)
+                ) continue;
                 const parsedValue = parseDynamicSettingValue(key, row.value);
                 if (parsedValue === null) {
                     console.warn(`[DynamicConfig] Invalid value for "${key}"; keeping previous valid value`);
@@ -163,7 +184,12 @@ export function createDynamicConfigService() {
         };
     }
 
-    function getDynamicSettings(): DynamicSettings { return { scanner: { ...dynamicSettings.scanner }, metrics: { ...dynamicSettings.metrics } }; }
+    function getDynamicSettings(): DynamicSettings {
+        return {
+            scanner: { ...dynamicSettings.scanner },
+            metrics: { ...dynamicSettings.metrics },
+        };
+    }
 
     function getTxFilters(): ActiveTxFilter[] {
         return getTxFilterSnapshot().filters;
