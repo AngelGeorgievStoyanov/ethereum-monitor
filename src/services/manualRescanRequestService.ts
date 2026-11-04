@@ -117,7 +117,7 @@ async function requestManualRescanOperation(
             fromBlock: requestedFromBlock,
             toBlock: state.lastProcessedBlock,
         });
-        getDynamicConfigService().updateScannerStatusSnapshot({ rescanJob: queuedJob });
+        getDynamicConfigService().updateScannerStatus({ rescanJob: queuedJob });
 
         void executeRescanJob(operationId, requestedFromBlock, state.lastProcessedBlock).catch(
             (error) => {
