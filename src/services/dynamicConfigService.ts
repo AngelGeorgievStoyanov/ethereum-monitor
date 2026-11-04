@@ -126,7 +126,7 @@ export function createDynamicConfigService() {
         if (slowRefreshTimer) return;
 
         slowRefreshTimer = setInterval(() => {
-            if (pendingReloadCount === 0 && !slowRefreshInProgress) {
+            if (!slowRefreshInProgress) {
                 void refreshSlowData();
             }
         }, DYNAMIC_CONFIG_SLOW_REFRESH_INTERVAL_MS);
@@ -148,8 +148,8 @@ export function createDynamicConfigService() {
             );
         }
 
-        startFastRefresh();
         startSlowRefresh();
+        startFastRefresh();
     }
 
     function stopRefreshTimers(): void {
