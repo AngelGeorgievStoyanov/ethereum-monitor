@@ -1357,14 +1357,33 @@ function buildScannerAnalytics(
             windowDatabaseByOperation[operation] = total;
         }
     }
-    const recentLagSamples = lagSamples.slice(lagSamplesStartIndex).filter((sample) => sample.timestampMs >= now - METRICS_RECENT_RATE_WINDOW_MS && sample.timestampMs <= now && sample.lagBlocks !== null);
+    const recentLagSamples = lagSamples
+        .slice(lagSamplesStartIndex)
+        .filter(
+            (sample) =>
+                sample.timestampMs >= now - METRICS_RECENT_RATE_WINDOW_MS &&
+                sample.timestampMs <= now &&
+                sample.lagBlocks !== null,
+        );
     const lagWindowStart = recentLagSamples[0];
     const lagWindowEnd = recentLagSamples[recentLagSamples.length - 1];
-    const lagWindowDurationMs = lagWindowStart && lagWindowEnd ? lagWindowEnd.timestampMs - lagWindowStart.timestampMs : 0;
-    const netLagReductionPerSecondLastMinute = lagWindowDurationMs > 0
-        ? Number(((Number(lagWindowStart.lagBlocks) - Number(lagWindowEnd.lagBlocks)) * 1000 / lagWindowDurationMs).toFixed(2))
-        : null;
-    const recentRateWindowSeconds = Math.max(1, Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000));
+    const lagWindowDurationMs =
+        lagWindowStart && lagWindowEnd
+            ? lagWindowEnd.timestampMs - lagWindowStart.timestampMs
+            : 0;
+    const netLagReductionPerSecondLastMinute =
+        lagWindowDurationMs > 0
+            ? Number(
+                  (
+                      ((Number(lagWindowStart.lagBlocks) - Number(lagWindowEnd.lagBlocks)) * 1000) /
+                      lagWindowDurationMs
+                  ).toFixed(2),
+              )
+            : null;
+    const recentRateWindowSeconds = Math.max(
+        1,
+        Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000),
+    );
     const recentRateSummary = getRecentBlockSummary(now);
 
     const windowMetrics = {
@@ -1372,8 +1391,12 @@ function buildScannerAnalytics(
             processedBlocks,
             processedTransactions,
             blocksPerSecond: Number((processedBlocks / windowSeconds).toFixed(2)),
-            blocksPerSecondLastMinute: Number((recentRateSummary.count / recentRateWindowSeconds).toFixed(2)),
-            transactionsPerSecondLastMinute: Number((recentRateSummary.totals.transactionCount / recentRateWindowSeconds).toFixed(2)),
+            blocksPerSecondLastMinute: Number(
+                (recentRateSummary.count / recentRateWindowSeconds).toFixed(2),
+            ),
+            transactionsPerSecondLastMinute: Number(
+                (recentRateSummary.totals.transactionCount / recentRateWindowSeconds).toFixed(2),
+            ),
             transactionsPerSecond: Number((processedTransactions / windowSeconds).toFixed(2)),
             averageTransactionsPerBlock: batchTotals.blocks
                 ? Number((batchTotals.transactions / batchTotals.blocks).toFixed(2))
