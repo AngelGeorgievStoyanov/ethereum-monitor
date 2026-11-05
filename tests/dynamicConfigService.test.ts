@@ -8,10 +8,7 @@ import { TX_FILTER_RELOAD_RETRY_DELAYS_MS } from '../src/constants/tx-filter.con
 import { getConfigurationService } from '../src/services/configurationService';
 import { createDynamicConfigService } from '../src/services/dynamicConfigService';
 import { getTxFilterService } from '../src/services/txFilterService';
-import {
-    mockActiveTxFilter,
-    mockDynamicSettings,
-} from './mock/dynamicConfigService.mock';
+import { mockActiveTxFilter, mockDynamicSettings } from './mock/dynamicConfigService.mock';
 
 vi.mock('../src/services/configurationService', () => ({
     getConfigurationService: vi.fn(),
