@@ -28,8 +28,13 @@ type CurrentMetrics = {
             successes: number;
             failures: number;
             retryableFailures: number;
+            rateLimitFailures: number;
             totalDurationMs: number;
             lastFailureAt: string | null;
+            lastFailureKind: string | null;
+            lastHttpStatus: number | null;
+            lastRpcCode: number | null;
+            lastFailureMessage: string | null;
         }>;
     };
 };
@@ -59,8 +64,13 @@ export async function refreshScannerStatus(): Promise<ScannerStatusResponse> {
         successes: endpoint.successes,
         failures: endpoint.failures,
         retryableFailures: endpoint.retryableFailures,
+        rateLimitFailures: endpoint.rateLimitFailures,
         totalDurationMs: endpoint.totalDurationMs,
         lastFailureAt: endpoint.lastFailureAt,
+        lastFailureKind: endpoint.lastFailureKind,
+        lastHttpStatus: endpoint.lastHttpStatus,
+        lastRpcCode: endpoint.lastRpcCode,
+        lastFailureMessage: endpoint.lastFailureMessage,
     }));
 
     const response = mapScannerStatusResponse({
