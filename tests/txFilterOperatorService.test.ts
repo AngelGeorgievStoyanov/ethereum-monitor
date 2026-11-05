@@ -14,9 +14,9 @@ import {
 
 describe('txFilterOperatorService', () => {
     it('normalizes case-insensitive string fields', () => {
-        expect(normalizeTxFilterValue(mixedCaseTransferType, getTxFilterField('transferType'))).toBe(
-            'native',
-        );
+        expect(
+            normalizeTxFilterValue(mixedCaseTransferType, getTxFilterField('transferType')),
+        ).toBe('native');
     });
 
     it('preserves exact bigint precision', () => {
@@ -52,10 +52,12 @@ describe('txFilterOperatorService', () => {
     });
 
     it('requires exactly two values for between', () => {
-        expect(() => validateOperatorValue('between', [1, 2], getTxFilterField('blockNumber'))).not.toThrow();
-        expect(() => validateOperatorValue('between', [1], getTxFilterField('blockNumber'))).toThrow(
-            'exactly two values',
-        );
+        expect(() =>
+            validateOperatorValue('between', [1, 2], getTxFilterField('blockNumber')),
+        ).not.toThrow();
+        expect(() =>
+            validateOperatorValue('between', [1], getTxFilterField('blockNumber')),
+        ).toThrow('exactly two values');
     });
 
     it('rejects null and undefined filter values', () => {

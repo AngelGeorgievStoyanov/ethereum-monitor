@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_FILTER_ARRAY_VALUES, MAX_FILTER_DEPTH, MAX_FILTER_NODES } from '../src/constants/tx-filter.constants';
+import {
+    MAX_FILTER_ARRAY_VALUES,
+    MAX_FILTER_DEPTH,
+    MAX_FILTER_NODES,
+} from '../src/constants/tx-filter.constants';
 import { validateTxFilterRule } from '../src/services/txFilterValidationService';
 import { ValidationError } from '../src/utils/validationError';
 import {
