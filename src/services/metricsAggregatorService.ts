@@ -1363,14 +1363,23 @@ function buildScannerAnalytics(
 
     for (let index = lagSamplesStartIndex; index < lagSamples.length; index += 1) {
         const sample = lagSamples[index];
-        if (sample.timestampMs > now || sample.lagBlocks === null) continue;
+        if (sample.timestampMs > now) continue;
+
+        if (sample.lagBlocks === null) {
+            // A null lag sample breaks continuity. Never calculate a rate across
+            // a regression or a period where the lag could not be measured.
+            lagWindowStart = undefined;
+            lagWindowEnd = undefined;
+            continue;
+        }
 
         lagWindowEnd = sample;
         if (sample.timestampMs <= lagWindowStartBoundaryMs) {
             lagWindowStart = sample;
         } else if (!lagWindowStart) {
             // If there is no sample at/before the 60-second boundary, use the
-            // earliest available sample inside the window for a partial interval.
+            // earliest valid sample after the boundary (or after the last null)
+            // for a partial interval.
             lagWindowStart = sample;
         }
     }
