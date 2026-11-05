@@ -415,11 +415,9 @@ export function createRpcClient() {
                     const startedAt = Date.now();
                     recordEndpointAttempt(endpoint);
                     try {
-                        const block = await trackBlockRpcRequest(() =>
-                            withTimeout(
-                                provider.getBlock(blockNumber, true),
-                                RPC_ENDPOINT_TIMEOUT_MS,
-                            ),
+                        const block = await withTimeout(
+                            trackBlockRpcRequest(() => provider.getBlock(blockNumber, true)),
+                            RPC_ENDPOINT_TIMEOUT_MS,
                         );
                         getBlockDurationMs = Date.now() - startedAt;
                         if (block) recordEndpointSuccess(endpoint, startedAt);
@@ -456,11 +454,11 @@ export function createRpcClient() {
                     let response: unknown;
                     recordEndpointAttempt(endpoint);
                     try {
-                        response = await trackBlockRpcRequest(() =>
-                            withTimeout(
+                        response = await withTimeout(
+                            trackBlockRpcRequest(() =>
                                 provider.send('eth_getBlockReceipts', [toQuantity(blockNumber)]),
-                                RPC_ENDPOINT_TIMEOUT_MS,
                             ),
+                            RPC_ENDPOINT_TIMEOUT_MS,
                         );
                         if (!Array.isArray(response)) {
                             throw new Error('eth_getBlockReceipts returned a non-array response');
