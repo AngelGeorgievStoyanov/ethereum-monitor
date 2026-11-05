@@ -453,9 +453,10 @@ export function createRpcClient() {
 
                 const fetchReceipts = async () => {
                     const startedAt = Date.now();
+                    let response: unknown;
                     recordEndpointAttempt(endpoint);
                     try {
-                        const response = await trackBlockRpcRequest(() =>
+                        response = await trackBlockRpcRequest(() =>
                             withTimeout(
                                 provider.send('eth_getBlockReceipts', [toQuantity(blockNumber)]),
                                 RPC_ENDPOINT_TIMEOUT_MS,
