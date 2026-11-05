@@ -117,7 +117,7 @@
     <section class="panel">
         <h2>RPC endpoints</h2>
         <div class="table-wrap">
-            <table><thead><tr><th>Endpoint</th><th>Attempts</th><th>Success rate</th><th>Avg. latency</th><th>Failures</th><th>Last failure</th></tr></thead><tbody id="rpcRows"><tr><td colspan="6" class="muted">Waiting for data</td></tr></tbody></table>
+            <table><thead><tr><th>Endpoint</th><th>Attempts</th><th>Success rate</th><th>Avg. latency</th><th>Failures</th><th>Rate limits</th><th>Last failure</th><th>Last error</th></tr></thead><tbody id="rpcRows"><tr><td colspan="8" class="muted">Waiting for data</td></tr></tbody></table>
         </div>
         <p class="hint">Counts represent actual RPC endpoint attempts made by scanner and recovery operations. Dashboard requests do not generate RPC calls. Counters reset when the process restarts.</p>
     </section>
@@ -404,9 +404,10 @@
         const rows = (data.rpcMetrics || []).map((item) => {
             const rate = item.attempts > 0 ? ((item.successes / item.attempts) * 100).toFixed(1) + '%' : '—';
             const avg = item.attempts > 0 ? duration(item.totalDurationMs / item.attempts) : '—';
-            return '<tr><td>#' + item.index + '</td><td>' + number(item.attempts) + '</td><td>' + rate + '</td><td>' + avg + '</td><td>' + number(item.failures) + '</td><td>' + (item.lastFailureAt ? new Date(item.lastFailureAt).toLocaleString() : '—') + '</td></tr>';
+            const lastError = [item.lastFailureKind, item.lastHttpStatus ? 'HTTP ' + item.lastHttpStatus : null, item.lastRpcCode !== null && item.lastRpcCode !== undefined ? 'RPC ' + item.lastRpcCode : null, item.lastFailureMessage].filter(Boolean).join(' · ');
+            return '<tr><td>#' + item.index + '</td><td>' + number(item.attempts) + '</td><td>' + rate + '</td><td>' + avg + '</td><td>' + number(item.failures) + '</td><td>' + number(item.rateLimitFailures) + '</td><td>' + (item.lastFailureAt ? new Date(item.lastFailureAt).toLocaleString() : '—') + '</td><td title="' + escapeHtml(lastError) + '">' + escapeHtml(lastError || '—') + '</td></tr>';
         }).join('');
-        $('rpcRows').innerHTML = rows || '<tr><td colspan="6" class="muted">No RPC endpoints reported</td></tr>';
+        $('rpcRows').innerHTML = rows || '<tr><td colspan="8" class="muted">No RPC endpoints reported</td></tr>';
 
         setText('reorgCount', number(recovery.reorgCount));
         setText('reorgDepth', number(recovery.reorgDepthLast));
