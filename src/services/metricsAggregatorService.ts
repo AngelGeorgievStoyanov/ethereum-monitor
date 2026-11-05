@@ -1392,7 +1392,7 @@ function buildScannerAnalytics(
     const lagWindowDurationMs =
         lagWindowStart && lagWindowEnd ? lagWindowEnd.timestampMs - lagWindowStart.timestampMs : 0;
     const netLagReductionPerSecondLastMinute =
-        lagWindowDurationMs > 0
+        lagWindowStart && lagWindowEnd && lagWindowDurationMs > 0
             ? Number(
                   (
                       ((Number(lagWindowStart.lagBlocks) - Number(lagWindowEnd.lagBlocks)) * 1000) /
