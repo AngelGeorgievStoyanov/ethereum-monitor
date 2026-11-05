@@ -1168,6 +1168,7 @@ export function recordProcessingBatch(input: {
     fetchStageDurationMs: number;
     processingStageDurationMs: number;
     persistenceStageDurationMs: number;
+    noFetchDurationMs: number;
     configuredMaxParallelBlocks: number;
     parallelProcessingLagBlocks: number;
     lagAtBatchStart: number;
@@ -1256,9 +1257,11 @@ function buildScannerAnalytics(
             const configuredParallelism = Number(sample.configuredMaxParallelBlocks ?? 0);
             totals.fetchWorkerMs += Number(sample.averageConcurrentFetches ?? 0) * fetchDurationMs;
             totals.fetchCapacityMs += configuredParallelism * fetchDurationMs;
-            totals.noFetchDurationMs +=
-                Number(sample.processingStageDurationMs ?? 0) +
-                Number(sample.persistenceStageDurationMs ?? 0);
+            totals.noFetchDurationMs += Number(
+                sample.noFetchDurationMs ??
+                    Number(sample.processingStageDurationMs ?? 0) +
+                        Number(sample.persistenceStageDurationMs ?? 0),
+            );
             return totals;
         },
         { fetchWorkerMs: 0, fetchCapacityMs: 0, noFetchDurationMs: 0 },

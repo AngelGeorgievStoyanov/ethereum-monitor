@@ -24,6 +24,10 @@ import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityE
 import { recordProcessingBatch } from './metricsAggregatorService';
 
 type ConfirmedBlock = CanonicalBlockIdentity;
+type PreparedBlock = {
+    blockNumber: number;
+    result: Awaited<ReturnType<typeof processFetchedBlock>>;
+};
 
 let lastLoggedFilterConfigVersion = '';
 
@@ -61,117 +65,169 @@ export async function processFinalizedBlocks(
     const parallelProcessingLagBlocks =
         Number(dynamicSettings.parallelProcessingLagBlocks) ||
         SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS;
-    const maxParallelBlocks =
-        Number(dynamicSettings.maxParallelBlocks) || SCANNER_MAX_PARALLEL_BLOCKS;
+    const maxParallelBlocks = Math.max(
+        1,
+        Math.floor(Number(dynamicSettings.maxParallelBlocks) || SCANNER_MAX_PARALLEL_BLOCKS),
+    );
     const lag = actualFinalizedBlockNumber - state.lastProcessedBlock;
-    const batchSize = lag > parallelProcessingLagBlocks ? maxParallelBlocks : 1;
-    const maxBatchIterations = Math.ceil(maxBlocksPerCatchup / batchSize);
-    let batchIterationCount = 0;
+    const configuredConcurrency = lag > parallelProcessingLagBlocks ? maxParallelBlocks : 1;
+    // Bound the ordered result buffer to two worker windows while workers refill slots.
+    const rollingWindowSize = configuredConcurrency > 1 ? configuredConcurrency * 2 : 1;
 
     const catchupStartedAt = Date.now();
     const catchupStartBlock = state.lastProcessedBlock + 1;
     const totals = createBlockProcessingTotals();
+    let blocksProcessedThisCatchup = 0;
     let currentBatchStart: number | undefined;
 
     while (
         state.lastProcessedBlock < finalizedCatchupTarget &&
-        batchIterationCount < maxBatchIterations
+        blocksProcessedThisCatchup < maxBlocksPerCatchup
     ) {
         currentBatchStart = state.lastProcessedBlock + 1;
         const batchStartedAt = Date.now();
         if (getDynamicConfigService().getScannerPaused()) return;
+
         const filterConfig = getActiveTxFilters();
         const activeTxFilters = filterConfig.filters;
         if (activeTxFilters.length === 0) return;
 
+        const expectedCheckpoint = state.lastProcessedBlock;
+        const windowLength = Math.min(
+            rollingWindowSize,
+            finalizedCatchupTarget - state.lastProcessedBlock,
+            maxBlocksPerCatchup - blocksProcessedThisCatchup,
+        );
         const blockNumbers = Array.from(
-            { length: Math.min(batchSize, finalizedCatchupTarget - state.lastProcessedBlock) },
+            { length: windowLength },
             (_, index) => currentBatchStart! + index,
         );
-        const expectedCheckpoint = state.lastProcessedBlock;
+        const workerCount = Math.min(configuredConcurrency, blockNumbers.length);
+
         if (filterConfig.version !== lastLoggedFilterConfigVersion) {
             console.log(
-                `[Scanner] First batch using transaction filter config version=${filterConfig.version}; blocks=${blockNumbers[0]}-${blockNumbers[blockNumbers.length - 1]}; filters=${activeTxFilters.length}`,
+                `[Scanner] First rolling window using transaction filter config version=${filterConfig.version}; blocks=${blockNumbers[0]}-${blockNumbers[blockNumbers.length - 1]}; filters=${activeTxFilters.length}`,
             );
             lastLoggedFilterConfigVersion = filterConfig.version;
         }
 
         try {
             const previousConfirmedBlock = await getConfirmedCheckpointBlock(expectedCheckpoint);
-            const fetchStageStartedAt = Date.now();
+            const fetchStartedAt: number[] = [];
+            const fetchFinishedAt: number[] = [];
+            const processingStartedAt: number[] = [];
+            const processingFinishedAt: number[] = [];
+            let nextBlockIndex = 0;
+            let stopScheduling = false;
+            const workerErrors: Array<{ index: number; error: unknown }> = [];
+
             let activeFetches = 0;
             let maxConcurrentFetches = 0;
+            let noFetchDurationMs = 0;
+            let noFetchStartedAt = Date.now();
             let totalConcurrentFetchMs = 0;
-            let lastFetchConcurrencyChangeAt = fetchStageStartedAt;
+            let lastFetchConcurrencyChangeAt = 0;
             const updateFetchConcurrency = (nextActiveFetches: number) => {
                 const now = Date.now();
-                totalConcurrentFetchMs += activeFetches * (now - lastFetchConcurrencyChangeAt);
+                if (activeFetches === 0 && nextActiveFetches > 0) {
+                    noFetchDurationMs += now - noFetchStartedAt;
+                } else if (activeFetches > 0 && nextActiveFetches === 0) {
+                    noFetchStartedAt = now;
+                }
+                if (lastFetchConcurrencyChangeAt > 0) {
+                    totalConcurrentFetchMs += activeFetches * (now - lastFetchConcurrencyChangeAt);
+                }
                 activeFetches = nextActiveFetches;
                 lastFetchConcurrencyChangeAt = now;
             };
-            const fetchedSettledBlocks = await Promise.allSettled(
-                blockNumbers.map(async (blockNumber) => {
-                    updateFetchConcurrency(activeFetches + 1);
-                    maxConcurrentFetches = Math.max(maxConcurrentFetches, activeFetches);
+
+            let activeProcessing = 0;
+            let maxConcurrentProcessing = 0;
+            const preparedBlocks: Array<PreparedBlock | undefined> = new Array(blockNumbers.length);
+
+            const workers = Array.from({ length: workerCount }, async () => {
+                while (!stopScheduling) {
+                    const index = nextBlockIndex;
+                    nextBlockIndex += 1;
+                    if (index >= blockNumbers.length) return;
+
+                    const blockNumber = blockNumbers[index];
                     try {
-                        return {
-                            blockNumber,
-                            fetched: await fetchBlockForProcessing(blockNumber),
-                        };
-                    } finally {
-                        updateFetchConcurrency(activeFetches - 1);
+                        const fetchStarted = Date.now();
+                        fetchStartedAt[index] = fetchStarted;
+                        updateFetchConcurrency(activeFetches + 1);
+                        maxConcurrentFetches = Math.max(maxConcurrentFetches, activeFetches);
+                        let fetched: Awaited<ReturnType<typeof fetchBlockForProcessing>>;
+                        try {
+                            fetched = await fetchBlockForProcessing(blockNumber);
+                        } finally {
+                            fetchFinishedAt[index] = Date.now();
+                            updateFetchConcurrency(activeFetches - 1);
+                        }
+
+                        const processingStarted = Date.now();
+                        processingStartedAt[index] = processingStarted;
+                        activeProcessing += 1;
+                        maxConcurrentProcessing = Math.max(
+                            maxConcurrentProcessing,
+                            activeProcessing,
+                        );
+                        try {
+                            const result = await processFetchedBlock(
+                                fetched,
+                                activeTxFilters,
+                                false,
+                            );
+                            preparedBlocks[index] = { blockNumber, result };
+                        } finally {
+                            processingFinishedAt[index] = Date.now();
+                            activeProcessing -= 1;
+                        }
+                    } catch (error) {
+                        workerErrors.push({ index, error });
+                        stopScheduling = true;
+                        return;
                     }
-                }),
-            );
-            const fetchStageDurationMs = Date.now() - fetchStageStartedAt;
-            totalConcurrentFetchMs += activeFetches * (Date.now() - lastFetchConcurrencyChangeAt);
-            const averageConcurrentFetches =
-                fetchStageDurationMs > 0 ? totalConcurrentFetchMs / fetchStageDurationMs : 0;
-            const failedFetch = fetchedSettledBlocks.find((result) => result.status === 'rejected');
-            if (failedFetch?.status === 'rejected') {
-                throw failedFetch.reason;
-            }
-            const fetchedBlocks = fetchedSettledBlocks.map((result) => {
-                if (result.status === 'rejected') throw result.reason;
-                return result.value;
+                }
             });
 
-            const fetchedBlockRecords = fetchedBlocks.map(({ fetched }) => ({
-                blockNumber: fetched.block.number,
-                blockHash: fetched.block.hash,
-                parentHash: fetched.block.parentHash,
+            // Workers catch task failures themselves; awaiting all workers drains every in-flight task.
+            await Promise.all(workers);
+            if (workerErrors.length > 0) {
+                const earliestFailure = workerErrors.reduce((earliest, current) =>
+                    current.index < earliest.index ? current : earliest,
+                );
+                throw earliestFailure.error;
+            }
+
+            const completedBlocks = preparedBlocks.map((prepared) => {
+                if (!prepared) {
+                    throw new Error('Rolling block worker completed without a prepared result');
+                }
+                return prepared;
+            });
+            const fetchedBlockRecords = completedBlocks.map(({ result }) => ({
+                blockNumber: result.block.blockNumber,
+                blockHash: result.block.blockHash,
+                parentHash: result.block.parentHash,
             }));
             validateBatchConnectivity(previousConfirmedBlock, fetchedBlockRecords, blockNumbers);
 
-            const processingStageStartedAt = Date.now();
-            let activeProcessing = 0;
-            let maxConcurrentProcessing = 0;
-            const settledBlocks = await Promise.allSettled(
-                fetchedBlocks.map(async ({ blockNumber, fetched }) => {
-                    activeProcessing += 1;
-                    maxConcurrentProcessing = Math.max(maxConcurrentProcessing, activeProcessing);
-                    try {
-                        return {
-                            blockNumber,
-                            result: await processFetchedBlock(fetched, activeTxFilters, false),
-                        };
-                    } finally {
-                        activeProcessing -= 1;
-                    }
-                }),
+            const firstFetchStartedAt = Math.min(...fetchStartedAt);
+            const lastFetchFinishedAt = Math.max(...fetchFinishedAt);
+            const fetchStageDurationMs = Math.max(0, lastFetchFinishedAt - firstFetchStartedAt);
+            totalConcurrentFetchMs += activeFetches * (Date.now() - lastFetchConcurrencyChangeAt);
+            const averageConcurrentFetches =
+                fetchStageDurationMs > 0 ? totalConcurrentFetchMs / fetchStageDurationMs : 0;
+            const firstProcessingStartedAt = Math.min(...processingStartedAt);
+            const lastProcessingFinishedAt = Math.max(...processingFinishedAt);
+            const processingStageDurationMs = Math.max(
+                0,
+                lastProcessingFinishedAt - firstProcessingStartedAt,
             );
-            const processingStageDurationMs = Date.now() - processingStageStartedAt;
-            const failedBlock = settledBlocks.find((result) => result.status === 'rejected');
-            if (failedBlock?.status === 'rejected') {
-                throw failedBlock.reason;
-            }
-            const preparedBlocks = settledBlocks.map((result) => {
-                if (result.status === 'rejected') throw result.reason;
-                return result.value;
-            });
 
-            const processedBlockRecords = preparedBlocks.map(({ result }) => result.block);
-            const candidates = preparedBlocks.flatMap(({ result }) => result.candidates);
+            const processedBlockRecords = completedBlocks.map(({ result }) => result.block);
+            const candidates = completedBlocks.flatMap(({ result }) => result.candidates);
             const databaseWriteStartedAt = Date.now();
             const committedCheckpoint = await persistProcessedBlockBatch({
                 candidates,
@@ -181,6 +237,7 @@ export async function processFinalizedBlocks(
                 newCheckpoint: blockNumbers[blockNumbers.length - 1],
             });
             const databaseWriteDurationMs = Date.now() - databaseWriteStartedAt;
+            if (activeFetches === 0) noFetchDurationMs += Date.now() - noFetchStartedAt;
 
             if (committedCheckpoint !== blockNumbers[blockNumbers.length - 1]) {
                 state.lastProcessedBlock = committedCheckpoint;
@@ -190,17 +247,17 @@ export async function processFinalizedBlocks(
             }
 
             state.lastProcessedBlock = committedCheckpoint;
-            batchIterationCount += 1;
+            blocksProcessedThisCatchup += completedBlocks.length;
             // Advance the in-memory checkpoint only after the DB transaction has committed.
             cacheConfirmedCheckpointBlock(
                 processedBlockRecords[processedBlockRecords.length - 1] ?? null,
                 committedCheckpoint,
             );
             const perBlockDatabaseWriteDurationMs = Math.ceil(
-                databaseWriteDurationMs / preparedBlocks.length,
+                databaseWriteDurationMs / completedBlocks.length,
             );
 
-            for (const { blockNumber, result } of preparedBlocks) {
+            for (const { blockNumber, result } of completedBlocks) {
                 result.databaseWriteDurationMs = perBlockDatabaseWriteDurationMs;
                 const blockDurationMs = result.blockDurationMs + perBlockDatabaseWriteDurationMs;
                 logBlockProcessed(
@@ -215,8 +272,8 @@ export async function processFinalizedBlocks(
             recordProcessingBatch({
                 startBlock: blockNumbers[0],
                 endBlock: blockNumbers[blockNumbers.length - 1],
-                blocks: preparedBlocks.length,
-                transactions: preparedBlocks.reduce(
+                blocks: completedBlocks.length,
+                transactions: completedBlocks.reduce(
                     (total, item) => total + item.result.transactionCount,
                     0,
                 ),
@@ -224,6 +281,7 @@ export async function processFinalizedBlocks(
                 databaseWriteDurationMs,
                 fetchStageDurationMs,
                 processingStageDurationMs,
+                noFetchDurationMs,
                 persistenceStageDurationMs: databaseWriteDurationMs,
                 configuredMaxParallelBlocks: maxParallelBlocks,
                 parallelProcessingLagBlocks,
