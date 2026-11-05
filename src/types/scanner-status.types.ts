@@ -47,8 +47,13 @@ export interface RpcEndpointMetrics {
     successes: number;
     failures: number;
     retryableFailures: number;
+    rateLimitFailures: number;
     totalDurationMs: number;
     lastFailureAt: string | null;
+    lastFailureKind: string | null;
+    lastHttpStatus: number | null;
+    lastRpcCode: number | null;
+    lastFailureMessage: string | null;
 }
 
 export interface RecentBlockMetric {
