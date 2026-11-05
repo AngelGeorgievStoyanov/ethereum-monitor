@@ -499,10 +499,13 @@ export function createRpcClient() {
                     fetchReceipts(),
                 ]);
 
-                const rejectedResults = [blockResult, receiptsResult].filter(
-                    (item): item is PromiseRejectedResult => item.status === 'rejected',
-                );
-                if (rejectedResults.length > 0) {
+                if (
+                    blockResult.status === 'rejected' ||
+                    receiptsResult.status === 'rejected'
+                ) {
+                    const rejectedResults = [blockResult, receiptsResult].filter(
+                        (item): item is PromiseRejectedResult => item.status === 'rejected',
+                    );
                     // A permanent error from either RPC call must prevent an unsafe retry.
                     const failure =
                         rejectedResults.find((item) => !classifyError(item.reason).retryable) ??
@@ -510,12 +513,8 @@ export function createRpcClient() {
                     throw failure.reason;
                 }
 
-                const block = (blockResult as PromiseFulfilledResult<
-                    Awaited<ReturnType<JsonRpcProvider['getBlock']>>
-                >).value;
-                const receipts = (receiptsResult as PromiseFulfilledResult<
-                    RpcTransactionReceipt[]
-                >).value;
+                const block = blockResult.value;
+                const receipts = receiptsResult.value;
 
                 if (!block) {
                     throw new Error(`Unable to load block ${blockNumber}`);
