@@ -115,11 +115,11 @@
     </div>
 
     <section class="panel">
-        <h2>RPC endpoints</h2>
+        <div class="panel-heading"><h2>RPC endpoints</h2><span class="hint" id="rpcEndpointCount">0 configured</span></div>
         <div class="table-wrap">
             <table><thead><tr><th>Endpoint</th><th>Attempts</th><th>Success rate</th><th>Avg. latency</th><th>Failures</th><th>Rate limits</th><th>Last failure</th><th>Last error</th></tr></thead><tbody id="rpcRows"><tr><td colspan="8" class="muted">Waiting for data</td></tr></tbody></table>
         </div>
-        <p class="hint">Endpoint #1 maps to RPC_URL_1, #2 to RPC_URL_2, and so on in .env. Rate limits and last error are tracked per endpoint. Counts represent actual RPC attempts; dashboard requests do not generate RPC calls. Counters reset when the process restarts.</p>
+        <p class="hint">Endpoint numbers follow the configured RPC_URL_* entries in .env. Add another RPC_URL_n entry and it will appear automatically; no dashboard changes are needed. Counts represent actual RPC attempts and reset when the process restarts.</p>
     </section>
 
     <section class="panel">
@@ -401,7 +401,9 @@
         setText('failedErc20', number(metrics.totalErc20FailedAttemptsSeen));
         drawChart(metrics.recentBlocks);
 
-        const rows = (data.rpcMetrics || []).map((item) => {
+        const rpcEndpoints = data.rpcMetrics || [];
+        setText('rpcEndpointCount', number(rpcEndpoints.length) + (rpcEndpoints.length === 1 ? ' configured endpoint' : ' configured endpoints'));
+        const rows = rpcEndpoints.map((item) => {
             const rate = item.attempts > 0 ? ((item.successes / item.attempts) * 100).toFixed(1) + '%' : '—';
             const avg = item.attempts > 0 ? duration(item.totalDurationMs / item.attempts) : '—';
             const lastError = [item.lastFailureKind, item.lastHttpStatus ? 'HTTP ' + item.lastHttpStatus : null, item.lastRpcCode !== null && item.lastRpcCode !== undefined ? 'RPC ' + item.lastRpcCode : null, item.lastFailureMessage].filter(Boolean).join(' · ');
