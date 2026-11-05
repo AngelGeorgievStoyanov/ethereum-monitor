@@ -1505,10 +1505,16 @@ function buildScannerAnalytics(
         catchUp: {
             netLagReductionPerSecond,
             netLagReductionPerSecondLastMinute,
-            lagAtAnalyticsWindowStart: analyticsLagWindow.start ? Number(analyticsLagWindow.start.lagBlocks) : null,
-            lagAtAnalyticsWindowEnd: analyticsLagWindow.end ? Number(analyticsLagWindow.end.lagBlocks) : null,
+            lagAtAnalyticsWindowStart: analyticsLagWindow.start
+                ? Number(analyticsLagWindow.start.lagBlocks)
+                : null,
+            lagAtAnalyticsWindowEnd: analyticsLagWindow.end
+                ? Number(analyticsLagWindow.end.lagBlocks)
+                : null,
             analyticsMeasurementDurationMs: analyticsLagWindow.durationMs,
-            lagAtWindowStart: recentLagWindow.start ? Number(recentLagWindow.start.lagBlocks) : null,
+            lagAtWindowStart: recentLagWindow.start
+                ? Number(recentLagWindow.start.lagBlocks)
+                : null,
             lagAtWindowEnd: recentLagWindow.end ? Number(recentLagWindow.end.lagBlocks) : null,
             measurementDurationMs: recentLagWindow.durationMs,
         },
