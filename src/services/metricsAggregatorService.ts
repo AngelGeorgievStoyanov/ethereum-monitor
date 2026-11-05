@@ -1264,6 +1264,25 @@ function buildScannerAnalytics(
         { fetchWorkerMs: 0, fetchCapacityMs: 0, noFetchDurationMs: 0 },
     );
     const recentRpcConcurrency = getRecentRpcConcurrency(now);
+    const recentFetchDurationMs = recentBatches.reduce(
+        (total, sample) => total + Number(sample.fetchStageDurationMs ?? 0),
+        0,
+    );
+    const fetchSlotUtilizationPercentLastMinute =
+        recentFetchMetrics.fetchCapacityMs > 0
+            ? Number(
+                  (
+                      (recentFetchMetrics.fetchWorkerMs / recentFetchMetrics.fetchCapacityMs) *
+                      100
+                  ).toFixed(1),
+              )
+            : null;
+    const averageNoFetchDurationPerBatchMsLastMinute = recentBatches.length
+        ? Number((recentFetchMetrics.noFetchDurationMs / recentBatches.length).toFixed(1))
+        : null;
+    const averageConcurrentFetchesLastMinute = recentFetchDurationMs > 0
+        ? Number((recentFetchMetrics.fetchWorkerMs / recentFetchDurationMs).toFixed(2))
+        : null;
     const batchTotals = selectedBatches.reduce(
         (totals, sample) => {
             const blocks = Number(sample.blocks ?? 0);
@@ -1513,36 +1532,9 @@ function buildScannerAnalytics(
                 : null,
             maxObservedConcurrentFetches: batchTotals.maxConcurrentFetches,
             maxObservedConcurrentProcessing: batchTotals.maxConcurrentProcessing,
-            fetchSlotUtilizationPercentLastMinute:
-                recentFetchMetrics.fetchCapacityMs > 0
-                    ? Number(
-                          (
-                              (recentFetchMetrics.fetchWorkerMs /
-                                  recentFetchMetrics.fetchCapacityMs) *
-                              100
-                          ).toFixed(1),
-                      )
-                    : null,
-            averageNoFetchDurationPerBatchMsLastMinute: recentBatches.length
-                ? Number(
-                      (recentFetchMetrics.noFetchDurationMs / recentBatches.length).toFixed(1),
-                  )
-                : null,
-            averageConcurrentFetchesLastMinute: recentBatches.length
-                ? Number(
-                      (
-                          recentFetchMetrics.fetchWorkerMs /
-                          Math.max(
-                              1,
-                              recentBatches.reduce(
-                                  (total, sample) =>
-                                      total + Number(sample.fetchStageDurationMs ?? 0),
-                                  0,
-                              ),
-                          )
-                      ).toFixed(2),
-                  )
-                : null,
+            fetchSlotUtilizationPercentLastMinute,
+            averageNoFetchDurationPerBatchMsLastMinute,
+            averageConcurrentFetchesLastMinute,
             averageBlockDurationMs: processedBlocks
                 ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
                 : null,
