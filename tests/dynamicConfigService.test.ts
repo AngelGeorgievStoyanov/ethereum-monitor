@@ -82,7 +82,7 @@ describe('dynamicConfigService', () => {
         await vi.advanceTimersByTimeAsync(DYNAMIC_CONFIG_SLOW_REFRESH_INTERVAL_MS);
 
         expect(configurationServiceMock.refresh).toHaveBeenCalledTimes(2);
-        expect(txFilterServiceMock.loadActiveTxFilters).toHaveBeenCalledTimes(3);
+        expect(txFilterServiceMock.loadActiveTxFilters).toHaveBeenCalledTimes(4);
     });
 
     it('does not initialize or start duplicate refresh intervals twice', async () => {
@@ -123,13 +123,14 @@ describe('dynamicConfigService', () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const initialization = service.init();
+        const initializationRejection = expect(initialization).rejects.toThrow(
+            'Unable to load required dynamic configuration',
+        );
         await vi.advanceTimersByTimeAsync(
             TX_FILTER_RELOAD_RETRY_DELAYS_MS.reduce((total, delay) => total + delay, 0),
         );
 
-        await expect(initialization).rejects.toThrow(
-            'Unable to load required dynamic configuration',
-        );
+        await initializationRejection;
         expect(service.getActiveTxFilterConfig).toThrow(
             'Dynamic configuration has not been initialized',
         );
