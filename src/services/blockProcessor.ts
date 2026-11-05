@@ -101,9 +101,17 @@ export async function processFinalizedBlocks(
             const fetchStageStartedAt = Date.now();
             let activeFetches = 0;
             let maxConcurrentFetches = 0;
+            let totalConcurrentFetchMs = 0;
+            let lastFetchConcurrencyChangeAt = fetchStageStartedAt;
+            const updateFetchConcurrency = (nextActiveFetches: number) => {
+                const now = Date.now();
+                totalConcurrentFetchMs += activeFetches * (now - lastFetchConcurrencyChangeAt);
+                activeFetches = nextActiveFetches;
+                lastFetchConcurrencyChangeAt = now;
+            };
             const fetchedSettledBlocks = await Promise.allSettled(
                 blockNumbers.map(async (blockNumber) => {
-                    activeFetches += 1;
+                    updateFetchConcurrency(activeFetches + 1);
                     maxConcurrentFetches = Math.max(maxConcurrentFetches, activeFetches);
                     try {
                         return {
@@ -111,11 +119,14 @@ export async function processFinalizedBlocks(
                             fetched: await fetchBlockForProcessing(blockNumber),
                         };
                     } finally {
-                        activeFetches -= 1;
+                        updateFetchConcurrency(activeFetches - 1);
                     }
                 }),
             );
             const fetchStageDurationMs = Date.now() - fetchStageStartedAt;
+            totalConcurrentFetchMs += activeFetches * (Date.now() - lastFetchConcurrencyChangeAt);
+            const averageConcurrentFetches =
+                fetchStageDurationMs > 0 ? totalConcurrentFetchMs / fetchStageDurationMs : 0;
             const failedFetch = fetchedSettledBlocks.find((result) => result.status === 'rejected');
             if (failedFetch?.status === 'rejected') {
                 throw failedFetch.reason;
@@ -219,6 +230,7 @@ export async function processFinalizedBlocks(
                 lagAtBatchStart: lag,
                 maxConcurrentFetches,
                 maxConcurrentProcessing,
+                averageConcurrentFetches,
             });
         } catch (error) {
             console.error(

@@ -4,8 +4,10 @@ import { getDynamicConfigService } from './dynamicConfigService';
 import {
     subscribeToRpcMetricEvents,
     subscribeToRpcOperationMetricEvents,
+    subscribeToRpcConcurrencyMetricEvents,
     type RpcMetricEventInput,
     type RpcOperationMetricEvent,
+    type RpcConcurrencyMetricEvent,
 } from '../metrics/metricsEventBus';
 import {
     FINALIZED_REGRESSION_WAIT_MS,
@@ -67,6 +69,10 @@ const blockSamples: Array<Record<string, unknown> & { timestampMs: number }> = [
 let blockSamplesStartIndex = 0;
 const rpcEvents: Array<Record<string, unknown> & { timestampMs: number }> = [];
 let rpcEventsStartIndex = 0;
+const rpcConcurrencySamples: Array<{ timestampMs: number; activeRequests: number }> = [
+    { timestampMs: startedAtMs, activeRequests: 0 },
+];
+let activeBlockRpcRequests = 0;
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
 const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
 const finalizedSamples: Array<{ timestampMs: number; blockNumber: number }> = [];
@@ -348,6 +354,12 @@ function publish(): void {
 }
 
 function trimSamples(now: number): void {
+    while (
+        rpcConcurrencySamples.length > 1 &&
+        now - rpcConcurrencySamples[1].timestampMs > METRICS_RETENTION_MS
+    ) {
+        rpcConcurrencySamples.shift();
+    }
     while (
         blockSamplesStartIndex < blockSamples.length &&
         (blockSamples.length - blockSamplesStartIndex > METRICS_SAMPLE_LIMITS.blocks ||
@@ -1161,6 +1173,7 @@ export function recordProcessingBatch(input: {
     lagAtBatchStart: number;
     maxConcurrentFetches: number;
     maxConcurrentProcessing: number;
+    averageConcurrentFetches: number;
 }): void {
     const now = Date.now();
     batchSamples.push({
@@ -1234,6 +1247,44 @@ function buildScannerAnalytics(
         (bucket) => bucket.timestampMs + METRICS_BUCKET_INTERVAL_MS > since,
     );
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
+    const recentBatches = batchSamples.filter(
+        (sample) => sample.timestampMs >= now - METRICS_RECENT_RATE_WINDOW_MS,
+    );
+    const recentFetchMetrics = recentBatches.reduce(
+        (totals, sample) => {
+            const fetchDurationMs = Number(sample.fetchStageDurationMs ?? 0);
+            const configuredParallelism = Number(sample.configuredMaxParallelBlocks ?? 0);
+            totals.fetchWorkerMs += Number(sample.averageConcurrentFetches ?? 0) * fetchDurationMs;
+            totals.fetchCapacityMs += configuredParallelism * fetchDurationMs;
+            totals.noFetchDurationMs +=
+                Number(sample.processingStageDurationMs ?? 0) +
+                Number(sample.persistenceStageDurationMs ?? 0);
+            return totals;
+        },
+        { fetchWorkerMs: 0, fetchCapacityMs: 0, noFetchDurationMs: 0 },
+    );
+    const recentRpcConcurrency = getRecentRpcConcurrency(now);
+    const recentFetchDurationMs = recentBatches.reduce(
+        (total, sample) => total + Number(sample.fetchStageDurationMs ?? 0),
+        0,
+    );
+    const fetchSlotUtilizationPercentLastMinute =
+        recentFetchMetrics.fetchCapacityMs > 0
+            ? Number(
+                  (
+                      (recentFetchMetrics.fetchWorkerMs / recentFetchMetrics.fetchCapacityMs) *
+                      100
+                  ).toFixed(1),
+              )
+            : null;
+    const averageNoFetchDurationPerBatchMsLastMinute =
+        recentBatches.length > 0
+            ? Number((recentFetchMetrics.noFetchDurationMs / recentBatches.length).toFixed(1))
+            : null;
+    const averageConcurrentFetchesLastMinute =
+        recentFetchDurationMs > 0
+            ? Number((recentFetchMetrics.fetchWorkerMs / recentFetchDurationMs).toFixed(2))
+            : null;
     const batchTotals = selectedBatches.reduce(
         (totals, sample) => {
             const blocks = Number(sample.blocks ?? 0);
@@ -1483,6 +1534,9 @@ function buildScannerAnalytics(
                 : null,
             maxObservedConcurrentFetches: batchTotals.maxConcurrentFetches,
             maxObservedConcurrentProcessing: batchTotals.maxConcurrentProcessing,
+            fetchSlotUtilizationPercentLastMinute,
+            averageNoFetchDurationPerBatchMsLastMinute,
+            averageConcurrentFetchesLastMinute,
             averageBlockDurationMs: processedBlocks
                 ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
                 : null,
@@ -1520,6 +1574,7 @@ function buildScannerAnalytics(
         },
         rpc: {
             totalRequests: rpcRequests,
+            concurrency: recentRpcConcurrency,
             failures: rpcFailures,
             rateLimitErrors: sumBucketMetric('rpcRateLimitErrors'),
             timeoutErrors: sumBucketMetric('rpcTimeoutErrors'),
@@ -1743,6 +1798,48 @@ function recordDatabaseQuery(input: DatabaseMetricEvent): void {
     publish();
 }
 
+function recordRpcConcurrency(input: RpcConcurrencyMetricEvent): void {
+    const now = Date.now();
+    activeBlockRpcRequests = Math.max(0, activeBlockRpcRequests + input.delta);
+    rpcConcurrencySamples.push({ timestampMs: now, activeRequests: activeBlockRpcRequests });
+    trimSamples(now);
+    publish();
+}
+
+function getRecentRpcConcurrency(now: number) {
+    const windowStart = Math.max(startedAtMs, now - METRICS_RECENT_RATE_WINDOW_MS);
+    let startSampleIndex = -1;
+
+    for (let index = 0; index < rpcConcurrencySamples.length; index += 1) {
+        if (rpcConcurrencySamples[index].timestampMs > windowStart) break;
+        startSampleIndex = index;
+    }
+
+    let activeRequests =
+        startSampleIndex >= 0 ? rpcConcurrencySamples[startSampleIndex].activeRequests : 0;
+    let cursor = windowStart;
+    let activeRequestMs = 0;
+    let maxActiveRequests = activeRequests;
+
+    for (let index = startSampleIndex + 1; index < rpcConcurrencySamples.length; index += 1) {
+        const sample = rpcConcurrencySamples[index];
+        if (sample.timestampMs > now) break;
+        activeRequestMs += activeRequests * (sample.timestampMs - cursor);
+        cursor = sample.timestampMs;
+        activeRequests = sample.activeRequests;
+        maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+    }
+
+    activeRequestMs += activeRequests * (now - cursor);
+    const durationMs = now - windowStart;
+    return {
+        activeRequests: activeBlockRpcRequests,
+        averageActiveRequestsLastMinute:
+            durationMs > 0 ? Number((activeRequestMs / durationMs).toFixed(2)) : null,
+        maxActiveRequestsLastMinute: maxActiveRequests,
+    };
+}
+
 function recordRpcOperation(input: RpcOperationMetricEvent): void {
     rpcOperationTotals.totalOperations += 1;
     if (input.outcome === 'success') {
@@ -1766,5 +1863,6 @@ function recordRpcOperation(input: RpcOperationMetricEvent): void {
 
 subscribeToRpcMetricEvents(recordRpcRequest);
 subscribeToRpcOperationMetricEvents(recordRpcOperation);
+subscribeToRpcConcurrencyMetricEvents(recordRpcConcurrency);
 subscribeToDatabaseMetricEvents(recordDatabaseQuery);
 subscribeToFilterMetricEvents(recordFilterEvaluation);

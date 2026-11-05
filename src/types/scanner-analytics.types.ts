@@ -26,6 +26,9 @@ export interface ScannerAnalyticsWindowMetrics {
         averageMaxConcurrentProcessing: number | null;
         maxObservedConcurrentFetches: number;
         maxObservedConcurrentProcessing: number;
+        fetchSlotUtilizationPercentLastMinute: number | null;
+        averageNoFetchDurationPerBatchMsLastMinute: number | null;
+        averageConcurrentFetchesLastMinute: number | null;
         averageBlockDurationMs: number | null;
         averageFilterDurationMs: number | null;
         averageDatabaseBatchWriteDurationMs: number | null;
@@ -42,6 +45,11 @@ export interface ScannerAnalyticsWindowMetrics {
     };
     rpc: {
         totalRequests: number;
+        concurrency: {
+            activeRequests: number;
+            averageActiveRequestsLastMinute: number | null;
+            maxActiveRequestsLastMinute: number;
+        };
         failures: number;
         rateLimitErrors: number;
         timeoutErrors: number;

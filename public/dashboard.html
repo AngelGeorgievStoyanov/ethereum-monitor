@@ -143,6 +143,9 @@
             <div class="metric-tile"><div class="label">RPC timeouts</div><div class="value" id="rpcTimeouts">—</div></div>
             <div class="metric-tile"><div class="label">RPC average latency</div><div class="value" id="rpcAverageLatency">—</div></div>
             <div class="metric-tile"><div class="label">RPC P95 latency</div><div class="value" id="rpcP95Latency">—</div></div>
+            <div class="metric-tile"><div class="label">Block RPC in flight · now / avg / peak</div><div class="value" id="blockRpcConcurrency">—</div></div>
+            <div class="metric-tile"><div class="label">Fetch slot utilization · 1min</div><div class="value" id="fetchSlotUtilization">—</div></div>
+            <div class="metric-tile"><div class="label">No-fetch time / batch · 1min</div><div class="value" id="noFetchTimePerBatch">—</div></div>
         </div>
         <h3 style="margin-top:20px">Finalized detection wait · last 3 hours</h3>
         <p class="hint">Wall-clock time between successful observations of a higher finalized block number. Repeated polls of the same height are ignored. Each interval is measured directly; it is not divided by the number of blocks received.</p>
@@ -479,6 +482,7 @@
         const windowProcessing = windowMetrics.processing || {};
         const windowCatchUp = windowMetrics.catchUp || {};
         const windowRpc = windowMetrics.rpc || {};
+        const rpcConcurrency = windowRpc.concurrency || {};
         const windowOperations = windowRpc.operations || {};
         const windowDatabase = windowMetrics.database || {};
         const windowFilters = windowMetrics.filters || {};
@@ -513,6 +517,9 @@
         setText('rpcTimeouts', number(windowRpc.timeoutErrors));
         setText('rpcAverageLatency', duration(windowRpc.averageLatencyMs));
         setText('rpcP95Latency', duration(windowRpc.latencyP95Ms));
+        setText('blockRpcConcurrency', number(rpcConcurrency.activeRequests) + ' / ' + number(rpcConcurrency.averageActiveRequestsLastMinute) + ' / ' + number(rpcConcurrency.maxActiveRequestsLastMinute));
+        setText('fetchSlotUtilization', windowProcessing.fetchSlotUtilizationPercentLastMinute === null || windowProcessing.fetchSlotUtilizationPercentLastMinute === undefined ? '—' : windowProcessing.fetchSlotUtilizationPercentLastMinute + '%');
+        setText('noFetchTimePerBatch', duration(windowProcessing.averageNoFetchDurationPerBatchMsLastMinute));
         setText('avgTransactionsPerBlock', number(windowProcessing.averageTransactionsPerBlock));
         setText('activeProcessingDuration', duration(windowProcessing.activeProcessingDurationMs));
         setText('activeBlocksPerSecond', number(windowProcessing.activeBlocksPerSecond));
