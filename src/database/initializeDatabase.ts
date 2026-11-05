@@ -27,7 +27,8 @@ export async function initializeDatabase(): Promise<void> {
         {
             settingKey: 'parallelProcessingLagBlocks',
             value: String(SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS),
-            description: 'Number of blocks the scanner stays behind the chain head during processing.',
+            description:
+                'Number of blocks the scanner stays behind the chain head during processing.',
         },
         {
             settingKey: 'maxBlocksPerCatchup',
@@ -37,12 +38,14 @@ export async function initializeDatabase(): Promise<void> {
         {
             settingKey: 'pollIntervalMs',
             value: String(SCANNER_POLL_INTERVAL_MS),
-            description: 'Interval between scanner checks for newly available blocks, in milliseconds.',
+            description:
+                'Interval between scanner checks for newly available blocks, in milliseconds.',
         },
         {
             settingKey: 'publishIntervalMs',
             value: String(METRICS_PUBLISH_INTERVAL_MS),
-            description: 'Interval at which collected scanner metrics are published, in milliseconds.',
+            description:
+                'Interval at which collected scanner metrics are published, in milliseconds.',
         },
         {
             settingKey: 'analyticsRefreshMs',
@@ -65,5 +68,7 @@ export async function initializeDatabase(): Promise<void> {
         );
     }
 
-    console.log('[Database] Connection established, missing tables synchronized, and default configuration seeded');
+    console.log(
+        '[Database] Connection established, missing tables synchronized, and default configuration seeded',
+    );
 }
