@@ -1,5 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MAX_ACTIVE_TX_FILTERS } from '../src/constants/tx-filter.constants';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    MAX_ACTIVE_TX_FILTERS,
+    TX_FILTER_INVALID_FILTER_MAX_ATTEMPTS,
+    TX_FILTER_INVALID_FILTER_RETRY_INTERVAL_MS,
+} from '../src/constants/tx-filter.constants';
 import {
     countActiveTxFilters,
     createTxFilter as insertTxFilter,
@@ -44,6 +48,10 @@ describe('txFilterService', () => {
         vi.mocked(deleteTxFilterById).mockResolvedValue(0);
     });
 
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('loads and compiles active filters for runtime use', async () => {
         vi.mocked(findActiveTxFilters).mockResolvedValue([activeNativeFilter]);
         const service = createTxFilterService();
@@ -64,6 +72,24 @@ describe('txFilterService', () => {
         await expect(service.loadActiveTxFilters()).resolves.toEqual([]);
         expect(service.getTxFilters()).toEqual([]);
         expect(deactivateInvalidTxFilter).not.toHaveBeenCalled();
+    });
+
+    it('deactivates an invalid filter after the configured number of failed loads', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.mocked(findActiveTxFilters).mockResolvedValue([invalidActiveFilter]);
+        vi.mocked(deactivateInvalidTxFilter).mockResolvedValue(true);
+        const service = createTxFilterService();
+
+        for (let attempt = 1; attempt <= TX_FILTER_INVALID_FILTER_MAX_ATTEMPTS; attempt += 1) {
+            if (attempt > 1) {
+                await vi.advanceTimersByTimeAsync(TX_FILTER_INVALID_FILTER_RETRY_INTERVAL_MS);
+            }
+            await service.loadActiveTxFilters();
+        }
+
+        expect(deactivateInvalidTxFilter).toHaveBeenCalledWith(2, expect.any(String));
+        expect(service.getTxFilters()).toEqual([]);
     });
 
     it('rejects invalid rules before attempting a database mutation', async () => {

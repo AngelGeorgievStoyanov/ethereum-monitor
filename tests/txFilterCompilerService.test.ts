@@ -17,8 +17,16 @@ describe('txFilterCompilerService', () => {
 
     it('evaluates nested all, any and not groups', () => {
         const predicate = compileTxFilterRule(nestedRule);
+        const lowValueSuccessfulTransaction = {
+            tx: { ...transaction.tx, value: 50n },
+        };
+        const lowValueFailedTransaction = {
+            tx: { ...transaction.tx, value: 50n, status: 'failed' },
+        };
 
         expect(predicate(transaction)).toBe(true);
+        expect(predicate(lowValueSuccessfulTransaction)).toBe(true);
+        expect(predicate(lowValueFailedTransaction)).toBe(false);
         expect(predicate(failedTransaction)).toBe(false);
     });
 
