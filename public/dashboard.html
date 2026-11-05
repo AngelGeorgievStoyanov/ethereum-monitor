@@ -119,7 +119,7 @@
         <div class="table-wrap">
             <table><thead><tr><th>Endpoint</th><th>Attempts</th><th>Success rate</th><th>Avg. latency</th><th>Failures</th><th>Rate limits</th><th>Last failure</th><th>Last error</th></tr></thead><tbody id="rpcRows"><tr><td colspan="8" class="muted">Waiting for data</td></tr></tbody></table>
         </div>
-        <p class="hint">Counts represent actual RPC endpoint attempts made by scanner and recovery operations. Dashboard requests do not generate RPC calls. Counters reset when the process restarts.</p>
+        <p class="hint">Endpoint #1 maps to RPC_URL_1, #2 to RPC_URL_2, and so on in .env. Rate limits and last error are tracked per endpoint. Counts represent actual RPC attempts; dashboard requests do not generate RPC calls. Counters reset when the process restarts.</p>
     </section>
 
     <section class="panel">
