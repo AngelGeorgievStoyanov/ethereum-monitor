@@ -469,10 +469,6 @@ export function createRpcClient() {
                             durationMs: getBlockReceiptsDurationMs,
                             outcome: 'success',
                         });
-                        if (!Array.isArray(response)) {
-                            throw new Error('eth_getBlockReceipts returned a non-array response');
-                        }
-                        return response as RpcTransactionReceipt[];
                     } catch (error) {
                         getBlockReceiptsDurationMs = Date.now() - startedAt;
                         const classification = classifyError(error);
@@ -490,6 +486,10 @@ export function createRpcClient() {
                         });
                         throw error;
                     }
+                    if (!Array.isArray(response)) {
+                        throw new Error('eth_getBlockReceipts returned a non-array response');
+                    }
+                    return response as RpcTransactionReceipt[];
                 };
 
                 // Wait for both requests to settle before execute() can retry or fail over.
@@ -498,15 +498,29 @@ export function createRpcClient() {
                     fetchReceipts(),
                 ]);
 
-                if (blockResult.status === 'rejected') throw blockResult.reason;
-                if (receiptsResult.status === 'rejected') throw receiptsResult.reason;
+                const rejectedResults = [blockResult, receiptsResult].filter(
+                    (item): item is PromiseRejectedResult => item.status === 'rejected',
+                );
+                if (rejectedResults.length > 0) {
+                    // A permanent error from either RPC call must prevent an unsafe retry.
+                    const failure =
+                        rejectedResults.find((item) => !classifyError(item.reason).retryable) ??
+                        rejectedResults[0];
+                    throw failure.reason;
+                }
 
-                const block = blockResult.value;
+                const block = (blockResult as PromiseFulfilledResult<
+                    Awaited<ReturnType<JsonRpcProvider['getBlock']>>
+                >).value;
+                const receipts = (receiptsResult as PromiseFulfilledResult<
+                    RpcTransactionReceipt[]
+                >).value;
+
                 if (!block) {
                     throw new Error(`Unable to load block ${blockNumber}`);
                 }
 
-                return { block, receipts: receiptsResult.value };
+                return { block, receipts };
             },
             false,
             RPC_ENDPOINT_TIMEOUT_MS * 2,
