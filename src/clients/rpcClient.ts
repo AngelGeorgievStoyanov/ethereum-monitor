@@ -462,6 +462,9 @@ export function createRpcClient() {
                                 RPC_ENDPOINT_TIMEOUT_MS,
                             ),
                         );
+                        if (!Array.isArray(response)) {
+                            throw new Error('eth_getBlockReceipts returned a non-array response');
+                        }
                         getBlockReceiptsDurationMs = Date.now() - startedAt;
                         recordEndpointSuccess(endpoint, startedAt);
                         publishRpcMetricEvent({
@@ -486,9 +489,6 @@ export function createRpcClient() {
                             rpcCode: classification.rpcCode,
                         });
                         throw error;
-                    }
-                    if (!Array.isArray(response)) {
-                        throw new Error('eth_getBlockReceipts returned a non-array response');
                     }
                     return response as RpcTransactionReceipt[];
                 };
