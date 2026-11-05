@@ -89,7 +89,10 @@ export const getScannerAnalysisController = async (req: Request, res: Response):
             },
             database: analytics.windowMetrics.database,
             filters: analytics.windowMetrics.filters,
-            catchUp: current.catchUp,
+            catchUp: {
+                ...(current.catchUp as Record<string, unknown>),
+                ...analytics.windowMetrics.catchUp,
+            },
             recovery: current.recovery,
         });
     } catch (error) {
