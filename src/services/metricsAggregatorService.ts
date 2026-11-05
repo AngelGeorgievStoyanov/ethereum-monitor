@@ -1365,14 +1365,15 @@ function buildScannerAnalytics(
         ? Number(((Number(lagWindowStart.lagBlocks) - Number(lagWindowEnd.lagBlocks)) * 1000 / lagWindowDurationMs).toFixed(2))
         : null;
     const recentRateWindowSeconds = Math.max(1, Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000));
+    const recentRateSummary = getRecentBlockSummary(now);
 
     const windowMetrics = {
         processing: {
             processedBlocks,
             processedTransactions,
             blocksPerSecond: Number((processedBlocks / windowSeconds).toFixed(2)),
-            blocksPerSecondLastMinute: Number((sumBucketMetric('processedBlocks') / recentRateWindowSeconds).toFixed(2)),
-            transactionsPerSecondLastMinute: Number((sumBucketMetric('processedTransactions') / recentRateWindowSeconds).toFixed(2)),
+            blocksPerSecondLastMinute: Number((recentRateSummary.count / recentRateWindowSeconds).toFixed(2)),
+            transactionsPerSecondLastMinute: Number((recentRateSummary.totals.transactionCount / recentRateWindowSeconds).toFixed(2)),
             transactionsPerSecond: Number((processedTransactions / windowSeconds).toFixed(2)),
             averageTransactionsPerBlock: batchTotals.blocks
                 ? Number((batchTotals.transactions / batchTotals.blocks).toFixed(2))
