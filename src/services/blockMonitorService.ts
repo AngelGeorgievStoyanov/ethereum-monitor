@@ -230,8 +230,12 @@ export function createBlockMonitorService() {
                                 () => dynamicConfigService.getActiveTxFilterConfig(),
                             );
                             if (!recoveryHandled) {
-                                await processFinalizedBlocks(state, finalizedCatchupTarget, () =>
-                                    dynamicConfigService.getActiveTxFilterConfig(),
+                                await processFinalizedBlocks(
+                                    state,
+                                    finalizedCatchupTarget,
+                                    finalized.number,
+                                    scannerSettings.maxBlocksPerCatchup,
+                                    () => dynamicConfigService.getActiveTxFilterConfig(),
                                 );
                             }
                             updateScannerContext({ lastProcessedBlock: state.lastProcessedBlock });
