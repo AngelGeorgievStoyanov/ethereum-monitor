@@ -4,6 +4,8 @@ export interface ScannerAnalyticsWindowMetrics {
         processedTransactions: number;
         blocksPerSecond: number;
         transactionsPerSecond: number;
+        blocksPerSecondLastMinute: number;
+        transactionsPerSecondLastMinute: number;
         averageTransactionsPerBlock: number | null;
         /** Sum of successful batch execution durations; excludes waiting for new finalized blocks. */
         activeProcessingDurationMs: number;
@@ -27,6 +29,12 @@ export interface ScannerAnalyticsWindowMetrics {
         averageBlockDurationMs: number | null;
         averageFilterDurationMs: number | null;
         averageDatabaseBatchWriteDurationMs: number | null;
+    };
+    catchUp: {
+        netLagReductionPerSecondLastMinute: number | null;
+        lagAtWindowStart: number | null;
+        lagAtWindowEnd: number | null;
+        measurementDurationMs: number;
     };
     rpc: {
         totalRequests: number;
