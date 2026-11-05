@@ -1513,14 +1513,35 @@ function buildScannerAnalytics(
                 : null,
             maxObservedConcurrentFetches: batchTotals.maxConcurrentFetches,
             maxObservedConcurrentProcessing: batchTotals.maxConcurrentProcessing,
-            fetchSlotUtilizationPercentLastMinute: recentFetchMetrics.fetchCapacityMs > 0
-                ? Number(((recentFetchMetrics.fetchWorkerMs / recentFetchMetrics.fetchCapacityMs) * 100).toFixed(1))
-                : null,
+            fetchSlotUtilizationPercentLastMinute:
+                recentFetchMetrics.fetchCapacityMs > 0
+                    ? Number(
+                          (
+                              (recentFetchMetrics.fetchWorkerMs /
+                                  recentFetchMetrics.fetchCapacityMs) *
+                              100
+                          ).toFixed(1),
+                      )
+                    : null,
             averageNoFetchDurationPerBatchMsLastMinute: recentBatches.length
-                ? Number((recentFetchMetrics.noFetchDurationMs / recentBatches.length).toFixed(1))
+                ? Number(
+                      (recentFetchMetrics.noFetchDurationMs / recentBatches.length).toFixed(1),
+                  )
                 : null,
             averageConcurrentFetchesLastMinute: recentBatches.length
-                ? Number((recentFetchMetrics.fetchWorkerMs / Math.max(1, recentBatches.reduce((total, sample) => total + Number(sample.fetchStageDurationMs ?? 0), 0))).toFixed(2))
+                ? Number(
+                      (
+                          recentFetchMetrics.fetchWorkerMs /
+                          Math.max(
+                              1,
+                              recentBatches.reduce(
+                                  (total, sample) =>
+                                      total + Number(sample.fetchStageDurationMs ?? 0),
+                                  0,
+                              ),
+                          )
+                      ).toFixed(2),
+                  )
                 : null,
             averageBlockDurationMs: processedBlocks
                 ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
@@ -1793,17 +1814,21 @@ function recordRpcConcurrency(input: RpcConcurrencyMetricEvent): void {
 
 function getRecentRpcConcurrency(now: number) {
     const windowStart = Math.max(startedAtMs, now - METRICS_RECENT_RATE_WINDOW_MS);
-    let activeRequests = 0;
+    let startSampleIndex = -1;
+
+    for (let index = 0; index < rpcConcurrencySamples.length; index += 1) {
+        if (rpcConcurrencySamples[index].timestampMs > windowStart) break;
+        startSampleIndex = index;
+    }
+
+    let activeRequests =
+        startSampleIndex >= 0 ? rpcConcurrencySamples[startSampleIndex].activeRequests : 0;
     let cursor = windowStart;
     let activeRequestMs = 0;
-    let maxActiveRequests = 0;
+    let maxActiveRequests = activeRequests;
 
-    for (const sample of rpcConcurrencySamples) {
-        if (sample.timestampMs <= windowStart) {
-            activeRequests = sample.activeRequests;
-            maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
-            continue;
-        }
+    for (let index = startSampleIndex + 1; index < rpcConcurrencySamples.length; index += 1) {
+        const sample = rpcConcurrencySamples[index];
         if (sample.timestampMs > now) break;
         activeRequestMs += activeRequests * (sample.timestampMs - cursor);
         cursor = sample.timestampMs;
