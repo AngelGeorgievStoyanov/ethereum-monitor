@@ -12,6 +12,18 @@ export interface ScannerAnalyticsWindowMetrics {
         averageActiveProcessingMsPerBlock: number | null;
         averageActiveProcessingMsPerTransaction: number | null;
         processingBatches: number;
+        averageBlocksPerBatch: number;
+        minBlocksPerBatch: number;
+        maxBlocksPerBatch: number;
+        batchSizeDistribution: Record<string, number>;
+        averageBatchDurationMs: number | null;
+        averageFetchStageDurationMs: number | null;
+        averageProcessingStageDurationMs: number | null;
+        averagePersistenceStageDurationMs: number | null;
+        averageMaxConcurrentFetches: number | null;
+        averageMaxConcurrentProcessing: number | null;
+        maxObservedConcurrentFetches: number;
+        maxObservedConcurrentProcessing: number;
         averageBlockDurationMs: number | null;
         averageFilterDurationMs: number | null;
         averageDatabaseBatchWriteDurationMs: number | null;
