@@ -1133,6 +1133,14 @@ export function recordProcessingBatch(input: {
     transactions: number;
     durationMs: number;
     databaseWriteDurationMs: number;
+    fetchStageDurationMs: number;
+    processingStageDurationMs: number;
+    persistenceStageDurationMs: number;
+    configuredMaxParallelBlocks: number;
+    parallelProcessingLagBlocks: number;
+    lagAtBatchStart: number;
+    maxConcurrentFetches: number;
+    maxConcurrentProcessing: number;
 }): void {
     const now = Date.now();
     batchSamples.push({
@@ -1208,13 +1216,47 @@ function buildScannerAnalytics(
     const selectedBatches = batchSamples.filter((sample) => sample.timestampMs >= since);
     const batchTotals = selectedBatches.reduce(
         (totals, sample) => {
-            totals.blocks += Number(sample.blocks ?? 0);
+            const blocks = Number(sample.blocks ?? 0);
+            const batchSizeKey = String(blocks);
+            totals.blocks += blocks;
             totals.transactions += Number(sample.transactions ?? 0);
             totals.activeDurationMs += Number(sample.durationMs ?? 0);
             totals.databaseWriteDurationMs += Number(sample.databaseWriteDurationMs ?? 0);
+            totals.fetchStageDurationMs += Number(sample.fetchStageDurationMs ?? 0);
+            totals.processingStageDurationMs += Number(sample.processingStageDurationMs ?? 0);
+            totals.persistenceStageDurationMs += Number(sample.persistenceStageDurationMs ?? 0);
+            totals.totalMaxConcurrentFetches += Number(sample.maxConcurrentFetches ?? 0);
+            totals.totalMaxConcurrentProcessing += Number(sample.maxConcurrentProcessing ?? 0);
+            totals.maxConcurrentFetches = Math.max(
+                totals.maxConcurrentFetches,
+                Number(sample.maxConcurrentFetches ?? 0),
+            );
+            totals.maxConcurrentProcessing = Math.max(
+                totals.maxConcurrentProcessing,
+                Number(sample.maxConcurrentProcessing ?? 0),
+            );
+            totals.minBlocksPerBatch = Math.min(totals.minBlocksPerBatch, blocks);
+            totals.maxBlocksPerBatch = Math.max(totals.maxBlocksPerBatch, blocks);
+            totals.batchSizeDistribution[batchSizeKey] =
+                (totals.batchSizeDistribution[batchSizeKey] ?? 0) + 1;
             return totals;
         },
-        { blocks: 0, transactions: 0, activeDurationMs: 0, databaseWriteDurationMs: 0 },
+        {
+            blocks: 0,
+            transactions: 0,
+            activeDurationMs: 0,
+            databaseWriteDurationMs: 0,
+            fetchStageDurationMs: 0,
+            processingStageDurationMs: 0,
+            persistenceStageDurationMs: 0,
+            totalMaxConcurrentFetches: 0,
+            totalMaxConcurrentProcessing: 0,
+            maxConcurrentFetches: 0,
+            maxConcurrentProcessing: 0,
+            minBlocksPerBatch: Number.POSITIVE_INFINITY,
+            maxBlocksPerBatch: 0,
+            batchSizeDistribution: {} as Record<string, number>,
+        },
     );
     const sumBucketMetric = (key: keyof MinuteMetricBucket): number =>
         selectedMinuteBuckets.reduce((total, bucket) => total + Number(bucket[key] ?? 0), 0);
@@ -1327,6 +1369,32 @@ function buildScannerAnalytics(
                 ? Number((batchTotals.activeDurationMs / batchTotals.transactions).toFixed(4))
                 : null,
             processingBatches: selectedBatches.length,
+            averageBlocksPerBatch: selectedBatches.length
+                ? Number((batchTotals.blocks / selectedBatches.length).toFixed(2))
+                : 0,
+            minBlocksPerBatch: selectedBatches.length ? batchTotals.minBlocksPerBatch : 0,
+            maxBlocksPerBatch: batchTotals.maxBlocksPerBatch,
+            batchSizeDistribution: batchTotals.batchSizeDistribution,
+            averageBatchDurationMs: selectedBatches.length
+                ? Number((batchTotals.activeDurationMs / selectedBatches.length).toFixed(1))
+                : null,
+            averageFetchStageDurationMs: selectedBatches.length
+                ? Number((batchTotals.fetchStageDurationMs / selectedBatches.length).toFixed(1))
+                : null,
+            averageProcessingStageDurationMs: selectedBatches.length
+                ? Number((batchTotals.processingStageDurationMs / selectedBatches.length).toFixed(1))
+                : null,
+            averagePersistenceStageDurationMs: selectedBatches.length
+                ? Number((batchTotals.persistenceStageDurationMs / selectedBatches.length).toFixed(1))
+                : null,
+            averageMaxConcurrentFetches: selectedBatches.length
+                ? Number((batchTotals.totalMaxConcurrentFetches / selectedBatches.length).toFixed(2))
+                : null,
+            averageMaxConcurrentProcessing: selectedBatches.length
+                ? Number((batchTotals.totalMaxConcurrentProcessing / selectedBatches.length).toFixed(2))
+                : null,
+            maxObservedConcurrentFetches: batchTotals.maxConcurrentFetches,
+            maxObservedConcurrentProcessing: batchTotals.maxConcurrentProcessing,
             averageBlockDurationMs: processedBlocks
                 ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
                 : null,
