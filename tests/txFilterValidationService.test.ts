@@ -32,14 +32,18 @@ describe('txFilterValidationService', () => {
     });
 
     it('enforces the maximum nesting depth boundary', () => {
-        expect(() => validateTxFilterRule(createNestedNotRule(MAX_FILTER_DEPTH - 1))).not.toThrow();
+        expect(() =>
+            validateTxFilterRule(createNestedNotRule(MAX_FILTER_DEPTH - 1)),
+        ).not.toThrow();
         expect(() => validateTxFilterRule(createNestedNotRule(MAX_FILTER_DEPTH))).toThrow(
             `maximum nesting depth of ${MAX_FILTER_DEPTH}`,
         );
     });
 
     it('enforces the maximum node count boundary', () => {
-        expect(() => validateTxFilterRule(createNodeCountRule(MAX_FILTER_NODES - 1))).not.toThrow();
+        expect(() =>
+            validateTxFilterRule(createNodeCountRule(MAX_FILTER_NODES - 1)),
+        ).not.toThrow();
         expect(() => validateTxFilterRule(createNodeCountRule(MAX_FILTER_NODES))).toThrow(
             `maximum of ${MAX_FILTER_NODES} nodes`,
         );
