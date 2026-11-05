@@ -52,15 +52,31 @@ function validateBatchConnectivity(
 
 export async function processFinalizedBlocks(
     state: ScannerState,
-    finalizedBlockNumber: number,
+    finalizedCatchupTarget: number,
+    actualFinalizedBlockNumber: number,
+    maxBlocksPerCatchup: number,
     getActiveTxFilters: () => ActiveTxFilterConfig,
 ): Promise<void> {
+    const dynamicSettings = getDynamicConfigService().getDynamicSettings();
+    const parallelProcessingLagBlocks =
+        Number(dynamicSettings.parallelProcessingLagBlocks) ||
+        SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS;
+    const maxParallelBlocks =
+        Number(dynamicSettings.maxParallelBlocks) || SCANNER_MAX_PARALLEL_BLOCKS;
+    const lag = actualFinalizedBlockNumber - state.lastProcessedBlock;
+    const batchSize = lag > parallelProcessingLagBlocks ? maxParallelBlocks : 1;
+    const maxBatchIterations = Math.ceil(maxBlocksPerCatchup / batchSize);
+    let batchIterationCount = 0;
+
     const catchupStartedAt = Date.now();
     const catchupStartBlock = state.lastProcessedBlock + 1;
     const totals = createBlockProcessingTotals();
     let currentBatchStart: number | undefined;
 
-    while (state.lastProcessedBlock < finalizedBlockNumber) {
+    while (
+        state.lastProcessedBlock < finalizedCatchupTarget &&
+        batchIterationCount < maxBatchIterations
+    ) {
         currentBatchStart = state.lastProcessedBlock + 1;
         const batchStartedAt = Date.now();
         if (getDynamicConfigService().getScannerPaused()) return;
@@ -68,16 +84,8 @@ export async function processFinalizedBlocks(
         const activeTxFilters = filterConfig.filters;
         if (activeTxFilters.length === 0) return;
 
-        const dynamicSettings = getDynamicConfigService().getDynamicSettings();
-        const parallelProcessingLagBlocks =
-            Number(dynamicSettings.parallelProcessingLagBlocks) ||
-            SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS;
-        const maxParallelBlocks =
-            Number(dynamicSettings.maxParallelBlocks) || SCANNER_MAX_PARALLEL_BLOCKS;
-        const lag = finalizedBlockNumber - state.lastProcessedBlock;
-        const batchSize = lag > parallelProcessingLagBlocks ? maxParallelBlocks : 1;
         const blockNumbers = Array.from(
-            { length: Math.min(batchSize, finalizedBlockNumber - state.lastProcessedBlock) },
+            { length: Math.min(batchSize, finalizedCatchupTarget - state.lastProcessedBlock) },
             (_, index) => currentBatchStart! + index,
         );
         const expectedCheckpoint = state.lastProcessedBlock;
@@ -171,6 +179,7 @@ export async function processFinalizedBlocks(
             }
 
             state.lastProcessedBlock = committedCheckpoint;
+            batchIterationCount += 1;
             // Advance the in-memory checkpoint only after the DB transaction has committed.
             cacheConfirmedCheckpointBlock(
                 processedBlockRecords[processedBlockRecords.length - 1] ?? null,
@@ -188,7 +197,7 @@ export async function processFinalizedBlocks(
                     result,
                     blockDurationMs,
                     state.lastProcessedBlock,
-                    finalizedBlockNumber,
+                    actualFinalizedBlockNumber,
                 );
                 accumulateBlockMetrics(totals, result, blockDurationMs, blockNumber);
             }
