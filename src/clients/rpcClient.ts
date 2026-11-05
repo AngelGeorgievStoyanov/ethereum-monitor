@@ -3,7 +3,11 @@ import { RpcTransactionReceipt } from '../types/evm-rpc.types';
 import { RPC_ENDPOINT_TIMEOUT_MS } from '../constants/evm-rpc.constants';
 import { env } from '../config/env';
 import { formatError } from '../utils/formatError';
-import { publishRpcMetricEvent, publishRpcOperationMetricEvent } from '../metrics/metricsEventBus';
+import {
+    publishRpcConcurrencyMetricEvent,
+    publishRpcMetricEvent,
+    publishRpcOperationMetricEvent,
+} from '../metrics/metricsEventBus';
 import { classifyRpcError } from '../utils/classifyRpcError';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -70,6 +74,15 @@ export function createRpcClient() {
         },
     }));
     let nextEndpointIndex = 0;
+
+    async function trackBlockRpcRequest<T>(operation: () => Promise<T>): Promise<T> {
+        publishRpcConcurrencyMetricEvent({ delta: 1 });
+        try {
+            return await operation();
+        } finally {
+            publishRpcConcurrencyMetricEvent({ delta: -1 });
+        }
+    }
 
     async function execute<T>(
         operationName: string,
@@ -401,9 +414,8 @@ export function createRpcClient() {
                 try {
                     const endpoint = endpoints[endpointIndex - 1];
                     recordEndpointAttempt(endpoint);
-                    block = await withTimeout(
-                        provider.getBlock(blockNumber, true),
-                        RPC_ENDPOINT_TIMEOUT_MS,
+                    block = await trackBlockRpcRequest(() =>
+                        withTimeout(provider.getBlock(blockNumber, true), RPC_ENDPOINT_TIMEOUT_MS),
                     );
                     getBlockDurationMs = Date.now() - getBlockStartedAt;
                     if (block) recordEndpointSuccess(endpoint, getBlockStartedAt);
@@ -446,9 +458,11 @@ export function createRpcClient() {
                 try {
                     const endpoint = endpoints[endpointIndex - 1];
                     recordEndpointAttempt(endpoint);
-                    response = await withTimeout(
-                        provider.send('eth_getBlockReceipts', [toQuantity(blockNumber)]),
-                        RPC_ENDPOINT_TIMEOUT_MS,
+                    response = await trackBlockRpcRequest(() =>
+                        withTimeout(
+                            provider.send('eth_getBlockReceipts', [toQuantity(blockNumber)]),
+                            RPC_ENDPOINT_TIMEOUT_MS,
+                        ),
                     );
                     getBlockReceiptsDurationMs = Date.now() - getReceiptsStartedAt;
                     recordEndpointSuccess(endpoint, getReceiptsStartedAt);
