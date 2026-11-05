@@ -1402,16 +1402,26 @@ function buildScannerAnalytics(
                 ? Number((batchTotals.fetchStageDurationMs / selectedBatches.length).toFixed(1))
                 : null,
             averageProcessingStageDurationMs: selectedBatches.length
-                ? Number((batchTotals.processingStageDurationMs / selectedBatches.length).toFixed(1))
+                ? Number(
+                      (batchTotals.processingStageDurationMs / selectedBatches.length).toFixed(1),
+                  )
                 : null,
             averagePersistenceStageDurationMs: selectedBatches.length
-                ? Number((batchTotals.persistenceStageDurationMs / selectedBatches.length).toFixed(1))
+                ? Number(
+                      (batchTotals.persistenceStageDurationMs / selectedBatches.length).toFixed(1),
+                  )
                 : null,
             averageMaxConcurrentFetches: selectedBatches.length
-                ? Number((batchTotals.totalMaxConcurrentFetches / selectedBatches.length).toFixed(2))
+                ? Number(
+                      (batchTotals.totalMaxConcurrentFetches / selectedBatches.length).toFixed(2),
+                  )
                 : null,
             averageMaxConcurrentProcessing: selectedBatches.length
-                ? Number((batchTotals.totalMaxConcurrentProcessing / selectedBatches.length).toFixed(2))
+                ? Number(
+                      (batchTotals.totalMaxConcurrentProcessing / selectedBatches.length).toFixed(
+                          2,
+                      ),
+                  )
                 : null,
             maxObservedConcurrentFetches: batchTotals.maxConcurrentFetches,
             maxObservedConcurrentProcessing: batchTotals.maxConcurrentProcessing,
