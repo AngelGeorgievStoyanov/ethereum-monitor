@@ -1357,18 +1357,37 @@ function buildScannerAnalytics(
             windowDatabaseByOperation[operation] = total;
         }
     }
-    const recentLagSamples = lagSamples
-        .slice(lagSamplesStartIndex)
-        .filter(
-            (sample) =>
-                sample.timestampMs >= now - METRICS_RECENT_RATE_WINDOW_MS &&
-                sample.timestampMs <= now &&
-                sample.lagBlocks !== null,
-        );
-    const lagWindowStart = recentLagSamples[0];
-    const lagWindowEnd = recentLagSamples[recentLagSamples.length - 1];
+    const lagWindowStartBoundaryMs = now - METRICS_RECENT_RATE_WINDOW_MS;
+    let lagWindowStart:
+        | (Record<string, unknown> & { timestampMs: number })
+        | undefined;
+    let lagWindowEnd:
+        | (Record<string, unknown> & { timestampMs: number })
+        | undefined;
+
+    for (let index = lagSamplesStartIndex; index < lagSamples.length; index += 1) {
+        const sample = lagSamples[index];
+        if (sample.timestampMs > now || sample.lagBlocks === null) continue;
+
+        lagWindowEnd = sample;
+        if (sample.timestampMs <= lagWindowStartBoundaryMs) {
+            lagWindowStart = sample;
+        } else if (!lagWindowStart) {
+            // If there is no sample at/before the 60-second boundary, use the
+            // earliest available sample inside the window for a partial interval.
+            lagWindowStart = sample;
+        }
+    }
+
+    // Do not report a rate from stale data when no lag sample exists in this window.
+    if (lagWindowEnd && lagWindowEnd.timestampMs < lagWindowStartBoundaryMs) {
+        lagWindowStart = undefined;
+        lagWindowEnd = undefined;
+    }
     const lagWindowDurationMs =
-        lagWindowStart && lagWindowEnd ? lagWindowEnd.timestampMs - lagWindowStart.timestampMs : 0;
+        lagWindowStart && lagWindowEnd
+            ? lagWindowEnd.timestampMs - lagWindowStart.timestampMs
+            : 0;
     const netLagReductionPerSecondLastMinute =
         lagWindowDurationMs > 0
             ? Number(
