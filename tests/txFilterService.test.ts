@@ -60,8 +60,8 @@ describe('txFilterService', () => {
 
         expect(loaded).toHaveLength(1);
         expect(loaded[0].id).toBe(activeNativeFilter.id);
-        expect(loaded[0].predicate({ tx: { transferType: 'native' } })).toBe(true);
-        expect(loaded[0].predicate({ tx: { transferType: 'erc20' } })).toBe(false);
+        expect(loaded[0].predicate({ transferType: 'native' })).toBe(true);
+        expect(loaded[0].predicate({ transferType: 'erc20' })).toBe(false);
         expect(service.getTxFilters()).toEqual(loaded);
     });
 
