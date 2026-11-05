@@ -103,9 +103,7 @@ describe('dynamicConfigService', () => {
             (total, delay) => total + delay,
             0,
         );
-        await vi.advanceTimersByTimeAsync(
-            DYNAMIC_CONFIG_FAST_REFRESH_INTERVAL_MS + retryDuration,
-        );
+        await vi.advanceTimersByTimeAsync(DYNAMIC_CONFIG_FAST_REFRESH_INTERVAL_MS + retryDuration);
 
         expect(service.getActiveTxFilterConfig()).toMatchObject({
             version: initialVersion,

@@ -32,18 +32,14 @@ describe('txFilterValidationService', () => {
     });
 
     it('enforces the maximum nesting depth boundary', () => {
-        expect(() =>
-            validateTxFilterRule(createNestedNotRule(MAX_FILTER_DEPTH - 1)),
-        ).not.toThrow();
+        expect(() => validateTxFilterRule(createNestedNotRule(MAX_FILTER_DEPTH - 1))).not.toThrow();
         expect(() => validateTxFilterRule(createNestedNotRule(MAX_FILTER_DEPTH))).toThrow(
             `maximum nesting depth of ${MAX_FILTER_DEPTH}`,
         );
     });
 
     it('enforces the maximum node count boundary', () => {
-        expect(() =>
-            validateTxFilterRule(createNodeCountRule(MAX_FILTER_NODES - 1)),
-        ).not.toThrow();
+        expect(() => validateTxFilterRule(createNodeCountRule(MAX_FILTER_NODES - 1))).not.toThrow();
         expect(() => validateTxFilterRule(createNodeCountRule(MAX_FILTER_NODES))).toThrow(
             `maximum of ${MAX_FILTER_NODES} nodes`,
         );
@@ -65,9 +61,9 @@ describe('txFilterValidationService', () => {
     });
 
     it('rejects unsupported fields and operators', () => {
-        expect(() =>
-            validateTxFilterRule({ field: 'chainId', op: 'eq', value: '1' }),
-        ).toThrow('Unsupported transaction filter field');
+        expect(() => validateTxFilterRule({ field: 'chainId', op: 'eq', value: '1' })).toThrow(
+            'Unsupported transaction filter field',
+        );
         expect(() =>
             validateTxFilterRule({ field: 'transferType', op: 'gt', value: 'native' }),
         ).toThrow('not supported for this field');
