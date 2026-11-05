@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { TransactionFilterContext } from '../src/types/tx-filter.types';
 import { compileTxFilterRule } from '../src/services/txFilterCompilerService';
 import {
     failedTransaction,
@@ -17,11 +18,14 @@ describe('txFilterCompilerService', () => {
 
     it('evaluates nested all, any and not groups', () => {
         const predicate = compileTxFilterRule(nestedRule);
-        const lowValueSuccessfulTransaction = {
-            tx: { ...transaction.tx, value: 50n },
+        const lowValueSuccessfulTransaction: TransactionFilterContext = {
+            ...transaction,
+            value: 50n,
         };
-        const lowValueFailedTransaction = {
-            tx: { ...transaction.tx, value: 50n, status: 'failed' },
+        const lowValueFailedTransaction: TransactionFilterContext = {
+            ...transaction,
+            value: 50n,
+            status: 'failed',
         };
 
         expect(predicate(transaction)).toBe(true);
@@ -37,8 +41,8 @@ describe('txFilterCompilerService', () => {
             value: '9007199254740993',
         });
 
-        expect(predicate({ tx: { value: 9007199254740994n } })).toBe(true);
-        expect(predicate({ tx: { value: 9007199254740993n } })).toBe(false);
+        expect(predicate({ value: 9007199254740994n })).toBe(true);
+        expect(predicate({ value: 9007199254740993n })).toBe(false);
     });
 
     it('supports set membership operators', () => {
@@ -49,8 +53,8 @@ describe('txFilterCompilerService', () => {
         });
 
         expect(predicate(transaction)).toBe(true);
-        expect(predicate({ tx: { transferType: 'erc20' } })).toBe(true);
-        expect(predicate({ tx: { transferType: 'internal' } })).toBe(false);
+        expect(predicate({ transferType: 'erc20' })).toBe(true);
+        expect(predicate({ transferType: 'internal' })).toBe(false);
     });
 
     it('supports inclusive between comparisons', () => {
@@ -60,10 +64,10 @@ describe('txFilterCompilerService', () => {
             value: [100, 200],
         });
 
-        expect(predicate({ tx: { blockNumber: 100 } })).toBe(true);
-        expect(predicate({ tx: { blockNumber: 150 } })).toBe(true);
-        expect(predicate({ tx: { blockNumber: 200 } })).toBe(true);
-        expect(predicate({ tx: { blockNumber: 201 } })).toBe(false);
+        expect(predicate({ blockNumber: 100 })).toBe(true);
+        expect(predicate({ blockNumber: 150 })).toBe(true);
+        expect(predicate({ blockNumber: 200 })).toBe(true);
+        expect(predicate({ blockNumber: 201 })).toBe(false);
     });
 
     it('does not match missing values for comparison operators', () => {
@@ -73,8 +77,8 @@ describe('txFilterCompilerService', () => {
             value: 10,
         });
 
-        expect(predicate({ tx: {} })).toBe(false);
-        expect(predicate({ tx: { blockNumber: null } })).toBe(false);
+        expect(predicate({})).toBe(false);
+        expect(predicate({ blockNumber: null })).toBe(false);
     });
 
     it('rejects invalid rules before compilation', () => {
