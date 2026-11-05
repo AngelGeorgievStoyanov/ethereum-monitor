@@ -1357,49 +1357,52 @@ function buildScannerAnalytics(
             windowDatabaseByOperation[operation] = total;
         }
     }
-    const lagWindowStartBoundaryMs = now - METRICS_RECENT_RATE_WINDOW_MS;
-    let lagWindowStart: (Record<string, unknown> & { timestampMs: number }) | undefined;
-    let lagWindowEnd: (Record<string, unknown> & { timestampMs: number }) | undefined;
+    const getNetLagReductionWindow = (boundaryMs: number) => {
+        let start: (Record<string, unknown> & { timestampMs: number }) | undefined;
+        let end: (Record<string, unknown> & { timestampMs: number }) | undefined;
 
-    for (let index = lagSamplesStartIndex; index < lagSamples.length; index += 1) {
-        const sample = lagSamples[index];
-        if (sample.timestampMs > now) continue;
+        for (let index = lagSamplesStartIndex; index < lagSamples.length; index += 1) {
+            const sample = lagSamples[index];
+            if (sample.timestampMs > now) continue;
 
-        if (sample.lagBlocks === null) {
-            // A null lag sample breaks continuity. Never calculate a rate across
-            // a regression or a period where the lag could not be measured.
-            lagWindowStart = undefined;
-            lagWindowEnd = undefined;
-            continue;
+            if (sample.lagBlocks === null) {
+                // A null sample breaks continuity; never calculate across unknown lag.
+                start = undefined;
+                end = undefined;
+                continue;
+            }
+
+            end = sample;
+            if (sample.timestampMs <= boundaryMs) {
+                start = sample;
+            } else if (!start) {
+                // Use the earliest available sample for a partial measurement window.
+                start = sample;
+            }
         }
 
-        lagWindowEnd = sample;
-        if (sample.timestampMs <= lagWindowStartBoundaryMs) {
-            lagWindowStart = sample;
-        } else if (!lagWindowStart) {
-            // If there is no sample at/before the 60-second boundary, use the
-            // earliest valid sample after the boundary (or after the last null)
-            // for a partial interval.
-            lagWindowStart = sample;
+        if (end && end.timestampMs < boundaryMs) {
+            start = undefined;
+            end = undefined;
         }
-    }
 
-    // Do not report a rate from stale data when no lag sample exists in this window.
-    if (lagWindowEnd && lagWindowEnd.timestampMs < lagWindowStartBoundaryMs) {
-        lagWindowStart = undefined;
-        lagWindowEnd = undefined;
-    }
-    const lagWindowDurationMs =
-        lagWindowStart && lagWindowEnd ? lagWindowEnd.timestampMs - lagWindowStart.timestampMs : 0;
-    const netLagReductionPerSecondLastMinute =
-        lagWindowStart && lagWindowEnd && lagWindowDurationMs > 0
-            ? Number(
-                  (
-                      ((Number(lagWindowStart.lagBlocks) - Number(lagWindowEnd.lagBlocks)) * 1000) /
-                      lagWindowDurationMs
-                  ).toFixed(2),
-              )
-            : null;
+        const durationMs = start && end ? end.timestampMs - start.timestampMs : 0;
+        const ratePerSecond =
+            start && end && durationMs > 0
+                ? Number(
+                      (
+                          ((Number(start.lagBlocks) - Number(end.lagBlocks)) * 1000) /
+                          durationMs
+                      ).toFixed(2),
+                  )
+                : null;
+
+        return { start, end, durationMs, ratePerSecond };
+    };
+    const analyticsLagWindow = getNetLagReductionWindow(since);
+    const recentLagWindow = getNetLagReductionWindow(now - METRICS_RECENT_RATE_WINDOW_MS);
+    const netLagReductionPerSecond = analyticsLagWindow.ratePerSecond;
+    const netLagReductionPerSecondLastMinute = recentLagWindow.ratePerSecond;
     const recentRateWindowSeconds = Math.max(
         1,
         Math.min(METRICS_RECENT_RATE_WINDOW_MS / 1000, (now - startedAtMs) / 1000),
@@ -1500,10 +1503,14 @@ function buildScannerAnalytics(
                 : null,
         },
         catchUp: {
+            netLagReductionPerSecond,
             netLagReductionPerSecondLastMinute,
-            lagAtWindowStart: lagWindowStart ? Number(lagWindowStart.lagBlocks) : null,
-            lagAtWindowEnd: lagWindowEnd ? Number(lagWindowEnd.lagBlocks) : null,
-            measurementDurationMs: lagWindowDurationMs,
+            lagAtAnalyticsWindowStart: analyticsLagWindow.start ? Number(analyticsLagWindow.start.lagBlocks) : null,
+            lagAtAnalyticsWindowEnd: analyticsLagWindow.end ? Number(analyticsLagWindow.end.lagBlocks) : null,
+            analyticsMeasurementDurationMs: analyticsLagWindow.durationMs,
+            lagAtWindowStart: recentLagWindow.start ? Number(recentLagWindow.start.lagBlocks) : null,
+            lagAtWindowEnd: recentLagWindow.end ? Number(recentLagWindow.end.lagBlocks) : null,
+            measurementDurationMs: recentLagWindow.durationMs,
         },
         rpc: {
             totalRequests: rpcRequests,

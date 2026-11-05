@@ -130,9 +130,12 @@
             </select>
         </div>
         <div class="metric-grid">
-            <div class="metric-tile"><div class="label">Blocks / second</div><div class="value" id="analyticsBlocksPerSecond">—</div></div>
-            <div class="metric-tile"><div class="label">Transactions / second</div><div class="value" id="analyticsTransactionsPerSecond">—</div></div>
-            <div class="metric-tile"><div class="label">Net lag reduction / sec</div><div class="value" id="lagReductionRate">—</div></div>
+            <div class="metric-tile"><div class="label">Blocks / second · 1h</div><div class="value" id="analyticsBlocksPerSecond">—</div></div>
+            <div class="metric-tile"><div class="label">Transactions / second · 1h</div><div class="value" id="analyticsTransactionsPerSecond">—</div></div>
+            <div class="metric-tile"><div class="label">Net lag reduction / sec · 1h</div><div class="value" id="lagReductionRate">—</div></div>
+            <div class="metric-tile"><div class="label">Blocks / second · 1min</div><div class="value" id="analyticsBlocksPerSecondLastMinute">—</div></div>
+            <div class="metric-tile"><div class="label">Transactions / second · 1min</div><div class="value" id="analyticsTransactionsPerSecondLastMinute">—</div></div>
+            <div class="metric-tile"><div class="label">Net lag reduction / sec · 1min</div><div class="value" id="lagReductionRateLastMinute">—</div></div>
             <div class="metric-tile"><div class="label">Estimated catch-up</div><div class="value" id="catchUpEta">—</div></div>
         </div>
         <div class="metric-grid" style="margin-top:12px">
@@ -474,6 +477,7 @@
         const scanner = current.scanner || {};
         const windowMetrics = data.windowMetrics || {};
         const windowProcessing = windowMetrics.processing || {};
+        const windowCatchUp = windowMetrics.catchUp || {};
         const windowRpc = windowMetrics.rpc || {};
         const windowOperations = windowRpc.operations || {};
         const windowDatabase = windowMetrics.database || {};
@@ -500,7 +504,10 @@
         setText('finalizedLastBlocks', number(cadence.lastBlocksAdvanced));
         setText('analyticsBlocksPerSecond', windowProcessing.blocksPerSecond ?? '—');
         setText('analyticsTransactionsPerSecond', windowProcessing.transactionsPerSecond ?? '—');
-        setText('lagReductionRate', catchUp.lagReductionBlocksPerSecond === null || catchUp.lagReductionBlocksPerSecond === undefined ? '—' : catchUp.lagReductionBlocksPerSecond);
+        setText('lagReductionRate', windowCatchUp.netLagReductionPerSecond ?? '—');
+        setText('analyticsBlocksPerSecondLastMinute', windowProcessing.blocksPerSecondLastMinute ?? '—');
+        setText('analyticsTransactionsPerSecondLastMinute', windowProcessing.transactionsPerSecondLastMinute ?? '—');
+        setText('lagReductionRateLastMinute', windowCatchUp.netLagReductionPerSecondLastMinute ?? '—');
         setText('catchUpEta', formatSeconds(catchUp.estimatedRemainingSeconds));
         setText('rpc429', number(windowRpc.rateLimitErrors));
         setText('rpcTimeouts', number(windowRpc.timeoutErrors));

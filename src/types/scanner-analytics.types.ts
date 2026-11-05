@@ -31,7 +31,11 @@ export interface ScannerAnalyticsWindowMetrics {
         averageDatabaseBatchWriteDurationMs: number | null;
     };
     catchUp: {
+        netLagReductionPerSecond: number | null;
         netLagReductionPerSecondLastMinute: number | null;
+        lagAtAnalyticsWindowStart: number | null;
+        lagAtAnalyticsWindowEnd: number | null;
+        analyticsMeasurementDurationMs: number;
         lagAtWindowStart: number | null;
         lagAtWindowEnd: number | null;
         measurementDurationMs: number;
