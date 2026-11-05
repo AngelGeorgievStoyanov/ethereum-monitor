@@ -206,8 +206,13 @@ const endpointTotals = new Map<
         successes: number;
         failures: number;
         retryableFailures: number;
+        rateLimitFailures: number;
         durationMs: number;
         lastFailureAt: string | null;
+        lastFailureKind: string | null;
+        lastHttpStatus: number | null;
+        lastRpcCode: number | null;
+        lastFailureMessage: string | null;
     }
 >();
 const rpcOperationTotals = {
@@ -618,8 +623,13 @@ function calculateCurrentMetrics() {
         successes: value.successes,
         failures: value.failures,
         retryableFailures: value.retryableFailures,
+        rateLimitFailures: value.rateLimitFailures,
         totalDurationMs: value.durationMs,
         lastFailureAt: value.lastFailureAt,
+        lastFailureKind: value.lastFailureKind,
+        lastHttpStatus: value.lastHttpStatus,
+        lastRpcCode: value.lastRpcCode,
+        lastFailureMessage: value.lastFailureMessage,
         averageLatencyMs: value.attempts
             ? Number((value.durationMs / value.attempts).toFixed(1))
             : null,
@@ -1016,8 +1026,13 @@ export function recordRpcRequest(input: RpcInput): void {
         successes: 0,
         failures: 0,
         retryableFailures: 0,
+        rateLimitFailures: 0,
         durationMs: 0,
         lastFailureAt: null as string | null,
+        lastFailureKind: null as string | null,
+        lastHttpStatus: null as number | null,
+        lastRpcCode: null as number | null,
+        lastFailureMessage: null as string | null,
     };
     endpoint.attempts += 1;
     endpoint.durationMs += input.durationMs;
@@ -1025,7 +1040,12 @@ export function recordRpcRequest(input: RpcInput): void {
     else {
         endpoint.failures += 1;
         if (input.retryable ?? classification.retryable) endpoint.retryableFailures += 1;
+        if (failureKind === 'rateLimit') endpoint.rateLimitFailures += 1;
         endpoint.lastFailureAt = new Date(now).toISOString();
+        endpoint.lastFailureKind = failureKind;
+        endpoint.lastHttpStatus = input.httpStatus ?? classification.httpStatus;
+        endpoint.lastRpcCode = input.rpcCode ?? classification.rpcCode;
+        endpoint.lastFailureMessage = message.slice(0, 300);
     }
     endpointTotals.set(input.endpointIndex, endpoint);
     rpcEvents.push({
