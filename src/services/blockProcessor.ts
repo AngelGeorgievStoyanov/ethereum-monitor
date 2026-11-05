@@ -90,12 +90,24 @@ export async function processFinalizedBlocks(
 
         try {
             const previousConfirmedBlock = await getConfirmedCheckpointBlock(expectedCheckpoint);
+            const fetchStageStartedAt = Date.now();
+            let activeFetches = 0;
+            let maxConcurrentFetches = 0;
             const fetchedSettledBlocks = await Promise.allSettled(
-                blockNumbers.map(async (blockNumber) => ({
-                    blockNumber,
-                    fetched: await fetchBlockForProcessing(blockNumber),
-                })),
+                blockNumbers.map(async (blockNumber) => {
+                    activeFetches += 1;
+                    maxConcurrentFetches = Math.max(maxConcurrentFetches, activeFetches);
+                    try {
+                        return {
+                            blockNumber,
+                            fetched: await fetchBlockForProcessing(blockNumber),
+                        };
+                    } finally {
+                        activeFetches -= 1;
+                    }
+                }),
             );
+            const fetchStageDurationMs = Date.now() - fetchStageStartedAt;
             const failedFetch = fetchedSettledBlocks.find((result) => result.status === 'rejected');
             if (failedFetch?.status === 'rejected') {
                 throw failedFetch.reason;
@@ -112,12 +124,24 @@ export async function processFinalizedBlocks(
             }));
             validateBatchConnectivity(previousConfirmedBlock, fetchedBlockRecords, blockNumbers);
 
+            const processingStageStartedAt = Date.now();
+            let activeProcessing = 0;
+            let maxConcurrentProcessing = 0;
             const settledBlocks = await Promise.allSettled(
-                fetchedBlocks.map(async ({ blockNumber, fetched }) => ({
-                    blockNumber,
-                    result: await processFetchedBlock(fetched, activeTxFilters, false),
-                })),
+                fetchedBlocks.map(async ({ blockNumber, fetched }) => {
+                    activeProcessing += 1;
+                    maxConcurrentProcessing = Math.max(maxConcurrentProcessing, activeProcessing);
+                    try {
+                        return {
+                            blockNumber,
+                            result: await processFetchedBlock(fetched, activeTxFilters, false),
+                        };
+                    } finally {
+                        activeProcessing -= 1;
+                    }
+                }),
             );
+            const processingStageDurationMs = Date.now() - processingStageStartedAt;
             const failedBlock = settledBlocks.find((result) => result.status === 'rejected');
             if (failedBlock?.status === 'rejected') {
                 throw failedBlock.reason;
@@ -178,6 +202,14 @@ export async function processFinalizedBlocks(
                 ),
                 durationMs: Date.now() - batchStartedAt,
                 databaseWriteDurationMs,
+                fetchStageDurationMs,
+                processingStageDurationMs,
+                persistenceStageDurationMs: databaseWriteDurationMs,
+                configuredMaxParallelBlocks: maxParallelBlocks,
+                parallelProcessingLagBlocks,
+                lagAtBatchStart: lag,
+                maxConcurrentFetches,
+                maxConcurrentProcessing,
             });
         } catch (error) {
             console.error(
