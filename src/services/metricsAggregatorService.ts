@@ -1280,9 +1280,10 @@ function buildScannerAnalytics(
     const averageNoFetchDurationPerBatchMsLastMinute = recentBatches.length
         ? Number((recentFetchMetrics.noFetchDurationMs / recentBatches.length).toFixed(1))
         : null;
-    const averageConcurrentFetchesLastMinute = recentFetchDurationMs > 0
-        ? Number((recentFetchMetrics.fetchWorkerMs / recentFetchDurationMs).toFixed(2))
-        : null;
+    const averageConcurrentFetchesLastMinute =
+        recentFetchDurationMs > 0
+            ? Number((recentFetchMetrics.fetchWorkerMs / recentFetchDurationMs).toFixed(2))
+            : null;
     const batchTotals = selectedBatches.reduce(
         (totals, sample) => {
             const blocks = Number(sample.blocks ?? 0);
