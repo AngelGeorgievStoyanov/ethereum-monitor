@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Configuration from '../src/models/configuration';
 import { createConfigurationService } from '../src/services/configurationService';
-import {
-    configurationRows,
-    refreshedConfigurationRows,
-} from './mock/configurationService.mock';
+import { configurationRows, refreshedConfigurationRows } from './mock/configurationService.mock';
 
 vi.mock('../src/models/configuration', () => ({
     default: {
