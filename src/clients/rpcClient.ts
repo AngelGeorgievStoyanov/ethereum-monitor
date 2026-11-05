@@ -499,10 +499,7 @@ export function createRpcClient() {
                     fetchReceipts(),
                 ]);
 
-                if (
-                    blockResult.status === 'rejected' ||
-                    receiptsResult.status === 'rejected'
-                ) {
+                if (blockResult.status === 'rejected' || receiptsResult.status === 'rejected') {
                     const rejectedResults = [blockResult, receiptsResult].filter(
                         (item): item is PromiseRejectedResult => item.status === 'rejected',
                     );
