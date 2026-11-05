@@ -19,19 +19,15 @@ export const nestedRule: TxFilterRule = {
 };
 
 export const transaction: TransactionFilterContext = {
-    tx: {
-        transferType: 'native',
-        value: 150n,
-        status: 'success',
-        from: '0x000000000000000000000000000000000000dead',
-    },
+    transferType: 'native',
+    value: 150n,
+    status: 'success',
+    from: '0x000000000000000000000000000000000000dead',
 };
 
 export const failedTransaction: TransactionFilterContext = {
-    tx: {
-        transferType: 'erc20',
-        value: 50n,
-        status: 'failed',
-        from: '0x000000000000000000000000000000000000beef',
-    },
+    transferType: 'erc20',
+    value: 50n,
+    status: 'failed',
+    from: '0x000000000000000000000000000000000000beef',
 };
