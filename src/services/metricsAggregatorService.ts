@@ -1358,12 +1358,8 @@ function buildScannerAnalytics(
         }
     }
     const lagWindowStartBoundaryMs = now - METRICS_RECENT_RATE_WINDOW_MS;
-    let lagWindowStart:
-        | (Record<string, unknown> & { timestampMs: number })
-        | undefined;
-    let lagWindowEnd:
-        | (Record<string, unknown> & { timestampMs: number })
-        | undefined;
+    let lagWindowStart: (Record<string, unknown> & { timestampMs: number }) | undefined;
+    let lagWindowEnd: (Record<string, unknown> & { timestampMs: number }) | undefined;
 
     for (let index = lagSamplesStartIndex; index < lagSamples.length; index += 1) {
         const sample = lagSamples[index];
@@ -1385,9 +1381,7 @@ function buildScannerAnalytics(
         lagWindowEnd = undefined;
     }
     const lagWindowDurationMs =
-        lagWindowStart && lagWindowEnd
-            ? lagWindowEnd.timestampMs - lagWindowStart.timestampMs
-            : 0;
+        lagWindowStart && lagWindowEnd ? lagWindowEnd.timestampMs - lagWindowStart.timestampMs : 0;
     const netLagReductionPerSecondLastMinute =
         lagWindowDurationMs > 0
             ? Number(
