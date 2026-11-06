@@ -1,6 +1,6 @@
 # Development Guidelines
 
-These guidelines define how we write and change code in Ethereum Monitor. They describe the intended direction for new code and refactoring; they do not imply that every existing part of the codebase already complies.
+These guidelines define how we write and change code in EVM Monitor. They describe the intended direction for new code and refactoring; they do not imply that every existing part of the codebase already complies.
 
 ## 1. Core principles
 
