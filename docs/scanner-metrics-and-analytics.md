@@ -44,7 +44,7 @@ The current metrics include:
 
 ## Historical metrics retention
 
-History is bounded in memory using the retention settings in `src/constants/scanner-metrics.constants.ts`. These limits are independent of Ethereum block time and can be adjusted centrally.
+History is bounded in memory using the retention settings in `src/constants/scanner-metrics.constants.ts`. These limits are independent of EVM network block time and can be adjusted centrally.
 
 - Metric samples are retained for up to 3 hours, subject to per-category memory-safety limits.
 - Sample limits are capacity safeguards, not assumptions about how many blocks a network produces.
@@ -52,7 +52,7 @@ History is bounded in memory using the retention settings in `src/constants/scan
 - Network-independent one-minute buckets retain throughput, lag, RPC failure/latency, database query, filter evaluation, and batch-timing aggregates. Charts use the selected window's buckets rather than a fixed number of block samples.
 - Each analytics response reports requested duration, available duration, history start time, and whether the requested window is complete or partial.
 - A process that has been running for 40 minutes can return 40 minutes of partial data for a 1-hour window; it does not need to run for 3 hours.
-- Analytics are calculated on demand by the metrics aggregator for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 30000 ms). Dynamic Config does not own or periodically publish analytics results.
+- Analytics are calculated on demand by the metrics aggregator for the requested window. The most recently requested result is cached for `METRICS_ANALYTICS_REFRESH_INTERVAL_MS` (currently 5000 ms). Dynamic Config does not own or periodically publish analytics results.
 - Summary counters and breakdown tables are calculated for the selected window from minute buckets. Percentile latency uses the retained raw RPC request samples for that window.
 
 ## Dashboard polling

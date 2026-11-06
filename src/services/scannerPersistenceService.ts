@@ -22,12 +22,12 @@ async function trackDatabaseFailure<T>(operation: string, action: () => Promise<
     }
 }
 
-export async function createTransactionsFromEthereumDataBatch(
+export async function createTransactionsFromEvmDataBatch(
     candidates: readonly TransferBatchCandidate[],
     transaction?: import('sequelize').Transaction,
     reconcileMatches = false,
 ): Promise<void> {
-    await trackDatabaseFailure('createTransactionsFromEthereumDataBatch', () =>
+    await trackDatabaseFailure('createTransactionsFromEvmDataBatch', () =>
         createTransfersBatch(mapTransferBatchItems(candidates), transaction, reconcileMatches),
     );
 }

@@ -71,7 +71,7 @@ export function validateTxFilterAddresses(rule: TxFilterRule): void {
         if (validated.has(key)) continue;
 
         if (!isAddress(value)) {
-            throw new ValidationError(`Invalid Ethereum address: ${value}`);
+            throw new ValidationError(`Invalid EVM address: ${value}`);
         }
 
         validated.add(key);

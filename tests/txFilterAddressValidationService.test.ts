@@ -9,14 +9,12 @@ import {
 } from './mock/txFilterAddressValidationService.mock';
 
 describe('txFilterAddressValidationService', () => {
-    it('accepts a valid Ethereum address', () => {
+    it('accepts a valid EVM address', () => {
         expect(() => validateTxFilterAddresses(validAddressRule)).not.toThrow();
     });
 
-    it('rejects malformed Ethereum addresses', () => {
-        expect(() => validateTxFilterAddresses(invalidAddressRule)).toThrow(
-            'Invalid Ethereum address',
-        );
+    it('rejects malformed EVM addresses', () => {
+        expect(() => validateTxFilterAddresses(invalidAddressRule)).toThrow('Invalid EVM address');
     });
 
     it('validates token contract addresses as well as wallet addresses', () => {

@@ -13,7 +13,7 @@ import { mapTransactionPageResponse } from '../mappers/transactionResponseMapper
 
 export type TransferMetadata = TransferContextMetadata;
 
-export interface CreateTransactionFromEthereumDataOptions {
+export interface CreateTransactionFromEvmDataOptions {
     tx: TransactionResponse;
     receipt: RpcTransactionReceipt;
     blockTimestamp: number;
@@ -21,13 +21,13 @@ export interface CreateTransactionFromEthereumDataOptions {
     matchingTxFilters: ActiveTxFilter[];
 }
 
-export async function createTransactionFromEthereumData({
+export async function createTransactionFromEvmData({
     tx,
     receipt,
     blockTimestamp,
     transfer,
     matchingTxFilters,
-}: CreateTransactionFromEthereumDataOptions) {
+}: CreateTransactionFromEvmDataOptions) {
     const data = mapTransactionCreationData(tx, receipt, blockTimestamp, transfer);
     const transaction = await findOrCreateTransfer(data);
     await createTxMatches(

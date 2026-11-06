@@ -11,7 +11,7 @@ export const validAddressRule: TxFilterRule = {
 export const invalidAddressRule: TxFilterRule = {
     field: 'to',
     op: 'eq',
-    value: 'not-an-ethereum-address',
+    value: 'not-an-evm-address',
 };
 
 export function createAddressSetRule(addressCount: number): TxFilterRule {
