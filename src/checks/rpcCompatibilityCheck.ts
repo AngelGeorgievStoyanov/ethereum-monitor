@@ -28,24 +28,6 @@ export async function runRpcCompatibilityCheck(): Promise<void> {
                     `[RPCCompatibilityCheck] ${endpoint.name} finalized: UNSUPPORTED/FAILED; ${String(error)}`,
                 );
             }
-            if (!finalizedBlockNumber) {
-                try {
-                    const latestBlockNumber = await sendStartupRpcRequest(
-                        endpoint,
-                        'eth_blockNumber',
-                        [],
-                    );
-                    if (typeof latestBlockNumber !== 'string') {
-                        throw new Error('latest block number response is invalid');
-                    }
-                    finalizedBlockNumber = latestBlockNumber;
-                } catch (error) {
-                    console.error(
-                        `[RPCCompatibilityCheck] ${endpoint.name} could not get a block number to test eth_getBlockReceipts; ${String(error)}`,
-                    );
-                }
-            }
-
             if (finalizedBlockNumber) {
                 try {
                     const receipts = await sendStartupRpcRequest(endpoint, 'eth_getBlockReceipts', [
