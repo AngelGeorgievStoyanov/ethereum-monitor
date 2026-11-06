@@ -87,8 +87,8 @@ export interface BlockProcessingMetrics {
     lastProcessedBlock: number | null;
     lastProcessedAt: string | null;
     lastBlockDurationMs: number | null;
-    blocksProcessedLastMinute: number;
-    blocksPerSecondLastMinute: number;
+    blocksProcessedLast60Seconds: number;
+    blocksPerSecondLast60Seconds: number;
     averageBlockDurationLastMinuteMs: number | null;
     averageFetchDurationLastMinuteMs: number | null;
     averageDatabaseWriteDurationLastMinuteMs: number | null;

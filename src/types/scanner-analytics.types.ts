@@ -1,54 +1,57 @@
 export interface ScannerAnalyticsWindowMetrics {
     processing: {
-        processedBlocks: number;
-        processedTransactions: number;
-        blocksPerSecond: number;
-        transactionsPerSecond: number;
-        blocksPerSecondLastMinute: number;
-        transactionsPerSecondLastMinute: number;
-        averageTransactionsPerBlock: number | null;
+        processedBlocksInSelectedWindow: number;
+        processedTransactionsInSelectedWindow: number;
+        averageBlocksPerSecondInSelectedWindow: number;
+        averageTransactionsPerSecondInSelectedWindow: number;
+        blocksPerSecondLast60Seconds: number;
+        transactionsPerSecondLast60Seconds: number;
+        averageTransactionsPerBlockInSelectedWindow: number | null;
         /** Sum of successful batch execution durations; excludes waiting for new finalized blocks. */
-        activeProcessingDurationMs: number;
-        activeBlocksPerSecond: number;
-        activeTransactionsPerSecond: number;
-        averageActiveProcessingMsPerBlock: number | null;
-        averageActiveProcessingMsPerTransaction: number | null;
-        processingBatches: number;
-        averageBlocksPerBatch: number;
-        minBlocksPerBatch: number;
-        maxBlocksPerBatch: number;
-        batchSizeDistribution: Record<string, number>;
-        averageBatchDurationMs: number | null;
-        averageFetchStageDurationMs: number | null;
-        averageProcessingStageDurationMs: number | null;
-        averagePersistenceStageDurationMs: number | null;
-        averageMaxConcurrentFetches: number | null;
-        averageMaxConcurrentProcessing: number | null;
-        maxObservedConcurrentFetches: number;
-        maxObservedConcurrentProcessing: number;
-        fetchSlotUtilizationPercentLastMinute: number | null;
-        averageNoFetchDurationPerBatchMsLastMinute: number | null;
-        averageConcurrentFetchesLastMinute: number | null;
-        averageBlockDurationMs: number | null;
-        averageFilterDurationMs: number | null;
-        averageDatabaseBatchWriteDurationMs: number | null;
+        totalBatchElapsedDurationMsInSelectedWindow: number;
+        blocksPerSecondDuringBatchExecutionInSelectedWindow: number;
+        transactionsPerSecondDuringBatchExecutionInSelectedWindow: number;
+        averageBatchElapsedMsPerBlockInSelectedWindow: number | null;
+        averageBatchElapsedMsPerTransactionInSelectedWindow: number | null;
+        completedBatchesInSelectedWindow: number;
+        averageBlocksPerBatchInSelectedWindow: number;
+        minBlocksPerBatchInSelectedWindow: number;
+        maxBlocksPerBatchInSelectedWindow: number;
+        batchSizeDistributionInSelectedWindow: Record<string, number>;
+        averageBatchElapsedDurationMsInSelectedWindow: number | null;
+        averageFetchStageDurationMsInSelectedWindow: number | null;
+        averageProcessingStageDurationMsInSelectedWindow: number | null;
+        averagePersistenceStageDurationMsInSelectedWindow: number | null;
+        averageBatchMaxConcurrentFetchesInSelectedWindow: number | null;
+        averageBatchMaxConcurrentProcessingInSelectedWindow: number | null;
+        maxBatchConcurrentFetchesInSelectedWindow: number;
+        maxBatchConcurrentProcessingInSelectedWindow: number;
+        activeFetchesNow: number;
+        timeWeightedAverageFetchConcurrencyLast60Seconds: number;
+        maxConcurrentFetchesLast60Seconds: number;
+        fetchSlotUtilizationPercentLast60Seconds: number | null;
+        averageNoFetchDurationPerCompletedBatchLast60Seconds: number | null;
+        timeWeightedAverageFetchConcurrencyLast60Seconds: number | null;
+        averageBlockDurationMsInSelectedWindow: number | null;
+        averageFilterEvaluationDurationMsInSelectedWindow: number | null;
+        averageDatabaseBatchWriteDurationMsInSelectedWindow: number | null;
     };
     catchUp: {
-        netLagReductionPerSecond: number | null;
-        netLagReductionPerSecondLastMinute: number | null;
+        netLagReductionPerSecondInSelectedWindow: number | null;
+        netLagReductionPerSecondLast60Seconds: number | null;
         lagAtAnalyticsWindowStart: number | null;
         lagAtAnalyticsWindowEnd: number | null;
         analyticsMeasurementDurationMs: number;
-        lagAtWindowStart: number | null;
-        lagAtWindowEnd: number | null;
-        measurementDurationMs: number;
+        lagAtLast60SecondsWindowStart: number | null;
+        lagAtLast60SecondsWindowEnd: number | null;
+        measurementDurationMsLast60Seconds: number;
     };
     rpc: {
         totalRequests: number;
         concurrency: {
-            activeRequests: number;
-            averageActiveRequestsLastMinute: number | null;
-            maxActiveRequestsLastMinute: number;
+            activeRpcRequestsNow: number;
+            timeWeightedAverageActiveRpcRequestsLast60Seconds: number | null;
+            maxActiveRpcRequestsLast60Seconds: number;
         };
         failures: number;
         rateLimitErrors: number;
@@ -58,8 +61,8 @@ export interface ScannerAnalyticsWindowMetrics {
         jsonRpcErrors: number;
         otherErrors: number;
         retryableFailures: number;
-        averageLatencyMs: number | null;
-        latencyP95Ms: number | null;
+        averageLatencyMsInSelectedWindow: number | null;
+        latencyP95MsInSelectedWindow: number | null;
         methods: Array<{
             method: string;
             requests: number;
@@ -83,7 +86,7 @@ export interface ScannerAnalyticsWindowMetrics {
         writes: number;
         other: number;
         failures: number;
-        averageQueryDurationMs: number | null;
+        averageQueryDurationMsInSelectedWindow: number | null;
         /** Explicitly timed persistence transactions for successfully processed batches. */
         batchWrites: number;
         totalBatchWriteDurationMs: number;
@@ -98,7 +101,7 @@ export interface ScannerAnalyticsWindowMetrics {
         evaluations: number;
         matches: number;
         failures: number;
-        averageDurationMs: number | null;
+        averageEvaluationDurationMsInSelectedWindow: number | null;
         byFilter: Record<
             string,
             { evaluations: number; matches: number; failures: number; totalDurationMs: number }

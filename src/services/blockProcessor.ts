@@ -21,7 +21,7 @@ import {
 import { logBlockProcessed, logCatchUpComplete } from '../utils/scannerLogger';
 import { accumulateBlockMetrics, createBlockProcessingTotals } from './scannerMetrics';
 import { BlockChainDiscontinuityError } from '../errors/blockChainDiscontinuityError';
-import { recordProcessingBatch } from './metricsAggregatorService';
+import { recordFetchConcurrencySample, recordProcessingBatch } from './metricsAggregatorService';
 
 type ConfirmedBlock = CanonicalBlockIdentity;
 type PreparedBlock = {
@@ -123,6 +123,7 @@ export async function processFinalizedBlocks(
 
             let activeFetches = 0;
             let maxConcurrentFetches = 0;
+            recordFetchConcurrencySample(0, workerCount);
             let noFetchDurationMs = 0;
             let noFetchStartedAt = Date.now();
             let totalConcurrentFetchMs = 0;
@@ -139,6 +140,7 @@ export async function processFinalizedBlocks(
                 }
                 activeFetches = nextActiveFetches;
                 lastFetchConcurrencyChangeAt = now;
+                recordFetchConcurrencySample(activeFetches, workerCount);
             };
 
             let activeProcessing = 0;
@@ -240,6 +242,7 @@ export async function processFinalizedBlocks(
             if (activeFetches === 0) noFetchDurationMs += Date.now() - noFetchStartedAt;
 
             if (committedCheckpoint !== blockNumbers[blockNumbers.length - 1]) {
+                recordFetchConcurrencySample(0, 0);
                 state.lastProcessedBlock = committedCheckpoint;
                 // The checkpoint changed; never keep a cache for a different range.
                 invalidateConfirmedBlockCache();
@@ -290,7 +293,9 @@ export async function processFinalizedBlocks(
                 maxConcurrentProcessing,
                 averageConcurrentFetches,
             });
+            recordFetchConcurrencySample(0, 0);
         } catch (error) {
+            recordFetchConcurrencySample(0, 0);
             console.error(
                 `[Scanner] Processing failed at block ${currentBatchStart}; checkpoint=${state.lastProcessedBlock}: ${formatError(error)}`,
             );
