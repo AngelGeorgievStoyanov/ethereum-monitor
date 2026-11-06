@@ -94,9 +94,9 @@
         <section class="panel">
             <h2>Block processing · last minute</h2>
             <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
-                <div><div class="label">Blocks / minute</div><div class="value" id="blocksPerMinute">—</div></div>
+                <div><div class="label">Blocks processed · last 60 sec</div><div class="value" id="blocksLast60Seconds">—</div></div>
                 <div><div class="label">Avg. block time</div><div class="value" id="avgBlock">—</div></div>
-                <div><div class="label">Avg. DB write</div><div class="value" id="avgDb">—</div></div>
+                <div><div class="label">Avg. DB write · last 60 sec</div><div class="value" id="avgDb">—</div></div>
             </div>
             <svg id="performanceChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Recent block processing and database write duration chart"></svg>
             <div class="chart-legend"><span><i class="legend-dot"></i>Block duration</span><span><i class="legend-dot db"></i>Database write</span></div>
@@ -133,9 +133,9 @@
             <div class="metric-tile"><div class="label">Blocks / second · selected window</div><div class="value" id="analyticsBlocksPerSecond">—</div></div>
             <div class="metric-tile"><div class="label">Transactions / second · selected window</div><div class="value" id="analyticsTransactionsPerSecond">—</div></div>
             <div class="metric-tile"><div class="label">Net lag reduction / sec · selected window</div><div class="value" id="lagReductionRate">—</div></div>
-            <div class="metric-tile"><div class="label">Blocks / second · last 60 sec</div><div class="value" id="analyticsBlocksPerSecondLastMinute">—</div></div>
-            <div class="metric-tile"><div class="label">Transactions / second · last 60 sec</div><div class="value" id="analyticsTransactionsPerSecondLastMinute">—</div></div>
-            <div class="metric-tile"><div class="label">Net lag reduction / sec · last 60 sec</div><div class="value" id="lagReductionRateLastMinute">—</div></div>
+            <div class="metric-tile"><div class="label">Blocks / second · last 60 sec</div><div class="value" id="analyticsBlocksPerSecondLast60Seconds">—</div></div>
+            <div class="metric-tile"><div class="label">Transactions / second · last 60 sec</div><div class="value" id="analyticsTransactionsPerSecondLast60Seconds">—</div></div>
+            <div class="metric-tile"><div class="label">Net lag reduction / sec · last 60 sec</div><div class="value" id="lagReductionRateLast60Seconds">—</div></div>
             <div class="metric-tile"><div class="label">Estimated catch-up</div><div class="value" id="catchUpEta">—</div></div>
         </div>
         <div class="metric-grid" style="margin-top:12px">
@@ -166,8 +166,8 @@
         </div>
         <div class="metric-grid" style="margin-top:12px">
             <div class="metric-tile"><div class="label">Total batch elapsed time · selected window</div><div class="value" id="activeProcessingDuration">—</div></div>
-            <div class="metric-tile"><div class="label">Blocks / sec during batch execution · selected window</div><div class="value" id="blocksPerSecondDuringBatchExecutionInSelectedWindow">—</div></div>
-            <div class="metric-tile"><div class="label">Transactions / sec during batch execution · selected window</div><div class="value" id="transactionsPerSecondDuringBatchExecutionInSelectedWindow">—</div></div>
+            <div class="metric-tile"><div class="label">Blocks / sec during batch execution · selected window</div><div class="value" id="activeBlocksPerSecond">—</div></div>
+            <div class="metric-tile"><div class="label">Transactions / sec during batch execution · selected window</div><div class="value" id="activeTransactionsPerSecond">—</div></div>
             <div class="metric-tile"><div class="label">Batch elapsed ms / block · selected window</div><div class="value" id="activeMsPerBlock">—</div></div>
             <div class="metric-tile"><div class="label">Batch elapsed ms / transaction · selected window</div><div class="value" id="activeMsPerTransaction">—</div></div>
             <div class="metric-tile"><div class="label">DB write / block · selected window</div><div class="value" id="avgDbBatchWritePerBlock">—</div></div>
@@ -210,7 +210,7 @@
             <section>
                 <h2>Processing rate · blocks / minute</h2>
                 <svg id="throughputChart" class="chart" viewBox="0 0 700 190" role="img" aria-label="Blocks processed per minute"></svg>
-                <div class="chart-legend"><span><i class="legend-dot"></i>Blocks / minute</span></div>
+                <div class="chart-legend"><span><i class="legend-dot"></i>Blocks processed · last 60 sec</span></div>
             </section>
             <section>
                 <h2>RPC failures per minute</h2>
@@ -232,7 +232,7 @@
             <section>
                 <h2>Recent catch-up sessions</h2>
                 <div class="table-wrap">
-                    <table><thead><tr><th>Started</th><th>Blocks</th><th>Transactions</th><th>Duration</th><th>Blocks/sec</th><th>Status</th></tr></thead><tbody id="catchUpRows"><tr><td colspan="6" class="muted">Waiting for data</td></tr></tbody></table>
+                    <table><thead><tr><th>Started</th><th>Blocks</th><th>Transactions</th><th>Duration</th><th>Avg. blocks/sec since session start</th><th>Status</th></tr></thead><tbody id="catchUpRows"><tr><td colspan="6" class="muted">Waiting for data</td></tr></tbody></table>
                 </div>
             </section>
         </div>
@@ -397,9 +397,9 @@
         setPipeline('filterState', number(data.activeFiltersCount) + ' active filters', data.activeFiltersCount > 0 ? 'state' : '');
         setPipeline('databaseState', 'Checkpoint persisted: ' + number(data.lastProcessedBlock), 'state');
 
-        setText('blocksPerMinute', number(metrics.blocksProcessedLast60Seconds));
-        setText('avgBlock', duration(metrics.averageBlockDurationLastMinuteMs));
-        setText('avgDb', duration(metrics.averageDatabaseWriteDurationLastMinuteMs));
+        setText('blocksLast60Seconds', number(metrics.blocksProcessedLast60Seconds));
+        setText('avgBlock', duration(metrics.averageBlockDurationLast60SecondsMs));
+        setText('avgDb', duration(metrics.averageDatabaseWriteDurationLast60SecondsMs));
         setText('transactions', number(metrics.totalTransactions));
         setText('nativeSeen', number(metrics.totalNativeTransfersSeen));
         setText('nativeMatches', number(metrics.totalNativeMatches));
@@ -510,9 +510,9 @@
         setText('analyticsBlocksPerSecond', windowProcessing.averageBlocksPerSecondInSelectedWindow ?? '—');
         setText('analyticsTransactionsPerSecond', windowProcessing.averageTransactionsPerSecondInSelectedWindow ?? '—');
         setText('lagReductionRate', windowCatchUp.netLagReductionPerSecondInSelectedWindow ?? '—');
-        setText('analyticsBlocksPerSecondLastMinute', windowProcessing.blocksPerSecondLast60Seconds ?? '—');
-        setText('analyticsTransactionsPerSecondLastMinute', windowProcessing.transactionsPerSecondLast60Seconds ?? '—');
-        setText('lagReductionRateLastMinute', windowCatchUp.netLagReductionPerSecondLast60Seconds ?? '—');
+        setText('analyticsBlocksPerSecondLast60Seconds', windowProcessing.blocksPerSecondLast60Seconds ?? '—');
+        setText('analyticsTransactionsPerSecondLast60Seconds', windowProcessing.transactionsPerSecondLast60Seconds ?? '—');
+        setText('lagReductionRateLast60Seconds', windowCatchUp.netLagReductionPerSecondLast60Seconds ?? '—');
         setText('catchUpEta', formatSeconds(catchUp.estimatedCatchUpRemainingSeconds));
         setText('rpc429', number(windowRpc.rateLimitErrors));
         setText('rpcTimeouts', number(windowRpc.timeoutErrors));
@@ -528,7 +528,7 @@
         setText('activeTransactionsPerSecond', number(windowProcessing.transactionsPerSecondDuringBatchExecutionInSelectedWindow));
         setText('activeMsPerBlock', preciseDuration(windowProcessing.averageBatchElapsedMsPerBlockInSelectedWindow));
         setText('activeMsPerTransaction', preciseDuration(windowProcessing.averageBatchElapsedMsPerTransactionInSelectedWindow));
-        setText('avgDbBatchWritePerBlock', duration(windowDatabase.averageBatchWriteDurationMsInSelectedWindowPerBlockInSelectedWindow));
+        setText('avgDbBatchWritePerBlock', duration(windowDatabase.averageBatchWriteDurationMsPerBlockInSelectedWindow));
         setText('catchUpCap', number(scanner.maxBlocksPerCatchup));
         setText('parallelBlocks', number(scanner.maxParallelBlocks));
         setText('databaseFailures', number(windowDatabase.failures));
@@ -555,7 +555,7 @@
         setText('processMemory', number(processMetrics.memoryRssMb) + ' MB');
         setText('processHeap', number(processMetrics.memoryHeapUsedMb) + ' MB');
         setText('processEventLoop', number(processMetrics.eventLoopUtilizationPercent) + '%');
-        setText('avgDbBatchWrite', duration(windowProcessing.averageDatabaseBatchWriteDurationMsInSelectedWindow));
+        setText('avgDbBatchWrite', duration(windowDatabase.averageBatchWriteDurationMsInSelectedWindow));
         const minuteBuckets = data.minuteBuckets || [];
         drawMinuteChart('throughputChart', minuteBuckets, [
             { color: '#60a5fa', value: (bucket) => bucket.processedBlocks },

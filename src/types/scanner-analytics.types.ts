@@ -7,7 +7,7 @@ export interface ScannerAnalyticsWindowMetrics {
         blocksPerSecondLast60Seconds: number;
         transactionsPerSecondLast60Seconds: number;
         averageTransactionsPerBlockInSelectedWindow: number | null;
-        /** Sum of successful batch execution durations; excludes waiting for new finalized blocks. */
+        /** Sum of batch wall-clock durations, including fetch, processing and persistence. */
         totalBatchElapsedDurationMsInSelectedWindow: number;
         blocksPerSecondDuringBatchExecutionInSelectedWindow: number;
         transactionsPerSecondDuringBatchExecutionInSelectedWindow: number;

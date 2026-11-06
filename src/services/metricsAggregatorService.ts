@@ -1138,9 +1138,9 @@ export function getBlockProcessingMetrics() {
         lastBlockDurationMs: last ? Number(last.blockDurationMs) : null,
         blocksProcessedLast60Seconds: recent.count,
         blocksPerSecondLast60Seconds: Number((recent.count / recentWindowSeconds).toFixed(2)),
-        averageBlockDurationLastMinuteMs: average('blockDurationMs'),
-        averageFetchDurationLastMinuteMs: average('fetchDurationMs'),
-        averageDatabaseWriteDurationLastMinuteMs: average('databaseWriteDurationMs'),
+        averageBlockDurationLast60SecondsMs: average('blockDurationMs'),
+        averageFetchDurationLast60SecondsMs: average('fetchDurationMs'),
+        averageDatabaseWriteDurationLast60SecondsMs: average('databaseWriteDurationMs'),
         recentBlocks: recent.recentBlocks.map((sample) => ({
             blockNumber: Number(sample.blockNumber),
             processedAt: String(sample.timestamp),

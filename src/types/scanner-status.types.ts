@@ -89,9 +89,9 @@ export interface BlockProcessingMetrics {
     lastBlockDurationMs: number | null;
     blocksProcessedLast60Seconds: number;
     blocksPerSecondLast60Seconds: number;
-    averageBlockDurationLastMinuteMs: number | null;
-    averageFetchDurationLastMinuteMs: number | null;
-    averageDatabaseWriteDurationLastMinuteMs: number | null;
+    averageBlockDurationLast60SecondsMs: number | null;
+    averageFetchDurationLast60SecondsMs: number | null;
+    averageDatabaseWriteDurationLast60SecondsMs: number | null;
     recentBlocks: RecentBlockMetric[];
 }
 
