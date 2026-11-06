@@ -1,10 +1,10 @@
-# Ethereum Monitor
+# EVM Monitor
 
-Monitors native ETH transfers and ERC-20 transfer events on an EVM-compatible network. Matching transfers are stored in PostgreSQL.
+Monitors native-asset transfers and ERC-20 transfer events on an EVM-compatible network. Matching transfers are stored in PostgreSQL.
 
 ## Project scope
 
-Ethereum Monitor is a **lightweight, single-network, single-instance EVM monitoring application** designed for a limited scope. It provides continuous block scanning, native and ERC-20 transfer processing, configurable transaction filters, checkpoint persistence, and basic reorganization detection and recovery.
+EVM Monitor is a **lightweight, single-network, single-instance EVM monitoring application** designed for a limited scope. It provides continuous block scanning, native and ERC-20 transfer processing, configurable transaction filters, checkpoint persistence, and basic reorganization detection and recovery.
 
 Run exactly one application process against a given database/network. The scanner has no distributed lock or multi-instance coordination; starting multiple processes against the same database can cause concurrent scanning and conflicting work. It is not a production-ready monitoring platform and is not designed or validated for large-scale workloads, public multi-tenant use, high availability, or strict service-level guarantees. Its HTTP API is intended for local or otherwise trusted use; authentication and authorization are not implemented, so do not expose it directly to an untrusted network.
 
@@ -19,9 +19,9 @@ Requirements: Node.js 24, npm, PostgreSQL, and an RPC endpoint for the network y
 1. Run npm install.
 2. Create a .env file:
 
-    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=ethereum-mainnet
+    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-a
     DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432
-    RPC_URL_1=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
+    RPC_URL_1=https://YOUR_RPC_PROVIDER_ENDPOINT
 
 3. Run npm run dev.
 
@@ -33,16 +33,16 @@ At startup, the application checks whether a PostgreSQL database with this name 
 
 For example, with:
 
-    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=ethereum-mainnet
+    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-a
     DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432
 
-the application creates and uses the ethereum-mainnet database, and sets SCANNER_ID to ethereum-mainnet.
+the application creates and uses the network-a database, and sets SCANNER_ID to network-a.
 
 To use a separate database for Sepolia, change the name to:
 
-    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=ethereum-sepolia
+    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-b
 
-The application then creates and uses ethereum-sepolia if it does not already exist, and uses ethereum-sepolia as SCANNER_ID. Configure RPC_URL_1, and any additional RPC URLs, for that same network. Changing the name does not automatically change the RPC endpoint or migrate/copy data from the previous database.
+The application then creates and uses network-b if it does not already exist, and uses network-b as SCANNER_ID. Configure RPC_URL_1, and any additional RPC URLs, for that same network. Changing the name does not automatically change the RPC endpoint or migrate/copy data from the previous database.
 
 The PostgreSQL user in DATABASE_URL must be allowed to connect to the postgres administrative database and create databases. The name setting must contain 1-63 letters, numbers, hyphens, or underscores.
 
@@ -142,6 +142,6 @@ The dashboard is served separately at GET /dashboard.
 - RPC_URL_2, RPC_URL_3, etc.: optional fallback and verification endpoints for the same network.
 - START_BLOCK: optional initial block; used only when no checkpoint exists. Normal RPC requests time out after RPC_ENDPOINT_TIMEOUT_MS and can fail over to another configured endpoint.
 
-Native ETH transfers are unique by transaction hash and block hash. ERC-20 transfers also include the log index. This preserves separate records when a transaction appears on a replacement block. Internal trace transfers are not currently processed or available to transaction filters.
+native-asset transfers are unique by transaction hash and block hash. ERC-20 transfers also include the log index. This preserves separate records when a transaction appears on a replacement block. Internal trace transfers are not currently processed or available to transaction filters.
 
 Recovery metrics and block-processing metrics are kept in memory and reset when the process restarts.
