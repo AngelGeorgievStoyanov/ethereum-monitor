@@ -1,0 +1,55 @@
+import type {
+    BlockProcessingMetrics,
+    ScannerControlState,
+    ScannerRescanJobSummary,
+    ScannerStatusResponse,
+    ScannerStatusState,
+    RecoveryMetrics,
+    RpcEndpointMetrics,
+} from '../types/scanner-status.types';
+
+export function mapScannerStatusResponse(input: {
+    control: ScannerControlState;
+    scannerRunning: boolean;
+    state: ScannerStatusState | null;
+    rescanJob: ScannerRescanJobSummary | null;
+    recoveryMetrics: RecoveryMetrics;
+    processingMetrics: BlockProcessingMetrics;
+    activeFiltersCount: number;
+    processUptimeSeconds: number;
+    latestFinalizedBlock: number | null;
+    latestFinalizedAt: string | null;
+    lagBlocks: number | null;
+    finalizedRegression: boolean;
+    finalizedRegressionMessage: string | null;
+    rpcAvailable: boolean;
+    rpcMetrics: RpcEndpointMetrics[];
+    checkedAt: string;
+}): ScannerStatusResponse {
+    const lastProcessedBlock = input.state?.lastProcessedBlock ?? null;
+
+    return {
+        scannerRunning: input.scannerRunning,
+        paused: input.control.paused,
+        lastProcessedBlock,
+        reorgRecoveryActive: input.state?.reorgRecoveryActive ?? false,
+        reorgRecoveryBlocked: input.state?.reorgRecoveryBlocked ?? false,
+        reorgRecoveryBlockReason: input.state?.reorgRecoveryBlockReason ?? null,
+        reorgRecoveryStableBlocks: input.state?.reorgRecoveryStableBlocks ?? 0,
+        reorgRecoveryStartBlock: input.state?.reorgRecoveryStartBlock ?? null,
+        reorgRecoveryTargetBlock: input.state?.reorgRecoveryTargetBlock ?? null,
+        rescanJob: input.rescanJob,
+        recoveryMetrics: input.recoveryMetrics,
+        processingMetrics: input.processingMetrics,
+        activeFiltersCount: input.activeFiltersCount,
+        processUptimeSeconds: input.processUptimeSeconds,
+        latestFinalizedBlock: input.latestFinalizedBlock,
+        latestFinalizedAt: input.latestFinalizedAt,
+        lagBlocks: input.lagBlocks,
+        finalizedRegression: input.finalizedRegression,
+        finalizedRegressionMessage: input.finalizedRegressionMessage,
+        rpcAvailable: input.rpcAvailable,
+        rpcMetrics: input.rpcMetrics,
+        checkedAt: input.checkedAt,
+    };
+}

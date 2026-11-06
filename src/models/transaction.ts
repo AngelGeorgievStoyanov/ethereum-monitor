@@ -1,99 +1,92 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../database';
-import Configuration from './configuration';
+
+export type TransferType = 'native' | 'erc20' | 'internal';
 
 interface TransactionAttributes {
-    id: string;
-    configurationId: string;
-    hash: string;
+    id: number;
+    txHash: string;
+    transferType: TransferType;
+    tokenAddress?: string | null;
+    logIndex: number;
     nonce: number;
     blockHash: string;
     blockNumber: number;
     transactionIndex: number;
     from: string;
-    to?: string;
+    to?: string | null;
     value: string;
-    gas: number;
-    gasPrice: string;
-    input?: string;
-    status?: string;
+    internalCount: number | null;
+    chainStatus: 'SUCCESS' | 'FAILED';
+    recordStatus: 'NORMAL' | 'REORGED';
     transactionType?: string;
-    contractAddress?: string;
     timestamp?: Date;
-    requiredConfirmations?: number;
-    gasLimit?: number;
-    maxPriorityFeePerGas?: string;
-    maxFeePerGas?: string;
-    maxFeePerBlobGas?: string;
-    accessList?: string;
-    blobVersionedHashes?: string;
-    logsBloom?: string;
-    gasUsed?: number;
-    cumulativeGasUsed?: number;
-    root?: string;
-    blobGasUsed?: number;
 }
 
-interface TransactionCreationAttributes extends Optional<TransactionAttributes, 'id'> { }
+export type TransactionCreationAttributes = Optional<
+    TransactionAttributes,
+    | 'id'
+    | 'tokenAddress'
+    | 'to'
+    | 'internalCount'
+    | 'recordStatus'
+    | 'transactionType'
+    | 'timestamp'
+>;
 
-class Transaction extends Model<TransactionAttributes, TransactionCreationAttributes>
-    implements TransactionAttributes {
-    public id!: string;
-    public configurationId!: string;
-    public hash!: string;
+class Transaction
+    extends Model<TransactionAttributes, TransactionCreationAttributes>
+    implements TransactionAttributes
+{
+    public id!: number;
+    public txHash!: string;
+    public transferType!: TransferType;
+    public tokenAddress?: string | null;
+    public logIndex!: number;
     public nonce!: number;
     public blockHash!: string;
     public blockNumber!: number;
     public transactionIndex!: number;
     public from!: string;
-    public to?: string;
+    public to?: string | null;
     public value!: string;
-    public gas!: number;
-    public gasPrice!: string;
-    public input?: string;
-    public status?: string;
+    public internalCount!: number | null;
+    public chainStatus!: 'SUCCESS' | 'FAILED';
+    public recordStatus!: 'NORMAL' | 'REORGED';
     public transactionType?: string;
-    public contractAddress?: string;
     public timestamp?: Date;
-    public requiredConfirmations?: number;
-    public gasLimit?: number;
-    public maxPriorityFeePerGas?: string;
-    public maxFeePerGas?: string;
-    public maxFeePerBlobGas?: string;
-    public accessList?: string;
-    public blobVersionedHashes?: string;
-    public logsBloom?: string;
-    public gasUsed?: number;
-    public cumulativeGasUsed?: number;
-    public root?: string;
-    public blobGasUsed?: number;
-
-    public static associate() {
-        this.belongsTo(Configuration, { foreignKey: 'configurationId' });
-    }
 }
 
 Transaction.init(
     {
         id: {
-            type: DataTypes.UUID,
-            defaultValue: DataTypes.UUIDV4,
+            type: DataTypes.INTEGER,
+            autoIncrement: true,
             primaryKey: true,
         },
-        configurationId: {
-            type: DataTypes.UUID,
+        txHash: {
+            type: DataTypes.STRING(66),
             allowNull: false,
         },
-        hash: {
-            type: DataTypes.STRING,
+        transferType: {
+            type: DataTypes.ENUM('native', 'erc20', 'internal'),
             allowNull: false,
+        },
+        tokenAddress: {
+            type: DataTypes.STRING(42),
+            allowNull: true,
+        },
+        logIndex: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: -1,
         },
         nonce: {
             type: DataTypes.INTEGER,
             allowNull: false,
         },
         blockHash: {
-            type: DataTypes.STRING,
+            type: DataTypes.STRING(66),
             allowNull: false,
         },
         blockNumber: {
@@ -105,83 +98,61 @@ Transaction.init(
             allowNull: false,
         },
         from: {
-            type: DataTypes.STRING,
+            type: DataTypes.STRING(42),
             allowNull: false,
         },
         to: {
-            type: DataTypes.STRING,
+            type: DataTypes.STRING(42),
+            allowNull: true,
         },
         value: {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        gas: {
+        internalCount: {
             type: DataTypes.INTEGER,
-            allowNull: false,
-        },
-        gasPrice: {
-            type: DataTypes.STRING,
-            allowNull: false,
-        },
-        input: {
-            type: DataTypes.STRING,
             allowNull: true,
+            defaultValue: null,
         },
-        status: {
-            type: DataTypes.STRING,
+        chainStatus: {
+            type: DataTypes.STRING(20),
+            allowNull: false,
+            defaultValue: 'SUCCESS',
+        },
+        recordStatus: {
+            type: DataTypes.STRING(20),
+            allowNull: false,
+            defaultValue: 'NORMAL',
         },
         transactionType: {
             type: DataTypes.STRING,
-        },
-        contractAddress: {
-            type: DataTypes.STRING,
+            allowNull: true,
         },
         timestamp: {
             type: DataTypes.DATE,
-        },
-        requiredConfirmations: {
-            type: DataTypes.INTEGER,
-        },
-        gasLimit: {
-            type: DataTypes.INTEGER,
-        },
-        maxPriorityFeePerGas: {
-            type: DataTypes.STRING,
-        },
-        maxFeePerGas: {
-            type: DataTypes.STRING,
-        },
-        maxFeePerBlobGas: {
-            type: DataTypes.STRING,
-        },
-        accessList: {
-            type: DataTypes.TEXT,
-        },
-        blobVersionedHashes: {
-            type: DataTypes.TEXT,
-        },
-        logsBloom: {
-            type: DataTypes.STRING,
-        },
-        gasUsed: {
-            type: DataTypes.INTEGER,
-        },
-        cumulativeGasUsed: {
-            type: DataTypes.INTEGER,
-        },
-        root: {
-            type: DataTypes.STRING,
-        },
-        blobGasUsed: {
-            type: DataTypes.INTEGER,
+            allowNull: true,
         },
     },
     {
         sequelize,
         tableName: 'Transactions',
         modelName: 'Transaction',
-        timestamps: true
-    }
+        timestamps: true,
+        indexes: [
+            {
+                name: 'transactions_native_identity_unique',
+                unique: true,
+                fields: ['txHash', 'transferType', 'blockHash'],
+                where: { transferType: 'native' },
+            },
+            {
+                name: 'transactions_erc20_identity_unique',
+                unique: true,
+                fields: ['txHash', 'transferType', 'logIndex', 'blockHash'],
+                where: { transferType: 'erc20' },
+            },
+        ],
+    },
 );
 
 export default Transaction;

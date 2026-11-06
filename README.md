@@ -1,169 +1,155 @@
-# Ethereum Monitor
+# EVM Monitor
 
-Ethereum Monitor is an application designed to monitor Ethereum transactions. It includes features for managing configurations, monitoring transactions with Infura.
+Monitors native-asset transfers and ERC-20 transfer events on an EVM-compatible network. Matching transfers are stored in PostgreSQL.
 
-## Technologies
+## Project scope
 
-The project uses the following technologies and libraries:
+EVM Monitor is a **lightweight, single-network, single-instance EVM monitoring application** designed for a limited scope. It provides continuous block scanning, native and ERC-20 transfer processing, configurable transaction filters, checkpoint persistence, and basic reorganization detection and recovery.
 
-- **Node.js** - JavaScript runtime environment for server-side code.
-- **Express.js** - Minimal and flexible Node.js web framework.
-- **Sequelize** - Promise-based ORM (Object-Relational Mapping) for Node.js used for interacting with databases.
-- **SQLite** - Lightweight relational SQL database used for storing transactions.
-- **Ethers.js** - Library for interacting with the Ethereum network.
-- **TypeScript** - Statically typed superset of JavaScript used for development.
-- **Nodemon** - Tool for automatically restarting the application when file changes are detected.
-- **Async** - A utility module for working with asynchronous JavaScript, used to handle rate limiting.
-- **p-limit** - Limits the number of concurrent promises, used to manage rate limits imposed by the Infura API.
+Run exactly one application process against a given database/network. The scanner has no distributed lock or multi-instance coordination; starting multiple processes against the same database can cause concurrent scanning and conflicting work. It is not a production-ready monitoring platform and is not designed or validated for large-scale workloads, public multi-tenant use, high availability, or strict service-level guarantees. Its HTTP API is intended for local or otherwise trusted use; authentication and authorization are not implemented, so do not expose it directly to an untrusted network.
 
-## Prerequisites
+The implementation deliberately favors a compact architecture over production infrastructure. It does not aim to provide horizontal scan throughput, independently scalable ingestion and filtering, durable event streaming, comprehensive operational monitoring, or production-grade disaster recovery.
 
-1. **Infura Key:**
-   To interact with the Ethereum network, you need an Infura API key. Register on [Infura](https://infura.io/) to obtain a free API key. Add your Infura key to the `.env` file.
+For a substantially larger system or production deployment, the architecture must be redesigned. The main responsibilities, including RPC ingestion, address monitoring, filter evaluation, persistence, and event delivery, must be separated into independent services that can be scaled independently. The resulting architecture must also address queueing, access control, observability, redundancy, and operational safeguards. The current design should not be treated as a production blueprint.
 
-## Installation
+## Setup
 
-1. **Clone the repository:**
+Requirements: Node.js 24, npm, PostgreSQL, and an RPC endpoint for the network you want to monitor.
 
-    ```bash
-    git clone https://github.com/your-username/ethereum-monitor.git
-    cd ethereum-monitor
-    ```
+1. Run npm install.
+2. Create a .env file:
 
-2. **Install dependencies:**
+    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-a
+    CHAIN_ID=YOUR_NETWORK_CHAIN_ID
+    DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432
+    RPC_URL_1=https://YOUR_RPC_PROVIDER_ENDPOINT
 
-    ```bash
-    npm install
-    ```
+3. Run npm run dev.
 
-3. **Set up environment variables:**
+### Network and database name
 
-    Create a `.env` file in the root directory of the project and add the necessary configurations. Example `.env` file:
+BLOCKCHAIN_NETWORK_AND_DATABASE_NAME is the single setting used for both the PostgreSQL database name and SCANNER_ID.
 
-    ```env
-    INFURA_API_KEY=your-infura-api-key
-    ```
+At startup, the application checks whether a PostgreSQL database with this name exists. If it does not, the application creates it, then connects to it and creates any missing tables.
 
-## Running the Application
+For example, with:
 
-1. **Start the server in development mode:**
+    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-a
+    DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432
 
-    ```bash
-    npm run dev
-    ```
+the application creates and uses the network-a database, and sets SCANNER_ID to network-a.
 
-    This will start the application with `nodemon`, which will automatically restart the server when code changes are detected.
+To monitor a different EVM network, use a separate application instance and database identity. Change the name to a unique value for that network, for example:
 
-2. **Start the server in production mode:**
+    BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-b
 
-    ```bash
-    npm start
-    ```
+The application then creates and uses network-b if it does not already exist, and uses network-b as SCANNER_ID. Configure RPC_URL_1, and any additional RPC URLs, for that same network. Changing the name does not automatically change the RPC endpoint or migrate/copy data from the previous database.
 
-## API Endpoints
+CHAIN_ID is required and must be the decimal or 0x-prefixed hexadecimal chain ID of the EVM network. Before creating or connecting to the database, startup checks every configured RPC endpoint against this value. All endpoints must report the same expected chain ID.
 
-### Configurations
+Startup also checks that every endpoint returns a finalized block and supports eth_getBlockReceipts. An endpoint that does not support either required capability is reported by its RPC_URL_N setting and prevents startup; configure compatible endpoints for the selected network.
 
-- **GET /api/configurations/**
+When an existing checkpoint has a corresponding canonical block record, startup compares its stored hash with the block returned by the configured RPC network. A mismatch stops startup instead of continuing with a checkpoint from a different chain.
 
-  Retrieves all configurations.
+The PostgreSQL user in DATABASE_URL must be allowed to connect to the postgres administrative database and create databases. The name setting must contain 1-63 letters, numbers, hyphens, or underscores.
 
-- **POST /api/configurations/**
+To run the compiled application locally, use npm run build followed by npm start. The API listens on port 8000. These commands describe how to run the build; they do not imply that the application is production-ready.
 
-  Creates a new configuration. Requires configuration data in the request body.
+The application creates missing tables at startup. It does not migrate existing table schemas; schema changes must be applied separately.
 
-- **PUT /api/configurations/:id**
+## Startup and filters
 
-  Updates an existing configuration by its identifier. Requires updated configuration data in the request body.
+The scanner saves its checkpoint in PostgreSQL and resumes from it after a restart.
 
-- **DELETE /api/configurations/:id**
+- An existing checkpoint takes priority over START_BLOCK.
+- When creating a new scanner state, START_BLOCK sets the first block to process. The scanner stores START_BLOCK - 1 as its initial checkpoint. The value must be a non-negative safe integer at or below the current finalized block, and the RPC provider must return that block with a valid hash and parent hash.
+- When creating a new scanner state without START_BLOCK, scanning starts after the current finalized block. Existing chain history is skipped.
+- Filter creation does not determine the initial checkpoint. When there are no active filters, the scanner waits without advancing the checkpoint. Once an active filter is available, scanning continues from the next unprocessed block. Newly created filters do not trigger an automatic historical backfill.
+- DynamicConfigService owns the in-memory active-filter cache. Each instance applies a content-based configuration version and logs it. Normal scanner batches use one consistent configuration; reorg recovery reloads the active configuration for each block. Local API mutations refresh the in-process cache immediately; the cache also refreshes every 60 seconds when the database is available. If a refresh fails, the last successfully applied cache is retained.
+- Invalid active filters are logged and excluded from the active configuration without blocking valid filters. Validation is retried once per 60-second refresh, and retry counters reset on process restart. After three consecutive failed attempts, the application attempts to set the filter inactive in the database. Before doing so, it locks the row and verifies that the filter is still active and its rule has not changed since the failed validation. If the rule changed, the filter is not deactivated. See docs/generic-transaction-filters.md.
 
-  Deletes a configuration by its identifier.
+### Filter capacity
 
-### Transactions
+The default limits are 20 unique addresses per filter and 50 active filters. Only active filters count toward the active-filter limit; inactive filters do not. The limits are defined in src/constants/tx-filter.constants.ts and can be adjusted for the deployment.
 
-- **GET /api/transactions/**
+Address format validation uses ethers.isAddress and can be independently enabled or disabled for from/to addresses and tokenAddress in src/constants/tx-filter-address.constants.ts. Filter address validation does not make RPC calls.
 
-  Retrieves all transactions from the database.
+These limits are intended for a lightweight filter feature. If the application needs to monitor substantially more addresses or a much larger number of active filters, do not simply increase the limits. Use a separate address-monitoring microservice with a message queue or event bus. That service can manage large address subscriptions, batch and schedule RPC work, apply independent rate limits, and publish detected events for the transaction scanner or downstream consumers. This keeps high-volume address monitoring isolated from the main scanner.
 
-- **GET /api/transactions/filter**
+## Transaction filter engine
 
-   Warning: Executing raw SQL queries directly can be dangerous and may expose your application to SQL injection attacks. Always validate and sanitize user inputs rigorously. Ensure that any SQL queries are carefully controlled and not directly executed based on user inputs.
+The Generic Boolean Engine evaluates nested all (AND), any (OR), and not (NOT) rules against the predefined transfer context. It is generic over the available context fields and operators; it does not attempt to cover every possible EVM transaction shape.
 
-  Executes an SQL query specified by the sql parameter in the request. This endpoint allows you to perform raw SQL queries against the transactions database. Here are some examples:
+A execution error in one compiled filter is logged with its filter ID and treated as a non-match for that filter and transfer. Other filters and scanner processing continue.
 
-  Example 1: Retrieve transactions with a specific status
+## Block processing and recovery
 
-  GET http://localhost:8080/api/transactions/filter/query?sql=SELECT%20*%20FROM%20Transactions%20WHERE%20status%20=%20%27success%27
+The scanner checks block and receipt consistency before saving data. Block history, transfers, filter matches, and the checkpoint are saved in a database transaction. The checkpoint advances only after the writes succeed.
 
-  Description: This query retrieves all transactions from the Transactions table where the status is 'success'
+The database keeps block hashes and parent hashes. When a reorg is detected, the scanner searches up to 100 blocks for a common ancestor, marks replaced blocks and transfers as reorged, then reprocesses blocks one at a time. It requires 10 stable blocks before returning to normal processing.
 
-  Example 2: Retrieve transactions with a specific amount range
+With multiple RPC endpoints, reorg verification requires every configured endpoint to agree. With one endpoint, independent consensus is not possible. If provider verification fails after retries, receipt consistency fails during recovery, or the common ancestor is outside the stored block history, recovery is blocked rather than guessing or advancing the checkpoint. Receipt consistency failures during recovery stop automatic retries and record a reason in scanner state. Check GET /api/scanner/status and inspect the RPC providers before using POST /api/scanner/reorg-retry to retry blocked recovery.
 
-  GET http://localhost:8080/api/transactions/filter/query?sql=SELECT%20*%20FROM%20Transactions%20WHERE%20amount%20BETWEEN%20100%20AND%20200
+Finalized catch-up is processed in segments of up to 30 blocks. After each segment, the scanner polls the latest finalized block again before continuing, so an advancing finalized head updates the next target instead of relying on a stale value. When the lag is greater than `SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS` (currently 100 blocks), normal processing handles batches of up to `SCANNER_MAX_PARALLEL_BLOCKS` blocks in parallel (currently 3). At or below the lag threshold, blocks are processed one at a time. These limits are configured independently in `src/constants/scanner.constants.ts`. Recovery remains sequential.
 
-  Description: This query retrieves all transactions where the amount is between 100 and 200.
+## Monitoring dashboard
 
-  Example 3: Retrieve transactions with a specific sender address
+Open http://localhost:8000/dashboard while the backend is running. The page requests GET /api/scanner/status every 5 seconds and GET /api/scanner/analytics every 30 seconds. For a compact, shareable diagnostic report, use GET /api/scanner/analysis?window=1h (or window=3h). This endpoint returns the selected window's key processing, RPC, database, and filter metrics, together with current scanner/chain state, finalized cadence, process resource usage, catch-up, and recovery status. It omits detailed histories and non-core RPC method entries; the full analytics endpoint remains available for deeper investigation. These intervals are configurable in `public/dashboard.constants.js`. The page displays scanner state, block lag, processing totals, recent block timings, RPC endpoint statistics, and recovery/rescan information.
 
-  GET http://localhost:8080/api/transactions/filter/query?sql=SELECT%20*%20FROM%20Transactions%20WHERE%20senderAddress%20=%20%270x1234567890abcdef%27
+Processing and recovery metrics are held in process memory and reset when the process restarts. RPC counters include requests made through the shared RPC client, including status checks and recovery diagnostics. The dashboard is intended for local or otherwise trusted use; the API does not implement authentication or authorization.
 
-  Description: This query retrieves all transactions where the sender address is '0x1234567890abcdef'.
+## Manual rescan
 
-  Example 4: Retrieve transactions within a specific date range
-  
-  GET http://localhost:8080/api/transactions/filter/query?sql=SELECT%20*%20FROM%20Transactions%20WHERE%20date%20BETWEEN%20%272024-01-01%27%20AND%20%272024-12-31%27
+A rescan checks existing canonical history from fromBlock through the saved checkpoint. It does not move the checkpoint.
 
-  Description: This query retrieves all transactions that occurred between January 1, 2024, and December 31, 2024.
+1. Pause the scanner:
 
-Description of Query Parameter:
+        POST /api/scanner/pause
 
-sql: This is the raw SQL query you want to execute. Ensure that the query is properly URL-encoded to handle special characters.
+    The pause is applied on the next 30-second control refresh. The scanner finishes its current processing batch first.
 
-- **DELETE /api/transactions/**
+2. Start the rescan:
 
-Deletes all transactions from the database.
+        POST /api/scanner/rescan
+        Content-Type: application/json
 
-- **DELETE /api/transactions/filter**
+        {"fromBlock":19000000}
 
-Deletes transactions based on conditions specified by the `where` parameter in the request.
+3. Check progress with GET /api/scanner/rescan/OPERATION_ID, using the returned operation ID.
 
-- **DELETE /api/transactions/:id**
+The scanner must be idle and canonical history must exist for the full range. A chain mismatch stops the rescan and starts reorg recovery. Failed or interrupted jobs can be retried from the same starting block after checking their status.
 
-Deletes a transaction by its identifier.
+## API
 
-## Ethereum Service Overview
+All routes use the /api prefix.
 
-The Ethereum service handles interaction with the Ethereum network via Infura and monitors Ethereum transactions based on configurations stored in the database.
+| Method              | Route                         | Purpose                                                         |
+| ------------------- | ----------------------------- | --------------------------------------------------------------- |
+| GET                 | /health/live                  | Process liveness.                                               |
+| GET                 | /health/ready                 | Database and RPC availability.                                  |
+| GET                 | /scanner/status               | Checkpoint, lag, pause, recovery, RPC, and processing metrics.  |
+| GET                 | /scanner/analytics?window=1h  | Full analytics result for the selected 1h or 3h window.         |
+| GET                 | /scanner/analysis?window=1h   | Compact diagnostic report for sharing and performance analysis. |
+| POST                | /scanner/pause                | Request a manual pause.                                         |
+| POST                | /scanner/resume               | Resume scanning.                                                |
+| POST                | /scanner/rescan               | Start a manual rescan.                                          |
+| GET                 | /scanner/rescan/:id           | Check rescan progress.                                          |
+| POST                | /scanner/reorg-retry          | Retry blocked recovery.                                         |
+| GET/POST/PUT/DELETE | /tx-filters                   | Manage filters.                                                 |
+| GET                 | /transactions?page=1&limit=20 | List stored transfers.                                          |
+| DELETE              | /transactions/:id             | Delete a stored transfer.                                       |
 
-### Key Functions
+The dashboard is served separately at GET /dashboard.
 
-- **`getEthereumService()`**: Retrieves the singleton instance of the Ethereum service.
+## Configuration
 
-- **`createEthereumService()`**: Initializes a new instance of the Ethereum service with the following features:
-- Connects to the Ethereum network via Infura WebSocket provider.
-- Monitors transactions in real-time, including pending transactions and blocks.
-- Manages configurations and handles transactions based on user-defined criteria.
-- Uses `async` and `p-limit` libraries to handle rate limiting due to Infura's API limits.
+- BLOCKCHAIN_NETWORK_AND_DATABASE_NAME: required; database name and scanner ID.
+- CHAIN_ID: required EVM chain ID, in decimal or 0x-prefixed hexadecimal form.
+- DATABASE_URL: PostgreSQL server connection URL. Do not include a database name in the path.
+- RPC_URL_1: required RPC endpoint for the configured network.
+- RPC_URL_2, RPC_URL_3, etc.: optional fallback and verification endpoints for the same network.
+- START_BLOCK: optional initial block; used only when no checkpoint exists. Normal RPC requests time out after RPC_ENDPOINT_TIMEOUT_MS and can fail over to another configured endpoint.
 
-### Monitoring
+native-asset transfers are unique by transaction hash and block hash. ERC-20 transfers also include the log index. This preserves separate records when a transaction appears on a replacement block. Internal trace transfers are not currently processed or available to transaction filters.
 
-- **Blocks**: Monitors new blocks and processes transactions within those blocks.
-- **Pending Transactions**: Monitors pending transactions and processes them when they become available.
-
-### Configuration Handling
-
-- **Load Configurations**: Loads active configurations from the database.
-- **Add/Update/Remove Configuration**: Allows for dynamic configuration changes and updates the monitoring accordingly.
-
-## Notes
-
-- The `async` and `p-limit` libraries are used to manage the rate limits imposed by the free Infura API key. These libraries ensure that the number of concurrent requests does not exceed Infura's limitations.
-
-## License
-
-The project is licensed under the [MIT License](LICENSE).
-
----
-
-**Author**: Angel Stoyanov
+Recovery metrics and block-processing metrics are kept in memory and reset when the process restarts.
