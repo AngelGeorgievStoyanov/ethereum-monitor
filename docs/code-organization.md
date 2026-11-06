@@ -1,6 +1,6 @@
 # Code Organization Conventions
 
-> **Project scope:** These are lightweight project guidelines for a single-network EVM blockchain monitoring system, not a claim that every existing module already follows every rule. The current codebase contains some existing deviations (including services that call repository functions directly). Treat the guidelines as the intended direction for future changes and identify existing deviations explicitly during reviews. Do not add layers or abstractions solely to satisfy the document when they do not provide practical value. For a substantially larger system or production deployment, the architecture must be redesigned and the main responsibilities must be separated into independent services that can be scaled independently.
+> **Project scope:** These are project guidelines for a lightweight EVM blockchain monitoring system. Each running application instance is dedicated to exactly one EVM network and its own database. Never combine blocks, transactions, checkpoints, filters, metrics, or other scanner state from different networks in one instance or database. To monitor another EVM network, deploy a separate instance with its own network-specific RPC endpoints and database identity. RPC endpoints configured for one instance must all refer to that same network. The codebase has existing deviations from these guidelines; identify them explicitly during reviews. Do not add layers or abstractions solely to satisfy this document when they provide no practical value. For a substantially larger system or production deployment, redesign the architecture and separate responsibilities into independently scalable services.
 
 
 ## Related development documents
@@ -10,6 +10,14 @@ Use these documents together:
 - [Development Guidelines](./development-guidelines.md) — coding principles, generic and loosely coupled design, dependencies, simplicity, errors, and code reviews.
 - [Performance Guidelines](./performance-guidelines.md) — evidence-based optimization, avoiding unnecessary DB/RPC work, caching, memory, batching, and correctness.
 - This document — module responsibilities, dependency direction, and approved scanner operation.
+
+## Network isolation
+
+- One running application instance monitors exactly one EVM network.
+- All configured RPC endpoints for that instance must refer to the same network.
+- Never mix data or scanner state from different networks in the same instance or database.
+- Use a separate application instance, RPC configuration, and database identity for each additional network.
+- `BLOCKCHAIN_NETWORK_AND_DATABASE_NAME` identifies the network-specific database and scanner state; it does not select or validate the RPC network by itself. Configure every RPC endpoint for the same intended network.
 
 ## 1. Controllers
 
