@@ -72,9 +72,11 @@ let rpcEventsStartIndex = 0;
 const rpcConcurrencySamples: Array<{ timestampMs: number; activeRequests: number }> = [
     { timestampMs: startedAtMs, activeRequests: 0 },
 ];
-const fetchConcurrencySamples: Array<{ timestampMs: number; activeFetches: number; availableSlots: number }> = [
-    { timestampMs: startedAtMs, activeFetches: 0, availableSlots: 0 },
-];
+const fetchConcurrencySamples: Array<{
+    timestampMs: number;
+    activeFetches: number;
+    availableSlots: number;
+}> = [{ timestampMs: startedAtMs, activeFetches: 0, availableSlots: 0 }];
 let activeBlockRpcRequests = 0;
 const catchUpSessions: Array<Record<string, unknown> & { startedAtMs: number }> = [];
 const batchSamples: Array<Record<string, unknown> & { timestampMs: number }> = [];
@@ -360,7 +362,8 @@ function trimSamples(now: number): void {
     while (
         fetchConcurrencySamples.length > 1 &&
         now - fetchConcurrencySamples[1].timestampMs > METRICS_RETENTION_MS
-    ) fetchConcurrencySamples.shift();
+    )
+        fetchConcurrencySamples.shift();
     while (
         rpcConcurrencySamples.length > 1 &&
         now - rpcConcurrencySamples[1].timestampMs > METRICS_RETENTION_MS
@@ -457,8 +460,11 @@ function getRpcSummary(now: number): RpcSummary {
     if (
         rpcSummaryCache &&
         now - rpcSummaryCalculatedAt <
-            Math.min(Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) ||
-                METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_PUBLISH_INTERVAL_MS)
+            Math.min(
+                Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) ||
+                    METRICS_ANALYTICS_REFRESH_INTERVAL_MS,
+                METRICS_PUBLISH_INTERVAL_MS,
+            )
     ) {
         return rpcSummaryCache;
     }
@@ -1259,13 +1265,20 @@ function buildScannerAnalytics(
         (sample) => sample.timestampMs >= now - METRICS_RECENT_RATE_WINDOW_MS,
     );
     const recentNoFetchDurationMs = recentBatches.reduce(
-        (total, sample) => total + Number(sample.noFetchDurationMs ??
-            Number(sample.processingStageDurationMs ?? 0) + Number(sample.persistenceStageDurationMs ?? 0)), 0,
+        (total, sample) =>
+            total +
+            Number(
+                sample.noFetchDurationMs ??
+                    Number(sample.processingStageDurationMs ?? 0) +
+                        Number(sample.persistenceStageDurationMs ?? 0),
+            ),
+        0,
     );
     const recentRpcConcurrency = getRecentRpcConcurrency(now);
     const recentFetchConcurrency = getRecentFetchConcurrency(now);
     const averageNoFetchDurationPerCompletedBatchLast60Seconds = recentBatches.length
-        ? Number((recentNoFetchDurationMs / recentBatches.length).toFixed(1)) : null;
+        ? Number((recentNoFetchDurationMs / recentBatches.length).toFixed(1))
+        : null;
     const batchTotals = selectedBatches.reduce(
         (totals, sample) => {
             const blocks = Number(sample.blocks ?? 0);
@@ -1313,10 +1326,14 @@ function buildScannerAnalytics(
     const sumBucketMetric = (key: keyof MinuteMetricBucket): number =>
         selectedMinuteBuckets.reduce((total, bucket) => total + Number(bucket[key] ?? 0), 0);
     const windowSeconds = Math.max(1, availableWindowMs / 1000);
-    const selectedBlockSamples = blockSamples.slice(blockSamplesStartIndex)
+    const selectedBlockSamples = blockSamples
+        .slice(blockSamplesStartIndex)
         .filter((sample) => sample.timestampMs >= since && sample.timestampMs <= now);
     const processedBlocks = selectedBlockSamples.length;
-    const processedTransactions = selectedBlockSamples.reduce((total, sample) => total + Number(sample.transactionCount ?? 0), 0);
+    const processedTransactions = selectedBlockSamples.reduce(
+        (total, sample) => total + Number(sample.transactionCount ?? 0),
+        0,
+    );
     const rpcRequests = sumBucketMetric('rpcRequests');
     const rpcFailures = sumBucketMetric('rpcFailures');
     const logicalRpcOperations = sumBucketMetric('logicalRpcOperations');
@@ -1447,18 +1464,24 @@ function buildScannerAnalytics(
         processing: {
             processedBlocksInSelectedWindow: processedBlocks,
             processedTransactionsInSelectedWindow: processedTransactions,
-            averageBlocksPerSecondInSelectedWindow: Number((processedBlocks / windowSeconds).toFixed(2)),
+            averageBlocksPerSecondInSelectedWindow: Number(
+                (processedBlocks / windowSeconds).toFixed(2),
+            ),
             blocksPerSecondLast60Seconds: Number(
                 (recentRateSummary.count / recentRateWindowSeconds).toFixed(2),
             ),
             transactionsPerSecondLast60Seconds: Number(
                 (recentRateSummary.totals.transactionCount / recentRateWindowSeconds).toFixed(2),
             ),
-            averageTransactionsPerSecondInSelectedWindow: Number((processedTransactions / windowSeconds).toFixed(2)),
+            averageTransactionsPerSecondInSelectedWindow: Number(
+                (processedTransactions / windowSeconds).toFixed(2),
+            ),
             averageTransactionsPerBlockInSelectedWindow: batchTotals.blocks
                 ? Number((batchTotals.transactions / batchTotals.blocks).toFixed(2))
                 : null,
-            totalBatchElapsedDurationMsInSelectedWindow: Number(batchTotals.activeDurationMs.toFixed(1)),
+            totalBatchElapsedDurationMsInSelectedWindow: Number(
+                batchTotals.activeDurationMs.toFixed(1),
+            ),
             blocksPerSecondDuringBatchExecutionInSelectedWindow:
                 batchTotals.activeDurationMs > 0
                     ? Number(
@@ -1484,7 +1507,9 @@ function buildScannerAnalytics(
             averageBlocksPerBatchInSelectedWindow: selectedBatches.length
                 ? Number((batchTotals.blocks / selectedBatches.length).toFixed(2))
                 : 0,
-            minBlocksPerBatchInSelectedWindow: selectedBatches.length ? batchTotals.minBlocksPerBatch : 0,
+            minBlocksPerBatchInSelectedWindow: selectedBatches.length
+                ? batchTotals.minBlocksPerBatch
+                : 0,
             maxBlocksPerBatchInSelectedWindow: batchTotals.maxBlocksPerBatch,
             batchSizeDistributionInSelectedWindow: batchTotals.batchSizeDistribution,
             averageBatchElapsedDurationMsInSelectedWindow: selectedBatches.length
@@ -1518,12 +1543,22 @@ function buildScannerAnalytics(
             maxBatchConcurrentFetchesInSelectedWindow: batchTotals.maxConcurrentFetches,
             maxBatchConcurrentProcessingInSelectedWindow: batchTotals.maxConcurrentProcessing,
             activeFetchesNow: recentFetchConcurrency.activeFetchesNow,
-            timeWeightedAverageFetchConcurrencyLast60Seconds: recentFetchConcurrency.timeWeightedAverageFetchConcurrencyLast60Seconds,
-            maxConcurrentFetchesLast60Seconds: recentFetchConcurrency.maxConcurrentFetchesLast60Seconds,
-            fetchSlotUtilizationPercentLast60Seconds: recentFetchConcurrency.fetchSlotUtilizationPercentLast60Seconds,
+            timeWeightedAverageFetchConcurrencyLast60Seconds:
+                recentFetchConcurrency.timeWeightedAverageFetchConcurrencyLast60Seconds,
+            maxConcurrentFetchesLast60Seconds:
+                recentFetchConcurrency.maxConcurrentFetchesLast60Seconds,
+            fetchSlotUtilizationPercentLast60Seconds:
+                recentFetchConcurrency.fetchSlotUtilizationPercentLast60Seconds,
             averageNoFetchDurationPerCompletedBatchLast60Seconds,
             averageBlockDurationMsInSelectedWindow: processedBlocks
-                ? Number((selectedBlockSamples.reduce((total, sample) => total + Number(sample.blockDurationMs ?? 0), 0) / processedBlocks).toFixed(1))
+                ? Number(
+                      (
+                          selectedBlockSamples.reduce(
+                              (total, sample) => total + Number(sample.blockDurationMs ?? 0),
+                              0,
+                          ) / processedBlocks
+                      ).toFixed(1),
+                  )
                 : null,
             averageFilterEvaluationDurationMsInSelectedWindow: sumBucketMetric('filterEvaluations')
                 ? Number(
@@ -1534,7 +1569,15 @@ function buildScannerAnalytics(
                   )
                 : null,
             averageDatabaseBatchWriteDurationMsInSelectedWindow: processedBlocks
-                ? Number((selectedBlockSamples.reduce((total, sample) => total + Number(sample.databaseWriteDurationMs ?? 0), 0) / processedBlocks).toFixed(1))
+                ? Number(
+                      (
+                          selectedBlockSamples.reduce(
+                              (total, sample) =>
+                                  total + Number(sample.databaseWriteDurationMs ?? 0),
+                              0,
+                          ) / processedBlocks
+                      ).toFixed(1),
+                  )
                 : null,
         },
         catchUp: {
@@ -1550,7 +1593,9 @@ function buildScannerAnalytics(
             lagAtLast60SecondsWindowStart: recentLagWindow.start
                 ? Number(recentLagWindow.start.lagBlocks)
                 : null,
-            lagAtLast60SecondsWindowEnd: recentLagWindow.end ? Number(recentLagWindow.end.lagBlocks) : null,
+            lagAtLast60SecondsWindowEnd: recentLagWindow.end
+                ? Number(recentLagWindow.end.lagBlocks)
+                : null,
             measurementDurationMsLast60Seconds: recentLagWindow.durationMs,
         },
         rpc: {
@@ -1565,7 +1610,15 @@ function buildScannerAnalytics(
             otherErrors: sumBucketMetric('rpcOtherErrors'),
             retryableFailures: sumBucketMetric('rpcRetryableFailures'),
             averageLatencyMsInSelectedWindow: selectedRpcDurationCount
-                ? Number((sortedRpcDurations.reduce((total, sample) => total + (sample.timestampMs >= since ? sample.durationMs : 0), 0) / selectedRpcDurationCount).toFixed(1))
+                ? Number(
+                      (
+                          sortedRpcDurations.reduce(
+                              (total, sample) =>
+                                  total + (sample.timestampMs >= since ? sample.durationMs : 0),
+                              0,
+                          ) / selectedRpcDurationCount
+                      ).toFixed(1),
+                  )
                 : null,
             latencyP95MsInSelectedWindow: windowPercentile(0.95),
             methods: Object.entries(windowRpcMethods).map(([method, metric]) => ({
@@ -1680,8 +1733,11 @@ export function getScannerAnalytics(
     if (
         scannerAnalyticsCache?.windowLabel === windowLabel &&
         now - scannerAnalyticsCache.generatedAtMs <
-            Math.min(Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) ||
-                METRICS_ANALYTICS_REFRESH_INTERVAL_MS, METRICS_PUBLISH_INTERVAL_MS)
+            Math.min(
+                Number(getDynamicConfigService().getDynamicSettings().analyticsRefreshMs) ||
+                    METRICS_ANALYTICS_REFRESH_INTERVAL_MS,
+                METRICS_PUBLISH_INTERVAL_MS,
+            )
     ) {
         return scannerAnalyticsCache.result;
     }
@@ -1822,9 +1878,14 @@ function getRecentRpcConcurrency(now: number) {
 }
 
 export function recordFetchConcurrencySample(activeFetches: number, availableSlots: number): void {
-    const sample = { timestampMs: Date.now(), activeFetches: Math.max(0, activeFetches), availableSlots: Math.max(0, availableSlots) };
+    const sample = {
+        timestampMs: Date.now(),
+        activeFetches: Math.max(0, activeFetches),
+        availableSlots: Math.max(0, availableSlots),
+    };
     const previous = fetchConcurrencySamples[fetchConcurrencySamples.length - 1];
-    if (previous?.timestampMs === sample.timestampMs) fetchConcurrencySamples[fetchConcurrencySamples.length - 1] = sample;
+    if (previous?.timestampMs === sample.timestampMs)
+        fetchConcurrencySamples[fetchConcurrencySamples.length - 1] = sample;
     else fetchConcurrencySamples.push(sample);
 }
 function getRecentFetchConcurrency(now: number) {
@@ -1836,7 +1897,10 @@ function getRecentFetchConcurrency(now: number) {
     }
     let active = startIndex >= 0 ? fetchConcurrencySamples[startIndex].activeFetches : 0;
     let slots = startIndex >= 0 ? fetchConcurrencySamples[startIndex].availableSlots : 0;
-    let cursor = windowStart, activeFetchMs = 0, availableSlotMs = 0, peak = active;
+    let cursor = windowStart,
+        activeFetchMs = 0,
+        availableSlotMs = 0,
+        peak = active;
     for (let index = startIndex + 1; index < fetchConcurrencySamples.length; index += 1) {
         const sample = fetchConcurrencySamples[index];
         if (sample.timestampMs > now) break;
@@ -1853,10 +1917,16 @@ function getRecentFetchConcurrency(now: number) {
     availableSlotMs += slots * elapsed;
     const durationMs = Math.max(1, now - windowStart);
     return {
-        activeFetchesNow: fetchConcurrencySamples[fetchConcurrencySamples.length - 1]?.activeFetches ?? 0,
-        timeWeightedAverageFetchConcurrencyLast60Seconds: Number((activeFetchMs / durationMs).toFixed(2)),
+        activeFetchesNow:
+            fetchConcurrencySamples[fetchConcurrencySamples.length - 1]?.activeFetches ?? 0,
+        timeWeightedAverageFetchConcurrencyLast60Seconds: Number(
+            (activeFetchMs / durationMs).toFixed(2),
+        ),
         maxConcurrentFetchesLast60Seconds: peak,
-        fetchSlotUtilizationPercentLast60Seconds: availableSlotMs > 0 ? Number(((activeFetchMs / availableSlotMs) * 100).toFixed(1)) : null,
+        fetchSlotUtilizationPercentLast60Seconds:
+            availableSlotMs > 0
+                ? Number(((activeFetchMs / availableSlotMs) * 100).toFixed(1))
+                : null,
     };
 }
 function recordRpcOperation(input: RpcOperationMetricEvent): void {
