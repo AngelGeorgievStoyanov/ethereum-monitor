@@ -38,11 +38,11 @@ export interface BlockProcessingMetrics extends BlockProcessingTotals {
     lastProcessedBlock: number | null;
     lastProcessedAt: string | null;
     lastBlockDurationMs: number | null;
-    blocksProcessedLastMinute: number;
-    blocksPerSecondLastMinute: number;
-    averageBlockDurationLastMinuteMs: number | null;
-    averageFetchDurationLastMinuteMs: number | null;
-    averageDatabaseWriteDurationLastMinuteMs: number | null;
+    blocksProcessedLast60Seconds: number;
+    blocksPerSecondLast60Seconds: number;
+    averageBlockDurationLast60SecondsMs: number | null;
+    averageFetchDurationLast60SecondsMs: number | null;
+    averageDatabaseWriteDurationLast60SecondsMs: number | null;
     recentBlocks: RecentBlockMetric[];
 }
 

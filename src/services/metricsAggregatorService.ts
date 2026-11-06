@@ -1782,7 +1782,7 @@ function recordDatabaseQuery(input: DatabaseMetricEvent): void {
 function recordRpcConcurrency(input: RpcConcurrencyMetricEvent): void {
     const now = Date.now();
     activeBlockRpcRequests = Math.max(0, activeBlockRpcRequests + input.delta);
-    rpcConcurrencySamples.push({ timestampMs: now, activeRpcRequestsNow: activeBlockRpcRequests });
+    rpcConcurrencySamples.push({ timestampMs: now, activeRequests: activeBlockRpcRequests });
     trimSamples(now);
     publish();
 }
