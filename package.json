@@ -1,7 +1,7 @@
 {
-    "name": "ethereum-monitor",
+    "name": "evm-monitor",
     "version": "1.0.0",
-    "description": "Ethereum mainnet native and ERC-20 transfer monitor",
+    "description": "EVM-compatible network native-asset and ERC-20 transfer monitor",
     "main": "build/index.js",
     "scripts": {
         "build": "npm run clean && tsc",
