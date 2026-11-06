@@ -1326,14 +1326,11 @@ function buildScannerAnalytics(
     const sumBucketMetric = (key: keyof MinuteMetricBucket): number =>
         selectedMinuteBuckets.reduce((total, bucket) => total + Number(bucket[key] ?? 0), 0);
     const windowSeconds = Math.max(1, availableWindowMs / 1000);
-    const selectedBlockSamples = blockSamples
-        .slice(blockSamplesStartIndex)
-        .filter((sample) => sample.timestampMs >= since && sample.timestampMs <= now);
-    const processedBlocks = selectedBlockSamples.length;
-    const processedTransactions = selectedBlockSamples.reduce(
-        (total, sample) => total + Number(sample.transactionCount ?? 0),
-        0,
-    );
+    const processedBlocks = sumBucketMetric('processedBlocks');
+    const processedTransactions = sumBucketMetric('processedTransactions');
+    const completedBatches = sumBucketMetric('processingBatches');
+    const totalBatchDurationMs = sumBucketMetric('batchDurationMsTotal');
+    const totalBatchWriteDurationMs = sumBucketMetric('databaseBatchWriteDurationMsTotal');
     const rpcRequests = sumBucketMetric('rpcRequests');
     const rpcFailures = sumBucketMetric('rpcFailures');
     const logicalRpcOperations = sumBucketMetric('logicalRpcOperations');
@@ -1476,44 +1473,35 @@ function buildScannerAnalytics(
             averageTransactionsPerSecondInSelectedWindow: Number(
                 (processedTransactions / windowSeconds).toFixed(2),
             ),
-            averageTransactionsPerBlockInSelectedWindow: batchTotals.blocks
-                ? Number((batchTotals.transactions / batchTotals.blocks).toFixed(2))
+            averageTransactionsPerBlockInSelectedWindow: processedBlocks
+                ? Number((processedTransactions / processedBlocks).toFixed(2))
                 : null,
-            totalBatchElapsedDurationMsInSelectedWindow: Number(
-                batchTotals.activeDurationMs.toFixed(1),
-            ),
+            totalBatchElapsedDurationMsInSelectedWindow: Number(totalBatchDurationMs.toFixed(1)),
             blocksPerSecondDuringBatchExecutionInSelectedWindow:
-                batchTotals.activeDurationMs > 0
-                    ? Number(
-                          ((batchTotals.blocks * 1000) / batchTotals.activeDurationMs).toFixed(2),
-                      )
+                totalBatchDurationMs > 0
+                    ? Number(((processedBlocks * 1000) / totalBatchDurationMs).toFixed(2))
                     : 0,
             transactionsPerSecondDuringBatchExecutionInSelectedWindow:
-                batchTotals.activeDurationMs > 0
-                    ? Number(
-                          (
-                              (batchTotals.transactions * 1000) /
-                              batchTotals.activeDurationMs
-                          ).toFixed(2),
-                      )
+                totalBatchDurationMs > 0
+                    ? Number(((processedTransactions * 1000) / totalBatchDurationMs).toFixed(2))
                     : 0,
-            averageBatchElapsedMsPerBlockInSelectedWindow: batchTotals.blocks
-                ? Number((batchTotals.activeDurationMs / batchTotals.blocks).toFixed(1))
+            averageBatchElapsedMsPerBlockInSelectedWindow: processedBlocks
+                ? Number((totalBatchDurationMs / processedBlocks).toFixed(1))
                 : null,
-            averageBatchElapsedMsPerTransactionInSelectedWindow: batchTotals.transactions
-                ? Number((batchTotals.activeDurationMs / batchTotals.transactions).toFixed(4))
+            averageBatchElapsedMsPerTransactionInSelectedWindow: processedTransactions
+                ? Number((totalBatchDurationMs / processedTransactions).toFixed(4))
                 : null,
-            completedBatchesInSelectedWindow: selectedBatches.length,
-            averageBlocksPerBatchInSelectedWindow: selectedBatches.length
-                ? Number((batchTotals.blocks / selectedBatches.length).toFixed(2))
+            completedBatchesInSelectedWindow: completedBatches,
+            averageBlocksPerBatchInSelectedWindow: completedBatches
+                ? Number((processedBlocks / completedBatches).toFixed(2))
                 : 0,
             minBlocksPerBatchInSelectedWindow: selectedBatches.length
                 ? batchTotals.minBlocksPerBatch
                 : 0,
             maxBlocksPerBatchInSelectedWindow: batchTotals.maxBlocksPerBatch,
             batchSizeDistributionInSelectedWindow: batchTotals.batchSizeDistribution,
-            averageBatchElapsedDurationMsInSelectedWindow: selectedBatches.length
-                ? Number((batchTotals.activeDurationMs / selectedBatches.length).toFixed(1))
+            averageBatchElapsedDurationMsInSelectedWindow: completedBatches
+                ? Number((totalBatchDurationMs / completedBatches).toFixed(1))
                 : null,
             averageFetchStageDurationMsInSelectedWindow: selectedBatches.length
                 ? Number((batchTotals.fetchStageDurationMs / selectedBatches.length).toFixed(1))
@@ -1551,14 +1539,7 @@ function buildScannerAnalytics(
                 recentFetchConcurrency.fetchSlotUtilizationPercentLast60Seconds,
             averageNoFetchDurationPerCompletedBatchLast60Seconds,
             averageBlockDurationMsInSelectedWindow: processedBlocks
-                ? Number(
-                      (
-                          selectedBlockSamples.reduce(
-                              (total, sample) => total + Number(sample.blockDurationMs ?? 0),
-                              0,
-                          ) / processedBlocks
-                      ).toFixed(1),
-                  )
+                ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
                 : null,
             averageFilterEvaluationDurationMsInSelectedWindow: sumBucketMetric('filterEvaluations')
                 ? Number(
@@ -1569,15 +1550,7 @@ function buildScannerAnalytics(
                   )
                 : null,
             averageDatabaseBatchWriteDurationMsInSelectedWindow: processedBlocks
-                ? Number(
-                      (
-                          selectedBlockSamples.reduce(
-                              (total, sample) =>
-                                  total + Number(sample.databaseWriteDurationMs ?? 0),
-                              0,
-                          ) / processedBlocks
-                      ).toFixed(1),
-                  )
+                ? Number((totalBatchWriteDurationMs / processedBlocks).toFixed(1))
                 : null,
         },
         catchUp: {
@@ -1609,16 +1582,8 @@ function buildScannerAnalytics(
             jsonRpcErrors: sumBucketMetric('rpcJsonRpcErrors'),
             otherErrors: sumBucketMetric('rpcOtherErrors'),
             retryableFailures: sumBucketMetric('rpcRetryableFailures'),
-            averageLatencyMsInSelectedWindow: selectedRpcDurationCount
-                ? Number(
-                      (
-                          sortedRpcDurations.reduce(
-                              (total, sample) =>
-                                  total + (sample.timestampMs >= since ? sample.durationMs : 0),
-                              0,
-                          ) / selectedRpcDurationCount
-                      ).toFixed(1),
-                  )
+            averageLatencyMsInSelectedWindow: rpcRequests
+                ? Number((sumBucketMetric('rpcDurationMsTotal') / rpcRequests).toFixed(1))
                 : null,
             latencyP95MsInSelectedWindow: windowPercentile(0.95),
             methods: Object.entries(windowRpcMethods).map(([method, metric]) => ({
@@ -1656,13 +1621,13 @@ function buildScannerAnalytics(
                       ).toFixed(1),
                   )
                 : null,
-            batchWrites: selectedBatches.length,
-            totalBatchWriteDurationMs: Number(batchTotals.databaseWriteDurationMs.toFixed(1)),
-            averageBatchWriteDurationMsInSelectedWindow: selectedBatches.length
-                ? Number((batchTotals.databaseWriteDurationMs / selectedBatches.length).toFixed(1))
+            batchWrites: completedBatches,
+            totalBatchWriteDurationMs: Number(totalBatchWriteDurationMs.toFixed(1)),
+            averageBatchWriteDurationMsInSelectedWindow: completedBatches
+                ? Number((totalBatchWriteDurationMs / completedBatches).toFixed(1))
                 : null,
-            averageBatchWriteDurationMsPerBlockInSelectedWindow: batchTotals.blocks
-                ? Number((batchTotals.databaseWriteDurationMs / batchTotals.blocks).toFixed(1))
+            averageBatchWriteDurationMsPerBlockInSelectedWindow: processedBlocks
+                ? Number((totalBatchWriteDurationMs / processedBlocks).toFixed(1))
                 : null,
             byOperation: windowDatabaseByOperation,
         },
@@ -1682,12 +1647,24 @@ function buildScannerAnalytics(
         },
     };
 
+    const sampleWindowTruncated =
+        (rpcEvents.length - rpcEventsStartIndex >= METRICS_SAMPLE_LIMITS.rpcEvents &&
+            rpcEvents[rpcEventsStartIndex]?.timestampMs > since) ||
+        (lagSamples.length - lagSamplesStartIndex >= METRICS_SAMPLE_LIMITS.lag &&
+            lagSamples[lagSamplesStartIndex]?.timestampMs > since) ||
+        (batchSamples.length >= METRICS_SAMPLE_LIMITS.batches &&
+            batchSamples[0]?.timestampMs > since) ||
+        (minuteBuckets.length >= METRICS_MAX_BUCKETS && minuteBuckets[0]?.timestampMs > since);
+
     return {
         generatedAt: new Date(now).toISOString(),
         window: windowLabel,
         requestedWindowMs,
         availableWindowMs,
-        windowCoverage: now - startedAtMs >= requestedWindowMs ? 'complete' : 'partial',
+        windowCoverage:
+            now - startedAtMs >= requestedWindowMs && !sampleWindowTruncated
+                ? 'complete'
+                : 'partial',
         historyStartedAt: startedAt,
         availableWindows: METRICS_TIME_WINDOWS.map(({ value, label }) => ({ value, label })),
         current,

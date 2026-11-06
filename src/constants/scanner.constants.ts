@@ -1,12 +1,14 @@
 import { env } from '../config/env';
+export {
+    MAX_BLOCKS_PER_FINALIZED_CATCHUP,
+    SCANNER_MAX_PARALLEL_BLOCKS,
+    SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS,
+    SCANNER_POLL_INTERVAL_MS,
+} from './scanner-settings.constants';
 
 export const SCANNER_ID = env.blockchainNetworkAndDatabaseName;
-export const SCANNER_POLL_INTERVAL_MS = 4000;
 export const SCANNER_START_RETRY_BASE_DELAY_MS = 1000;
 export const SCANNER_START_RETRY_MAX_DELAY_MS = 30000;
-export const SCANNER_PARALLEL_PROCESSING_LAG_BLOCKS = 100;
-export const MAX_BLOCKS_PER_FINALIZED_CATCHUP = 30;
-export const SCANNER_MAX_PARALLEL_BLOCKS = 3;
 
 export const CONSENSUS_RETRY_INTERVAL_MS = 30000;
 export const CONSENSUS_MAX_RETRIES = 10;

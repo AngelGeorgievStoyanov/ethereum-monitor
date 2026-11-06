@@ -10,11 +10,15 @@ import {
     stopScannerControlRefresh,
 } from './services/scannerControlService';
 import { formatError } from './utils/formatError';
+import { runNetworkCheck } from './checks/networkCheck';
+import { runRpcCompatibilityCheck } from './checks/rpcCompatibilityCheck';
 
 export async function startApplication(): Promise<void> {
     let dynamicConfigService: ReturnType<typeof getDynamicConfigService> | undefined;
 
     try {
+        await runNetworkCheck();
+        await runRpcCompatibilityCheck();
         await initializeDatabase();
 
         dynamicConfigService = getDynamicConfigService();

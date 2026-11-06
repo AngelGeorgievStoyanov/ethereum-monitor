@@ -12,13 +12,24 @@ function parseOptionalBlock(name: string): number | undefined {
     return blockNumber;
 }
 
-const rpcUrls = Object.entries(process.env)
+const rpcEndpoints = Object.entries(process.env)
     .flatMap(([name, value]) => {
         const match = /^RPC_URL_(\d+)$/.exec(name);
-        return match && value?.trim() ? [{ index: Number(match[1]), url: value.trim() }] : [];
+        if (!match || !value?.trim()) return [];
+        return [{ name, index: Number(match[1]), url: value.trim() }];
     })
-    .sort((left, right) => left.index - right.index)
-    .map((item) => item.url);
+    .sort((left, right) => left.index - right.index);
+
+const rpcUrls = rpcEndpoints.map((endpoint) => endpoint.url);
+
+const chainIdValue = process.env.CHAIN_ID?.trim();
+if (!chainIdValue || !/^(?:\d+|0x[0-9a-f]+)$/i.test(chainIdValue)) {
+    throw new Error('CHAIN_ID must be configured as a decimal or hexadecimal EVM chain ID');
+}
+const chainId = BigInt(chainIdValue);
+if (chainId <= 0n) {
+    throw new Error('CHAIN_ID must be greater than zero');
+}
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) {
@@ -39,7 +50,9 @@ if (!/^[a-zA-Z0-9_-]{1,63}$/.test(blockchainNetworkAndDatabaseName)) {
 
 export const env = {
     blockchainNetworkAndDatabaseName,
+    chainId,
     databaseUrl,
+    rpcEndpoints,
     rpcUrls,
     startBlock: parseOptionalBlock('START_BLOCK'),
 };

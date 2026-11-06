@@ -48,6 +48,8 @@ History is bounded in memory using the retention settings in `src/constants/scan
 
 - Metric samples are retained for up to 3 hours, subject to per-category memory-safety limits.
 - Sample limits are capacity safeguards, not assumptions about how many blocks a network produces.
+- Long-window block/transaction totals, block duration averages, RPC request totals/average latency, and batch totals use retained minute aggregates rather than capped per-operation samples.
+- Raw RPC latency percentiles, lag-reduction measurements, and detailed batch-stage statistics still depend on bounded samples. If a sample limit has evicted part of the requested window, `windowCoverage` is reported as `partial` even when the process has been running longer than the requested duration.
 - Analytics exposes two windows: `1h` and `3h`.
 - Network-independent one-minute buckets retain throughput, lag, RPC failure/latency, database query, filter evaluation, and batch-timing aggregates. Charts use the selected window's buckets rather than a fixed number of block samples.
 - Each analytics response reports requested duration, available duration, history start time, and whether the requested window is complete or partial.

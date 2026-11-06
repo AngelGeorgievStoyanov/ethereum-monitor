@@ -20,6 +20,7 @@ Requirements: Node.js 24, npm, PostgreSQL, and an RPC endpoint for the network y
 2. Create a .env file:
 
     BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-a
+    CHAIN_ID=YOUR_NETWORK_CHAIN_ID
     DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432
     RPC_URL_1=https://YOUR_RPC_PROVIDER_ENDPOINT
 
@@ -43,6 +44,12 @@ To monitor a different EVM network, use a separate application instance and data
     BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-b
 
 The application then creates and uses network-b if it does not already exist, and uses network-b as SCANNER_ID. Configure RPC_URL_1, and any additional RPC URLs, for that same network. Changing the name does not automatically change the RPC endpoint or migrate/copy data from the previous database.
+
+CHAIN_ID is required and must be the decimal or 0x-prefixed hexadecimal chain ID of the EVM network. Before creating or connecting to the database, startup checks every configured RPC endpoint against this value. All endpoints must report the same expected chain ID.
+
+Startup also checks that every endpoint returns a finalized block and supports eth_getBlockReceipts. An endpoint that does not support either required capability is reported by its RPC_URL_N setting and prevents startup; configure compatible endpoints for the selected network.
+
+When an existing checkpoint has a corresponding canonical block record, startup compares its stored hash with the block returned by the configured RPC network. A mismatch stops startup instead of continuing with a checkpoint from a different chain.
 
 The PostgreSQL user in DATABASE_URL must be allowed to connect to the postgres administrative database and create databases. The name setting must contain 1-63 letters, numbers, hyphens, or underscores.
 
@@ -137,6 +144,7 @@ The dashboard is served separately at GET /dashboard.
 ## Configuration
 
 - BLOCKCHAIN_NETWORK_AND_DATABASE_NAME: required; database name and scanner ID.
+- CHAIN_ID: required EVM chain ID, in decimal or 0x-prefixed hexadecimal form.
 - DATABASE_URL: PostgreSQL server connection URL. Do not include a database name in the path.
 - RPC_URL_1: required RPC endpoint for the configured network.
 - RPC_URL_2, RPC_URL_3, etc.: optional fallback and verification endpoints for the same network.

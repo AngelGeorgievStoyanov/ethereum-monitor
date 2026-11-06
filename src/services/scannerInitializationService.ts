@@ -1,5 +1,6 @@
 import type { ScannerState } from '../types/scanner-state.types';
 import { createScannerState, findScannerState } from '../repositories/scannerStateRepository';
+import { findCanonicalBlockIdentity } from '../repositories/blockRepository';
 import { env } from '../config/env';
 import { SCANNER_ID } from '../constants/scanner.constants';
 import { evmRpcClient } from './evmBlockDataService';
@@ -13,6 +14,24 @@ export class UnsafeScannerStartError extends Error {
 
 export async function initializeScannerState(): Promise<ScannerState> {
     let state = await findScannerState(SCANNER_ID);
+
+    if (state && state.lastProcessedBlock >= 0) {
+        const storedBlock = await findCanonicalBlockIdentity(state.lastProcessedBlock);
+        if (storedBlock) {
+            const rpcBlock = await evmRpcClient.getBlock(state.lastProcessedBlock);
+            if (
+                !rpcBlock?.hash ||
+                rpcBlock.hash.toLowerCase() !== storedBlock.blockHash.toLowerCase()
+            ) {
+                throw new UnsafeScannerStartError(
+                    `Stored checkpoint block ${state.lastProcessedBlock} does not match the configured RPC network. Database "${SCANNER_ID}" may belong to another network.`,
+                );
+            }
+            console.log(
+                `[Scanner] Existing checkpoint verified against RPC at block ${state.lastProcessedBlock}`,
+            );
+        }
+    }
 
     if (!state) {
         const finalized = await evmRpcClient.getBlock('finalized');
