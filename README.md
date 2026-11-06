@@ -38,7 +38,7 @@ For example, with:
 
 the application creates and uses the network-a database, and sets SCANNER_ID to network-a.
 
-To use a separate database for Sepolia, change the name to:
+To monitor a different EVM network, use a separate application instance and database identity. Change the name to a unique value for that network, for example:
 
     BLOCKCHAIN_NETWORK_AND_DATABASE_NAME=network-b
 
