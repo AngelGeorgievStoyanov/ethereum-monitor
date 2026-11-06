@@ -31,7 +31,6 @@ export interface ScannerAnalyticsWindowMetrics {
         maxConcurrentFetchesLast60Seconds: number;
         fetchSlotUtilizationPercentLast60Seconds: number | null;
         averageNoFetchDurationPerCompletedBatchLast60Seconds: number | null;
-        timeWeightedAverageFetchConcurrencyLast60Seconds: number | null;
         averageBlockDurationMsInSelectedWindow: number | null;
         averageFilterEvaluationDurationMsInSelectedWindow: number | null;
         averageDatabaseBatchWriteDurationMsInSelectedWindow: number | null;
@@ -90,8 +89,8 @@ export interface ScannerAnalyticsWindowMetrics {
         /** Explicitly timed persistence transactions for successfully processed batches. */
         batchWrites: number;
         totalBatchWriteDurationMs: number;
-        averageBatchWriteDurationMs: number | null;
-        averageBatchWriteDurationMsPerBlock: number | null;
+        averageBatchWriteDurationMsInSelectedWindow: number | null;
+        averageBatchWriteDurationMsPerBlockInSelectedWindow: number | null;
         byOperation: Record<
             string,
             { count: number; totalDurationMs: number; maxDurationMs: number }

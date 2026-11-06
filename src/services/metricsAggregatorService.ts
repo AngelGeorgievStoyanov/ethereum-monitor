@@ -825,7 +825,7 @@ function calculateCurrentMetrics() {
         filters: {
             ...filterMetrics,
             averageDurationMs: filterMetrics.evaluations
-                ? Number((filterMetrics.totalDurationMs / filterMetrics.evaluations).toFixed(2))
+                ? Number((filterMetrics.totalDurationMs / filterMetrics.evaluations).toFixed(4))
                 : null,
         },
         database: {
@@ -1523,7 +1523,7 @@ function buildScannerAnalytics(
             fetchSlotUtilizationPercentLast60Seconds: recentFetchConcurrency.fetchSlotUtilizationPercentLast60Seconds,
             averageNoFetchDurationPerCompletedBatchLast60Seconds,
             averageBlockDurationMsInSelectedWindow: processedBlocks
-                ? Number((sumBucketMetric('blockDurationMsTotal') / processedBlocks).toFixed(1))
+                ? Number((selectedBlockSamples.reduce((total, sample) => total + Number(sample.blockDurationMs ?? 0), 0) / processedBlocks).toFixed(1))
                 : null,
             averageFilterEvaluationDurationMsInSelectedWindow: sumBucketMetric('filterEvaluations')
                 ? Number(
@@ -1534,11 +1534,7 @@ function buildScannerAnalytics(
                   )
                 : null,
             averageDatabaseBatchWriteDurationMsInSelectedWindow: processedBlocks
-                ? Number(
-                      (
-                          sumBucketMetric('databaseBatchWriteDurationMsTotal') / processedBlocks
-                      ).toFixed(1),
-                  )
+                ? Number((selectedBlockSamples.reduce((total, sample) => total + Number(sample.databaseWriteDurationMs ?? 0), 0) / processedBlocks).toFixed(1))
                 : null,
         },
         catchUp: {
@@ -1568,8 +1564,8 @@ function buildScannerAnalytics(
             jsonRpcErrors: sumBucketMetric('rpcJsonRpcErrors'),
             otherErrors: sumBucketMetric('rpcOtherErrors'),
             retryableFailures: sumBucketMetric('rpcRetryableFailures'),
-            averageLatencyMsInSelectedWindow: rpcRequests
-                ? Number((sumBucketMetric('rpcDurationMsTotal') / rpcRequests).toFixed(1))
+            averageLatencyMsInSelectedWindow: selectedRpcDurationCount
+                ? Number((sortedRpcDurations.reduce((total, sample) => total + (sample.timestampMs >= since ? sample.durationMs : 0), 0) / selectedRpcDurationCount).toFixed(1))
                 : null,
             latencyP95MsInSelectedWindow: windowPercentile(0.95),
             methods: Object.entries(windowRpcMethods).map(([method, metric]) => ({
@@ -1609,10 +1605,10 @@ function buildScannerAnalytics(
                 : null,
             batchWrites: selectedBatches.length,
             totalBatchWriteDurationMs: Number(batchTotals.databaseWriteDurationMs.toFixed(1)),
-            averageBatchWriteDurationMs: selectedBatches.length
+            averageBatchWriteDurationMsInSelectedWindow: selectedBatches.length
                 ? Number((batchTotals.databaseWriteDurationMs / selectedBatches.length).toFixed(1))
                 : null,
-            averageBatchWriteDurationMsPerBlock: batchTotals.blocks
+            averageBatchWriteDurationMsPerBlockInSelectedWindow: batchTotals.blocks
                 ? Number((batchTotals.databaseWriteDurationMs / batchTotals.blocks).toFixed(1))
                 : null,
             byOperation: windowDatabaseByOperation,
@@ -1626,7 +1622,7 @@ function buildScannerAnalytics(
                       (
                           sumBucketMetric('predicateDurationMsTotal') /
                           sumBucketMetric('filterEvaluations')
-                      ).toFixed(2),
+                      ).toFixed(4),
                   )
                 : null,
             byFilter: windowFiltersById,
